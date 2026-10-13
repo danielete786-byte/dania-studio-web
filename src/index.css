@@ -1,0 +1,16 @@
+@tailwind base; @tailwind components; @tailwind utilities;
+html { background:#fff; color:#0A1330; -webkit-font-smoothing:antialiased; }
+html.lenis, html.lenis body { height:auto; }
+.lenis.lenis-smooth { scroll-behavior:auto !important; }
+.gold-text { background:linear-gradient(100deg,#F2C94C 0%,#D4A537 45%,#B8862B 100%); -webkit-background-clip:text; background-clip:text; color:transparent; }
+.gold-bg { background:linear-gradient(100deg,#F2C94C 0%,#D4A537 45%,#B8862B 100%); }
+.h-display { font-weight:200; letter-spacing:-0.045em; line-height:0.98; }
+.kicker { font-size:12px; letter-spacing:.28em; text-transform:uppercase; font-weight:500; color:#B8862B; }
+.card { position:relative; overflow:hidden; border-radius:28px; background:#fafaf7; }
+.card::before { content:''; position:absolute; inset:0; pointer-events:none; opacity:0; transition:opacity .5s;
+  background:radial-gradient(380px circle at var(--mx,50%) var(--my,50%), rgba(242,201,76,.28), transparent 60%); }
+.card:hover::before { opacity:1; }
+.card::after { content:''; position:absolute; inset:0; border-radius:inherit; padding:1px; pointer-events:none;
+  background:radial-gradient(300px circle at var(--mx,50%) var(--my,50%), #D4A537, rgba(10,19,48,.07) 70%);
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite:xor; mask-composite:exclude; }
+@media (prefers-reduced-motion: reduce) { *{ animation:none!important; transition:none!important; } }
