@@ -21,11 +21,11 @@ type Props = z.infer<typeof gtaSchema>
 
 export const gtaDefaults: Props = {
   scenes: [
-    { seconds: 6, voice: 'audio/gta/vo1.wav', voiceSeconds: 4.96, caption: 'GTA 6 es el juego más nominado de The Game Awards. Te lo cuento en menos de un minuto.' },
-    { seconds: 7, voice: 'audio/gta/vo2.wav', voiceSeconds: 6.28, caption: 'Ocho nominaciones, entre ellas Juego del Año, y mejor actuación para Manni L. Pérez, que da vida a Lucía.' },
-    { seconds: 5, voice: 'audio/gta/vo3.wav', voiceSeconds: 4.09, caption: 'Y sale mañana, 19 de noviembre, en PlayStation 5 y Xbox Series.' },
-    { seconds: 5, voice: 'audio/gta/vo4.wav', voiceSeconds: 3.97, caption: 'En PC aún no hay fecha. La gala será el 10 de diciembre.' },
-    { seconds: 4, voice: 'audio/gta/vo5.wav', voiceSeconds: 2.6, caption: '¿Lo juegas el día uno? Cuéntamelo.' },
+    { seconds: 6, voice: 'audio/gta/vo1.wav', voiceSeconds: 5.08, caption: 'GTA 6 es el juego más nominado de The Game Awards. Te lo cuento en menos de un minuto.' },
+    { seconds: 7, voice: 'audio/gta/vo2.wav', voiceSeconds: 6.16, caption: 'Ocho nominaciones, entre ellas Juego del Año, y mejor actuación para Manni L. Pérez, que da vida a Lucía.' },
+    { seconds: 5.8, voice: 'audio/gta/vo3.wav', voiceSeconds: 5.16, caption: 'Y sale mañana, 19 de noviembre, en PlayStation 5 y Xbox Series.' },
+    { seconds: 5, voice: 'audio/gta/vo4.wav', voiceSeconds: 4.4, caption: 'En PC aún no hay fecha. La gala será el 10 de diciembre.' },
+    { seconds: 4.4, voice: 'audio/gta/vo5.wav', voiceSeconds: 3.48, caption: '¿Vas a jugarlo el día uno? ¡Cuéntamelo!' },
   ],
   nominations: 8,
   categories: ['🏆 Juego del Año', '🎬 Dirección', '📖 Narrativa', '🎨 Arte', '🎵 Música', '🔊 Audio', '🎭 Actuación', '💥 Acción/Aventura'],
@@ -261,16 +261,16 @@ export const GtaNominado: React.FC<Props> = (p) => {
             {i === 1 ? <S2 dur={d} p={p} /> : <S dur={d} p={p} />}
             <Caption text={p.scenes[i].caption} voiceFrames={Math.round(p.scenes[i].voiceSeconds * fps)} />
             <Sequence from={VOICE_DELAY}><Audio src={staticFile(p.scenes[i].voice)} volume={1} /></Sequence>
-            <Audio src={staticFile('sfx/whoosh.wav')} volume={0.55} />
-            <Audio src={staticFile('sfx/boom.wav')} volume={0.8} />
+            <Audio src={staticFile('sfx/whoosh.wav')} volume={0.22} />
+            <Audio src={staticFile('sfx/boom.wav')} volume={0.3} />
             {i === 1 && Array.from({ length: p.nominations }, (_, k) => (
-              <Sequence key={k} from={6 + Math.round(k * 4.5)} durationInFrames={5}><Audio src={staticFile('sfx/tick.wav')} volume={0.35} playbackRate={1 + k * 0.08} /></Sequence>
+              <Sequence key={k} from={6 + Math.round(k * 4.5)} durationInFrames={5}><Audio src={staticFile('sfx/tick.wav')} volume={0.12} playbackRate={1 + k * 0.08} /></Sequence>
             ))}
           </Sequence>
         )
       })}
-      <Sequence from={timeline[4].from - 22} durationInFrames={30}><Audio src={staticFile('sfx/riser.wav')} volume={0.3} /></Sequence>
-      <Audio src={staticFile('sfx/pad.wav')} volume={0.5} />
+      <Sequence from={timeline[4].from - 22} durationInFrames={30}><Audio src={staticFile('sfx/riser.wav')} volume={0.1} /></Sequence>
+      <Audio src={staticFile('sfx/pad.wav')} volume={(fr) => { let t = 0; for (const s of p.scenes) { const a = t + VOICE_DELAY, b = a + Math.round(s.voiceSeconds * fps); if (fr >= a - 6 && fr <= b + 6) return 0.05; t += Math.round(s.seconds * fps) } return 0.14 }} />
       <Floaters />
       <div style={{ position: 'absolute', top: 70, left: 0, right: 0, textAlign: 'center', transform: `translateY(${topIn}px)` }}>
         <span style={{ fontFamily: CAP_FONT, fontWeight: 800, fontSize: 44, color: '#fff', background: c.ink, border: `5px solid ${c.yellow}`, padding: '12px 34px', borderRadius: 999 }}>⏱️ TE LO CUENTO EN MENOS DE UN MINUTO</span>
