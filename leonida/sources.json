@@ -1,0 +1,13 @@
+{
+  "note": "Lista blanca de fuentes. La web solo enlaza noticias de estos dominios (y sus subdominios). Añadir un dominio nuevo es una decisión manual del dueño de la web.",
+  "newsDomains": [
+    "rockstargames.com", "take2games.com", "playstation.com", "xbox.com",
+    "ign.com", "eurogamer.net", "eurogamer.es", "gamespot.com", "polygon.com", "videogameschronicle.com",
+    "theverge.com", "kotaku.com", "pcgamer.com", "gamesradar.com", "techradar.com", "tomsguide.com",
+    "techpowerup.com", "tweaktown.com", "gamedaily.com", "gamesindustry.biz", "theguardian.com",
+    "bbc.com", "bbc.co.uk", "reuters.com", "bloomberg.com", "cbsnews.com", "yahoo.com", "cnbc.com",
+    "3djuegos.com", "vandal.elespanol.com", "meristation.as.com", "hobbyconsolas.com", "xataka.com",
+    "vidaextra.com", "elpais.com", "elmundo.es", "rtve.es"
+  ],
+  "videoChannel": "Rockstar Games"
+}
