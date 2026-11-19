@@ -1,0 +1,724 @@
+<title>Ombra Yogur de Café</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..800;1,6..96,400..700&family=Manrope:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/*
+  BRIEF · Ombra (marca ficticia), yogur fermentado en café, lujo. Público: foodies que pagan 10 € por un tarro.
+  Tesis: "el café se funde con la leche". Momento firma: shader a pantalla completa donde el espresso cae y se mezcla con la crema al hacer scroll (y se remueve con el ratón).
+  Materiales: °C, h, msnm, pH, lote, lacre, tarro de 140 g. Riesgo: un solo tema oscuro "espresso" alternando bandas de leche, display Bodoni gigante.
+  Layout: retícula de 12 columnas asimétrica; bandas a sangre espresso / leche; metadata en mono.
+*/
+:root{
+  --espresso:#120b08; --roast:#1f140e; --crema:#d39a5c; --milk:#f4ede2; --ink:#1a110c; --seal:#8f2a22;
+  --fg:#efe3d0; --muted:#a8927b; --line:#3a2a20; --ink-muted:#7a6452; --ink-line:#d9cbb8;
+  --display:"Bodoni Moda","Didot","Bodoni 72",Georgia,serif;
+  --body:"Manrope","Helvetica Neue",Arial,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+  --ease-out:cubic-bezier(.16,1,.3,1); --ease-inout:cubic-bezier(.65,0,.35,1);
+  --dur-s:.6s; --dur-m:1s;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--espresso);color:var(--fg);font:400 16px/1.6 var(--body);overflow-x:hidden;-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:60;background:var(--espresso)}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--crema);outline-offset:4px;border-radius:4px}
+::selection{background:var(--crema);color:var(--ink)}
+.wrap{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));max-width:1520px;margin:0 auto}
+.grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));column-gap:clamp(12px,2vw,28px)}
+.mono{font:500 12px/1.4 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+h1,h2,h3{font-family:var(--display);font-weight:500;margin:0;text-wrap:balance}
+em{font-style:italic;color:var(--crema)}
+.mask{display:inline-block;overflow:hidden;padding-bottom:.2em;margin-bottom:-.2em;vertical-align:top}
+.mask>span{display:inline-block}
+.band-milk{background:var(--milk);color:var(--ink)}
+.band-milk .mono{color:var(--ink-muted)}
+.band-milk em{color:#9c5f22}
+
+/* grain over everything */
+.grain{position:fixed;inset:-50%;z-index:80;pointer-events:none;opacity:.07;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");animation:grain 1s steps(6) infinite}
+@keyframes grain{0%{transform:translate(0,0)}20%{transform:translate(-3%,2%)}40%{transform:translate(2%,-4%)}60%{transform:translate(-4%,-2%)}80%{transform:translate(3%,4%)}100%{transform:translate(0,0)}}
+
+/* loader (only when JS+GSAP are running) */
+.loader{display:none}
+html.js .loader{display:flex;position:fixed;inset:0;z-index:100;background:var(--milk);color:var(--ink);flex-direction:column;justify-content:space-between;padding:max(24px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 28px max(16px,env(safe-area-inset-left,0px))}
+.loader .row{display:flex;justify-content:space-between;align-items:flex-end;gap:16px}
+.loader .mono{color:var(--ink-muted)}
+.loader-n{font:400 clamp(5rem,19vw,17rem)/.8 var(--display);letter-spacing:-.05em;font-variant-numeric:tabular-nums}
+.loader-n small{font:500 .22em var(--mono);letter-spacing:0;color:#9c5f22;vertical-align:top;margin-left:.2em}
+.loader-bar{height:2px;background:var(--ink-line);position:relative;overflow:hidden}
+.loader-bar i{position:absolute;inset:0;background:var(--ink);transform:scaleX(0);transform-origin:left}
+
+/* nav */
+.nav{position:fixed;top:env(safe-area-inset-top,0px);left:0;right:0;z-index:50;padding-block:18px;mix-blend-mode:difference;color:#fff}
+.nav .wrap{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.brand{font:600 21px/1 var(--display);letter-spacing:.34em;text-decoration:none}
+.nav ul{display:flex;gap:30px;list-style:none;margin:0;padding:0}
+.nav ul a{font:500 12px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;text-decoration:none;position:relative;display:inline-block;overflow:hidden;padding-bottom:4px}
+.nav ul a span{display:block;transition:transform var(--dur-s) var(--ease-out)}
+.nav ul a span+span{position:absolute;left:0;top:100%}
+.nav ul a:hover span{transform:translateY(-100%)}
+@media (max-width:760px){.nav ul{display:none}}
+.btn{display:inline-flex;align-items:center;gap:12px;font:600 14px/1 var(--body);padding:17px 28px;border-radius:999px;border:1px solid currentColor;background:transparent;color:inherit;cursor:pointer;text-decoration:none;position:relative;overflow:hidden;isolation:isolate}
+.btn::before{content:"";position:absolute;inset:0;background:currentColor;border-radius:inherit;transform:translateY(101%);transition:transform var(--dur-s) var(--ease-out);z-index:-1}
+.btn:hover::before{transform:none}
+.btn:hover .t{color:var(--espresso)}
+.btn .t{transition:color var(--dur-s) var(--ease-out)}
+.btn.solid{background:var(--crema);border-color:var(--crema);color:var(--ink)}
+.btn.solid::before{background:var(--milk)}
+.btn.solid:hover .t{color:var(--ink)}
+.nav .btn{padding:12px 20px;font-size:13px}
+.band-milk .btn:hover .t{color:var(--milk)}
+
+/* HERO · signature */
+.hero{position:relative;min-height:min(100svh,980px);display:flex;align-items:flex-end;overflow:hidden;isolation:isolate}
+.hero canvas{position:absolute;inset:0;width:100%;height:100%;z-index:-2;display:block;background:radial-gradient(70% 80% at 70% 45%,#f4ede2 0,#d39a5c 35%,#4a2a19 65%,#120b08)}
+.hero::after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(18,11,8,.92) 0,rgba(18,11,8,.55) 38%,rgba(18,11,8,0) 70%),linear-gradient(0deg,rgba(18,11,8,.85),rgba(18,11,8,0) 40%)}
+.hero .wrap{width:100%;padding-block:clamp(110px,14vw,150px) clamp(36px,5vw,64px)}
+.hero .meta{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:10px 32px;margin-bottom:clamp(18px,3vw,34px)}
+.hero h1{grid-column:1/9;font-size:clamp(3.2rem,9.4vw,10.5rem);line-height:.88;letter-spacing:-.05em}
+.hero h1 .it{font-style:italic;font-weight:400;color:var(--crema)}
+.hero .foot{grid-column:1/-1;display:flex;justify-content:space-between;align-items:flex-end;gap:28px;flex-wrap:wrap;margin-top:clamp(26px,4vw,48px)}
+.hero .lede{max-width:46ch;margin:0;color:#d8c8b2;font-size:clamp(1rem,1.2vw,1.15rem)}
+.hero .lede strong{color:var(--fg);font-weight:600}
+.hero .ctas{display:flex;gap:12px;flex-wrap:wrap}
+.stir{position:absolute;right:max(16px,env(safe-area-inset-right,0px));top:clamp(96px,12vw,130px);display:flex;align-items:center;gap:12px}
+.stir i{width:42px;height:42px;border-radius:50%;border:1px solid rgba(239,227,208,.5);display:grid;place-items:center}
+.stir i::after{content:"";width:6px;height:6px;border-radius:50%;background:var(--crema);animation:orbit 2.4s linear infinite}
+@keyframes orbit{from{transform:rotate(0) translateX(12px)}to{transform:rotate(360deg) translateX(12px)}}
+@media (pointer:coarse){.stir{display:none}}
+@media (max-width:900px){.hero h1{grid-column:1/-1}.hero::after{background:linear-gradient(0deg,rgba(18,11,8,.96) 0,rgba(18,11,8,.82) 50%,rgba(18,11,8,.25) 80%,rgba(18,11,8,0) 100%)}}
+.stir .mono{color:var(--fg);background:rgba(18,11,8,.55);padding:8px 12px;border-radius:999px;backdrop-filter:blur(6px)}
+
+/* marquee */
+.marquee{border-block:1px solid var(--line);overflow:hidden;padding-block:20px;white-space:nowrap}
+.marquee .row{display:inline-flex;gap:46px;font:italic 400 clamp(1.7rem,3.4vw,3.2rem)/1.1 var(--display);will-change:transform}
+.marquee .row span{display:inline-flex;align-items:center;gap:46px}
+.marquee .row span::after{content:"";width:11px;height:11px;border-radius:50%;background:var(--crema)}
+
+/* manifesto */
+.manifesto{padding-block:clamp(100px,13vw,200px)}
+.manifesto .label{grid-column:1/4;display:flex;flex-direction:column;gap:10px}
+.manifesto p{grid-column:4/13;margin:0;font:400 clamp(1.7rem,3.6vw,3.7rem)/1.14 var(--display);letter-spacing:-.025em}
+.manifesto p .w{display:inline-block}
+@media (max-width:900px){.manifesto .label,.manifesto p{grid-column:1/-1}.manifesto .label{margin-bottom:24px}}
+
+/* process */
+.process{position:relative;background:var(--roast);overflow:hidden}
+.process-head{padding-top:clamp(70px,8vw,110px);display:flex;justify-content:space-between;align-items:flex-end;gap:24px;flex-wrap:wrap}
+.process-head h2{font-size:clamp(2.6rem,6vw,6.6rem);line-height:.92;letter-spacing:-.045em}
+.clock{display:flex;gap:28px;align-items:flex-end}
+.clock div{display:flex;flex-direction:column;gap:6px}
+.clock b{font:400 clamp(2.2rem,4vw,3.6rem)/.9 var(--display);font-variant-numeric:tabular-nums;letter-spacing:-.03em}
+.clock b small{font:500 .3em var(--mono);color:var(--crema);margin-left:4px;letter-spacing:0}
+.pbar{height:1px;background:var(--line);margin-top:28px;position:relative}
+.pbar i{position:absolute;inset:0;background:var(--crema);transform-origin:left;transform:scaleX(1)}
+.track{position:relative;display:flex;flex-wrap:wrap;gap:clamp(18px,2.4vw,34px);padding:46px max(16px,env(safe-area-inset-right,0px)) clamp(70px,8vw,110px) max(16px,env(safe-area-inset-left,0px))}
+.process.is-pinned .track{flex-wrap:nowrap;width:max-content;will-change:transform}
+.pipe{position:absolute;left:0;top:50%;height:120px;transform:translateY(-50%);pointer-events:none;display:none;overflow:visible}
+.process.is-pinned .pipe{display:block}
+.pipe path{fill:none;stroke:var(--crema);stroke-width:1.5;stroke-dasharray:4 7;opacity:.5}
+.pipe .draw{stroke-dasharray:none;stroke-width:2.5;opacity:1}
+.step{position:relative;z-index:1;width:min(80vw,540px);flex:none;border:1px solid var(--line);border-radius:30px;padding:26px;display:flex;flex-direction:column;gap:20px;background:var(--espresso)}
+.step .top{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.step .num{font:italic 400 clamp(3rem,5vw,4.6rem)/.8 var(--display);color:var(--crema)}
+.step h3{font-size:clamp(1.9rem,2.7vw,2.7rem);line-height:1;letter-spacing:-.03em}
+.step p{margin:0;color:var(--muted);max-width:46ch}
+.step p em{color:var(--fg)}
+.illu{aspect-ratio:16/10;border-radius:20px;background:radial-gradient(120% 90% at 50% 100%,rgba(211,154,92,.18),transparent 60%),var(--roast);display:grid;place-items:center;overflow:hidden;max-width:100%}
+.illu svg{width:78%;height:auto;overflow:visible}
+.specs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;border-top:1px solid var(--line);padding-top:16px;margin-top:auto}
+.specs div{display:flex;flex-direction:column;gap:4px;overflow:hidden}
+.specs b{font:500 clamp(1.05rem,1.5vw,1.4rem)/1.1 var(--mono);font-variant-numeric:tabular-nums}
+@media (max-width:899px){.track{flex-direction:column}.step{width:100%}}
+
+/* svg illustration language */
+.ink{stroke:var(--fg);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.inkf{fill:var(--fg)} .acc{fill:var(--crema)} .accs{stroke:var(--crema);fill:none;stroke-width:2;stroke-linecap:round}
+.seal{fill:var(--seal)} .milkf{fill:var(--milk)}
+.lbl{font:500 20px var(--mono);fill:var(--fg)}
+@keyframes sway{50%{transform:rotate(4deg)}}
+@keyframes drop{0%{transform:translateY(0);opacity:0}15%{opacity:1}100%{transform:translateY(120px);opacity:0}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes drip{0%{transform:translateY(0) scale(.6);opacity:0}20%{opacity:1}90%{opacity:1}100%{transform:translateY(64px) scale(1);opacity:0}}
+@keyframes pour{to{stroke-dashoffset:-60}}
+@keyframes wave{50%{transform:translateX(-30px)}}
+@keyframes rise{0%{transform:translateY(0);opacity:0}20%{opacity:.9}100%{transform:translateY(-90px);opacity:0}}
+@keyframes stamp{0%,30%{transform:translateY(-70px)}45%{transform:translateY(0)}60%,100%{transform:translateY(-70px)}}
+@keyframes sealIn{0%,40%{transform:scale(0)}48%{transform:scale(1.15)}55%,100%{transform:scale(1)}}
+@keyframes steam{0%{stroke-dashoffset:40;opacity:0}40%{opacity:.8}100%{stroke-dashoffset:-40;opacity:0}}
+.a-sway{transform-origin:200px 20px;animation:sway 4s ease-in-out infinite}
+.a-drop{animation:drop 2.4s cubic-bezier(.5,0,.8,.4) infinite}
+.a-spin{transform-box:fill-box;transform-origin:center;animation:spin 9s linear infinite}
+.a-drip{animation:drip 1.6s cubic-bezier(.5,0,.75,0) infinite}
+.a-pour{stroke-dasharray:14 10;animation:pour .9s linear infinite}
+.a-wave{animation:wave 3s ease-in-out infinite}
+.a-rise{animation:rise 3s ease-out infinite}
+.a-stamp{animation:stamp 3.2s var(--ease-out) infinite}
+.a-seal{transform-box:fill-box;transform-origin:center;animation:sealIn 3.2s var(--ease-out) infinite}
+.a-steam{stroke-dasharray:30 50;animation:steam 3s ease-in-out infinite}
+
+/* anatomy */
+.anatomy{position:relative}
+.anatomy.is-sticky{height:260vh}
+.anatomy .stick{min-height:100svh;display:flex;align-items:center;padding-block:90px}
+.anatomy.is-sticky .stick{position:sticky;top:0}
+.anatomy .grid{align-items:center;width:100%}
+.anatomy .copy{grid-column:1/6;display:flex;flex-direction:column;gap:22px}
+.anatomy h2{font-size:clamp(2.6rem,5.4vw,5.8rem);line-height:.92;letter-spacing:-.045em}
+.layers{list-style:none;margin:0;padding:0}
+.layers li{display:grid;grid-template-columns:64px 1fr auto;gap:14px;align-items:baseline;padding:16px 0;border-top:1px solid var(--ink-line);color:var(--ink-muted);transition:color var(--dur-s) var(--ease-out)}
+.layers li.on{color:var(--ink)}
+.layers li .mono{color:inherit}
+.layers li strong{font:500 1.2rem/1.2 var(--display)}
+.jarwrap{grid-column:7/13;display:grid;place-items:center;position:relative}
+.jarwrap svg{width:min(430px,80vw);height:auto;max-width:100%}
+.ph{position:absolute;right:4%;top:6%;text-align:right}
+.ph b{display:block;font:400 clamp(2.6rem,4vw,4rem)/1 var(--display);font-variant-numeric:tabular-nums}
+@media (max-width:900px){.anatomy .copy,.jarwrap{grid-column:1/-1}.jarwrap{margin-top:40px}}
+
+/* collection */
+.collection{padding-block:clamp(100px,12vw,180px);transition:background-color var(--dur-m) var(--ease-out);background-color:var(--espresso)}
+.collection-head{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;flex-wrap:wrap;margin-bottom:52px}
+.collection-head h2{font-size:clamp(2.6rem,6vw,6.6rem);line-height:.92;letter-spacing:-.045em}
+.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(14px,2vw,30px)}
+.card{border-top:1px solid var(--line);padding-top:20px;display:flex;flex-direction:column;gap:16px;outline-offset:8px}
+.card .stage{aspect-ratio:4/5;border-radius:26px;overflow:hidden;display:grid;place-items:center;max-width:100%;position:relative}
+.card .stage svg{width:56%;height:auto;transition:transform 1.2s var(--ease-out)}
+.card:hover .stage svg,.card:focus-visible .stage svg{transform:translateY(-14px) rotate(-4deg) scale(1.05)}
+.card .notes{position:absolute;left:18px;right:18px;bottom:18px;display:flex;gap:8px;flex-wrap:wrap;transform:translateY(calc(100% + 30px));transition:transform var(--dur-m) var(--ease-out)}
+.card:hover .notes,.card:focus-visible .notes{transform:none}
+.card .notes span{font:500 11px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;background:rgba(244,237,226,.92);color:var(--ink);padding:8px 10px;border-radius:999px}
+.card .row{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.card h3{font-size:clamp(1.6rem,2.3vw,2.2rem);letter-spacing:-.02em}
+.card p{margin:0;color:var(--muted);font-size:15px}
+.price{font:500 15px/1 var(--mono);font-variant-numeric:tabular-nums}
+@media (hover:none){.card .notes{transform:none}}
+@media (max-width:900px){.cards{grid-template-columns:1fr}}
+
+/* figures */
+.figures{padding-block:clamp(80px,10vw,140px)}
+.figs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:24px}
+.fig{display:flex;flex-direction:column;gap:10px;border-left:1px solid var(--ink-line);padding-left:18px}
+.fig b{font:400 clamp(3.2rem,6.4vw,6.6rem)/.9 var(--display);letter-spacing:-.045em;font-variant-numeric:tabular-nums}
+.fig b small{font:500 .34em var(--mono);letter-spacing:0;color:#9c5f22;margin-left:6px}
+@media (max-width:900px){.figs{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* reserve + giant wordmark */
+.reserve{padding-block:clamp(100px,12vw,170px) 0;position:relative;overflow:hidden}
+.reserve h2{font-size:clamp(3rem,8.6vw,9.6rem);line-height:.88;letter-spacing:-.05em}
+.reserve form{display:flex;gap:12px;flex-wrap:wrap;margin-top:40px;max-width:640px;align-items:flex-end}
+.reserve label{flex-basis:100%}
+.reserve input{flex:1 1 260px;min-width:0;background:transparent;border:0;border-bottom:1px solid var(--muted);color:var(--fg);font:400 1.2rem/1.4 var(--body);padding:14px 2px}
+.reserve input::placeholder{color:var(--muted)}
+.reserve input:focus{outline:none;border-bottom-color:var(--crema)}
+.note{margin-top:14px;min-height:1.5em;color:var(--muted);font-size:14px}
+.wordmark{margin-top:clamp(60px,8vw,110px);font:600 clamp(5rem,23vw,24rem)/.8 var(--display);letter-spacing:-.04em;text-align:center;color:transparent;-webkit-text-stroke:1px #5a4232;background:radial-gradient(260px circle at var(--mx,50%) var(--my,50%),var(--crema),transparent 70%) no-repeat;-webkit-background-clip:text;background-clip:text;user-select:none;padding-bottom:.08em}
+footer{border-top:1px solid var(--line);padding-block:26px 40px}
+footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+
+/* cursor */
+.cursor{position:fixed;left:0;top:0;z-index:90;pointer-events:none;width:10px;height:10px;border-radius:999px;background:var(--crema);display:grid;place-items:center;font:600 11px/1 var(--mono);letter-spacing:.1em;color:var(--ink);opacity:0;transition:width .5s var(--ease-out),height .5s var(--ease-out),opacity .3s}
+.cursor.is-big{width:96px;height:96px}
+.cursor::after{content:attr(data-label);opacity:0;transition:opacity .3s}
+.cursor.is-big::after{opacity:1}
+@media (hover:none),(pointer:coarse){.cursor{display:none}}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+  .grain{display:none}
+}
+</style>
+
+<div class="grain" aria-hidden="true"></div>
+
+<div class="loader" aria-hidden="true">
+  <div class="row"><span class="mono">Ombra · Lote 07</span><span class="mono">Fermentando</span></div>
+  <div>
+    <div class="row"><span class="loader-n"><span id="ln">4</span><small>°C</small></span><span class="mono">Objetivo 38 °C</span></div>
+    <div class="loader-bar"><i id="lbar"></i></div>
+  </div>
+</div>
+
+<nav class="nav" aria-label="Principal">
+  <div class="wrap">
+    <a class="brand" href="#top">OMBRA</a>
+    <ul>
+      <li><a href="#proceso"><span>Proceso</span><span aria-hidden="true">Proceso</span></a></li>
+      <li><a href="#anatomia"><span>El tarro</span><span aria-hidden="true">El tarro</span></a></li>
+      <li><a href="#coleccion"><span>Colección</span><span aria-hidden="true">Colección</span></a></li>
+    </ul>
+    <a class="btn magnetic" href="#reserva"><span class="t">Reservar lote 08</span></a>
+  </div>
+</nav>
+
+<main id="top">
+  <header class="hero">
+    <canvas id="fluid" role="img" aria-label="Espresso cayendo y mezclándose con crema de yogur"></canvas>
+    <div class="stir" aria-hidden="true"><i></i><span class="mono">Mueve el ratón para remover</span></div>
+    <div class="wrap">
+      <div class="grid">
+        <div class="meta">
+          <span class="mono">Lote 07 · Noviembre 2026</span>
+          <span class="mono">Huila, Colombia · 1.900 msnm</span>
+          <span class="mono">Tirada: 1.200 tarros</span>
+        </div>
+        <h1 id="h1">
+          <span class="mask"><span>El café</span></span><br>
+          <span class="mask"><span>que se hizo</span></span><br>
+          <span class="mask"><span class="it">yogur.</span></span>
+        </h1>
+        <div class="foot">
+          <p class="lede">Ombra fermenta leche entera de pasto con un <strong>cold brew de 20 horas</strong>. Un yogur denso, amargo en la entrada y dulce al final, que se sirve frío y se come despacio.</p>
+          <div class="ctas">
+            <a class="btn solid magnetic" href="#proceso"><span class="t">Ver cómo se hace</span></a>
+            <a class="btn magnetic" href="#coleccion"><span class="t">La colección</span></a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="marquee" aria-hidden="true">
+    <div class="row" id="mq">
+      <span>Cold brew 20 h</span><span>Fermentación 11 h a 38 °C</span><span>Leche de pasto 4,2 %</span><span>Tueste 14 min a 196 °C</span><span>Sellado con lacre a mano</span>
+      <span>Cold brew 20 h</span><span>Fermentación 11 h a 38 °C</span><span>Leche de pasto 4,2 %</span><span>Tueste 14 min a 196 °C</span><span>Sellado con lacre a mano</span>
+    </div>
+  </div>
+
+  <section class="manifesto band-milk" aria-label="Manifiesto">
+    <div class="wrap"><div class="grid">
+      <div class="label"><span class="mono">Manifiesto</span><span class="mono">Hecho en frío</span></div>
+      <p id="manifesto">No mezclamos café con yogur. Fermentamos la leche dentro del café, a la temperatura del cuerpo, hasta que dejan de ser dos cosas. Por eso tarda tres días y por eso solo sale un lote al mes.</p>
+    </div></div>
+  </section>
+
+  <section class="process" id="proceso" aria-label="Proceso de fabricación">
+    <div class="wrap">
+      <div class="process-head">
+        <div>
+          <span class="mono">Proceso · del grano al tarro</span>
+          <h2>Seis pasos.<br><em>Ningún atajo.</em></h2>
+        </div>
+        <div class="clock" aria-hidden="true">
+          <div><span class="mono">Paso</span><b><span id="cur">06</span><small>/06</small></b></div>
+          <div><span class="mono">Tiempo</span><b><span id="hrs">72</span><small>h</small></b></div>
+        </div>
+      </div>
+      <div class="pbar"><i id="pbar"></i></div>
+    </div>
+    <div class="track" id="track">
+      <svg class="pipe" id="pipe" aria-hidden="true"><path id="pipeBase"/><path id="pipeDraw" class="draw"/></svg>
+
+      <article class="step" data-h="0">
+        <div class="top"><span class="num">01</span><span class="mono">Hora 0 · Finca</span></div>
+        <div class="illu"><svg viewBox="0 0 400 250" aria-hidden="true">
+          <g class="a-sway">
+            <path class="ink" d="M20 30 C120 20 240 40 380 24"/>
+            <path class="ink" d="M120 26 C130 60 150 70 170 74 M240 32 C238 70 252 86 270 92"/>
+            <ellipse class="inkf" cx="90" cy="18" rx="26" ry="9" opacity=".35"/><ellipse class="inkf" cx="320" cy="14" rx="28" ry="9" opacity=".35"/>
+            <circle class="seal" cx="172" cy="84" r="13"/><circle class="seal" cx="152" cy="80" r="12"/><circle class="acc" cx="164" cy="100" r="11"/>
+            <circle class="seal" cx="272" cy="102" r="13"/><circle class="seal" cx="254" cy="98" r="11"/>
+          </g>
+          <circle class="seal a-drop" cx="264" cy="118" r="11" style="animation-delay:.6s"/><circle class="seal a-drop" cx="160" cy="110" r="10" style="animation-delay:1.5s"/>
+          <path class="ink" d="M120 240 L140 180 L300 180 L320 240 Z"/><path class="accs" d="M150 200 L290 200"/>
+        </svg></div>
+        <h3>Cereza a mano</h3>
+        <p>En la finca de los Pastrana, en Huila, solo se recogen cerezas de un rojo profundo. Se seleccionan dos veces y se despulpan el mismo día.</p>
+        <div class="specs"><div><span class="mono">Altitud</span><b>1.900 m</b></div><div><span class="mono">Variedad</span><b>Caturra</b></div><div><span class="mono">Brix</span><b>22°</b></div></div>
+      </article>
+
+      <article class="step" data-h="24">
+        <div class="top"><span class="num">02</span><span class="mono">Hora 24 · Tostadero</span></div>
+        <div class="illu"><svg viewBox="0 0 400 250" aria-hidden="true">
+          <rect class="ink" x="70" y="40" width="200" height="170" rx="18"/><circle class="ink" cx="170" cy="125" r="62"/>
+          <g class="a-spin"><circle cx="170" cy="125" r="62" fill="none"/><g class="inkf">
+            <ellipse cx="170" cy="85" rx="12" ry="8"/><ellipse cx="205" cy="110" rx="12" ry="8" transform="rotate(40 205 110)"/>
+            <ellipse cx="195" cy="155" rx="12" ry="8" transform="rotate(80 195 155)"/><ellipse cx="145" cy="155" rx="12" ry="8" transform="rotate(20 145 155)"/>
+            <ellipse cx="135" cy="110" rx="12" ry="8" transform="rotate(-30 135 110)"/></g></g>
+          <path class="accs" d="M300 70 v120"/><circle class="acc" cx="300" cy="196" r="12"/>
+          <text x="318" y="96" class="lbl">196°</text>
+          <path class="accs a-steam" d="M150 30 c-10-12 10-18 0-30 M190 30 c-10-12 10-18 0-30"/>
+        </svg></div>
+        <h3>Tueste lento</h3>
+        <p>Tueste medio-claro en tambor durante catorce minutos. Buscamos notas de panela y cacao, nunca el amargor quemado que taparía la leche.</p>
+        <div class="specs"><div><span class="mono">Temp. final</span><b>196 °C</b></div><div><span class="mono">Tiempo</span><b>14 min</b></div><div><span class="mono">Reposo</span><b>24 h</b></div></div>
+      </article>
+
+      <article class="step" data-h="25">
+        <div class="top"><span class="num">03</span><span class="mono">Hora 25 · Torre de frío</span></div>
+        <div class="illu"><svg viewBox="0 0 400 250" aria-hidden="true">
+          <path class="ink" d="M150 20 h100 l-10 50 h-80 z"/><rect class="acc" x="166" y="40" width="68" height="22" rx="3" opacity=".7"/>
+          <path class="ink" d="M200 70 v20"/>
+          <circle class="acc a-drip" cx="200" cy="96" r="5"/><circle class="acc a-drip" cx="200" cy="96" r="5" style="animation-delay:.8s"/>
+          <path class="ink" d="M150 160 h100 l-8 70 h-84 z"/><rect class="inkf" x="160" y="196" width="80" height="30" rx="2" opacity=".85"/>
+          <path class="ink" d="M120 20 v210 M280 20 v210"/><text x="292" y="130" class="lbl">4 °C</text>
+        </svg></div>
+        <h3>Cold brew, 20 horas</h3>
+        <p>El café molido grueso gotea en agua mineral a 4 °C durante veinte horas. Se filtra tres veces, por papel, por lino y por sílex, hasta quedar limpio como un té.</p>
+        <div class="specs"><div><span class="mono">Ratio</span><b>1:5</b></div><div><span class="mono">Infusión</span><b>20 h</b></div><div><span class="mono">Filtrados</span><b>3</b></div></div>
+      </article>
+
+      <article class="step" data-h="45">
+        <div class="top"><span class="num">04</span><span class="mono">Hora 45 · Lechería</span></div>
+        <div class="illu"><svg viewBox="0 0 400 250" aria-hidden="true">
+          <path class="ink" d="M80 30 l40 0 l10 30 l-20 40 l-40 0 l-6 -40 z" transform="rotate(-25 100 60)"/>
+          <path class="a-pour" d="M150 92 C165 120 170 140 172 165" stroke="var(--milk)" stroke-width="10" fill="none" stroke-linecap="round"/>
+          <path class="ink" d="M90 150 h220 v70 a16 16 0 0 1 -16 16 h-188 a16 16 0 0 1 -16 -16 z"/>
+          <clipPath id="vat"><path d="M92 152 h216 v68 a14 14 0 0 1 -14 14 h-188 a14 14 0 0 1 -14 -14 z"/></clipPath>
+          <g clip-path="url(#vat)"><path class="milkf a-wave" d="M60 180 q25 -10 50 0 t50 0 t50 0 t50 0 t50 0 t50 0 v80 h-300 z"/></g>
+          <text x="236" y="136" class="lbl">4,2 %</text>
+        </svg></div>
+        <h3>Leche de pasto</h3>
+        <p>Leche entera de vacas que pastan todo el año en el valle del Pas. Llega esa misma mañana, se pasteuriza a baja temperatura y se une al café en frío.</p>
+        <div class="specs"><div><span class="mono">Grasa</span><b>4,2 %</b></div><div><span class="mono">Pasteur.</span><b>72 °C</b></div><div><span class="mono">Café</span><b>18 %</b></div></div>
+      </article>
+
+      <article class="step" data-h="46">
+        <div class="top"><span class="num">05</span><span class="mono">Hora 46 · Fermentación</span></div>
+        <div class="illu"><svg viewBox="0 0 400 250" aria-hidden="true">
+          <path class="ink" d="M110 40 h170 v150 a30 30 0 0 1 -30 30 h-110 a30 30 0 0 1 -30 -30 z"/>
+          <rect class="acc" x="114" y="110" width="162" height="106" rx="24" opacity=".55"/>
+          <circle class="milkf a-rise" cx="150" cy="200" r="6"/><circle class="milkf a-rise" cx="190" cy="205" r="4" style="animation-delay:.7s"/>
+          <circle class="milkf a-rise" cx="230" cy="198" r="5" style="animation-delay:1.4s"/><circle class="milkf a-rise" cx="255" cy="206" r="3" style="animation-delay:2.1s"/>
+          <path class="accs" d="M320 50 v140"/><circle class="acc" cx="320" cy="198" r="14"/>
+          <path class="ink" d="M314 50 a6 6 0 0 1 12 0 v130 h-12 z"/><text x="338" y="110" class="lbl">38°</text>
+          <circle class="ink" cx="60" cy="70" r="28"/><path class="ink a-spin" d="M60 70 v-18"/><path class="ink" d="M60 70 h12"/>
+        </svg></div>
+        <h3>Once horas a 38 °C</h3>
+        <p>Cultivos vivos de <em>S. thermophilus</em> y <em>L. bulgaricus</em> fermentan la mezcla a temperatura corporal. El café no se añade después: fermenta con la leche.</p>
+        <div class="specs"><div><span class="mono">Temp.</span><b>38 °C</b></div><div><span class="mono">Tiempo</span><b>11 h</b></div><div><span class="mono">pH final</span><b>4,5</b></div></div>
+      </article>
+
+      <article class="step" data-h="72">
+        <div class="top"><span class="num">06</span><span class="mono">Hora 57–72 · Envasado</span></div>
+        <div class="illu"><svg viewBox="0 0 400 250" aria-hidden="true">
+          <g class="a-stamp"><rect class="inkf" x="182" y="0" width="36" height="46" rx="6"/><rect class="inkf" x="170" y="44" width="60" height="12" rx="4"/></g>
+          <rect class="ink" x="140" y="96" width="120" height="16" rx="5"/>
+          <path class="ink" d="M146 112 h108 v100 a22 22 0 0 1 -22 22 h-64 a22 22 0 0 1 -22 -22 z"/>
+          <rect class="acc" x="150" y="160" width="100" height="70" rx="16" opacity=".6"/>
+          <circle class="seal a-seal" cx="200" cy="104" r="22"/>
+          <text x="200" y="110" text-anchor="middle" class="a-seal" style="font:italic 600 16px var(--display);fill:#f4ede2">O</text>
+          <text x="282" y="200" class="lbl">48 h · 2 °C</text>
+        </svg></div>
+        <h3>Lacre y reposo</h3>
+        <p>Se envasa en tarros de vidrio ámbar de 140 g, se sella con lacre a mano y madura en cámara. Cada tarro lleva el número de lote y la fecha de tueste.</p>
+        <div class="specs"><div><span class="mono">Tarro</span><b>140 g</b></div><div><span class="mono">Reposo</span><b>48 h</b></div><div><span class="mono">Consumo</span><b>21 días</b></div></div>
+      </article>
+    </div>
+  </section>
+
+  <section class="anatomy band-milk" id="anatomia" aria-label="Anatomía del tarro">
+    <div class="stick wrap">
+      <div class="grid">
+        <div class="copy">
+          <span class="mono">Anatomía de un tarro · 140 g</span>
+          <h2>Cuatro capas,<br><em>una cuchara.</em></h2>
+          <ol class="layers" id="layers">
+            <li class="on"><span class="mono">Base</span><strong>Compota de café y panela</strong><span class="mono">22 g</span></li>
+            <li class="on"><span class="mono">Cuerpo</span><strong>Yogur fermentado en café</strong><span class="mono">96 g</span></li>
+            <li class="on"><span class="mono">Velo</span><strong>Crema batida de espresso</strong><span class="mono">18 g</span></li>
+            <li class="on"><span class="mono">Cierre</span><strong>Nibs de cacao tostado</strong><span class="mono">4 g</span></li>
+          </ol>
+        </div>
+        <div class="jarwrap">
+          <div class="ph"><span class="mono">pH</span><b id="ph">4,5</b></div>
+          <svg viewBox="0 0 300 400" role="img" aria-label="Tarro de Ombra lleno con sus cuatro capas">
+            <defs>
+              <clipPath id="jarclip"><path d="M58 92 h184 v236 a40 40 0 0 1 -40 40 h-104 a40 40 0 0 1 -40 -40 z"/></clipPath>
+              <linearGradient id="g-base" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5a3320"/><stop offset="1" stop-color="#2a170e"/></linearGradient>
+              <linearGradient id="g-body" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d9b48a"/><stop offset="1" stop-color="#b98757"/></linearGradient>
+              <linearGradient id="g-veil" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fffaf2"/><stop offset="1" stop-color="#e7cfae"/></linearGradient>
+              <linearGradient id="glass" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity=".5"/><stop offset=".18" stop-color="#fff" stop-opacity="0"/><stop offset=".85" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#fff" stop-opacity=".3"/></linearGradient>
+            </defs>
+            <g clip-path="url(#jarclip)">
+              <rect x="40" y="0" width="220" height="400" fill="#e9dfd0"/>
+              <rect id="L0" x="40" y="318" width="220" height="60" fill="url(#g-base)"/>
+              <rect id="L1" x="40" y="168" width="220" height="150" fill="url(#g-body)"/>
+              <rect id="L2" x="40" y="136" width="220" height="32" fill="url(#g-veil)"/>
+              <g id="L3">
+                <ellipse cx="96" cy="132" rx="7" ry="4" fill="#3b2116"/><ellipse cx="130" cy="128" rx="6" ry="3.5" fill="#2a170e"/><ellipse cx="166" cy="133" rx="7" ry="4" fill="#3b2116"/>
+                <ellipse cx="200" cy="129" rx="6" ry="3.5" fill="#2a170e"/><ellipse cx="114" cy="138" rx="5" ry="3" fill="#2a170e"/><ellipse cx="184" cy="139" rx="5" ry="3" fill="#3b2116"/>
+              </g>
+            </g>
+            <path d="M58 92 h184 v236 a40 40 0 0 1 -40 40 h-104 a40 40 0 0 1 -40 -40 z" fill="url(#glass)" stroke="#1a110c" stroke-opacity=".5" stroke-width="2"/>
+            <rect x="48" y="66" width="204" height="30" rx="8" fill="#1a110c"/>
+            <circle cx="150" cy="62" r="26" fill="#8f2a22"/>
+            <text x="150" y="70" text-anchor="middle" style="font:italic 600 22px var(--display);fill:#f4ede2">O</text>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="collection" id="coleccion" aria-label="Colección">
+    <div class="wrap">
+      <div class="collection-head">
+        <div><span class="mono">Colección · Lote 07</span><h2>Tres tarros,<br><em>tres tuestes.</em></h2></div>
+        <p class="mono" style="max-width:34ch;margin:0">Se sirven a 4 °C. Sácalo del frío cinco minutos antes para que se abra el aroma.</p>
+      </div>
+      <div class="cards" id="cards"></div>
+    </div>
+  </section>
+
+  <section class="figures band-milk" aria-label="Cifras del proceso">
+    <div class="wrap"><div class="figs">
+      <div class="fig"><span class="mono">Cold brew</span><b><span data-count="20">20</span><small>h</small></b></div>
+      <div class="fig"><span class="mono">Fermentación</span><b><span data-count="11">11</span><small>h</small></b></div>
+      <div class="fig"><span class="mono">Temperatura</span><b><span data-count="38">38</span><small>°C</small></b></div>
+      <div class="fig"><span class="mono">Tarros por lote</span><b><span data-count="1200">1.200</span></b></div>
+    </div></div>
+  </section>
+
+  <section class="reserve" id="reserva" aria-label="Reserva">
+    <div class="wrap">
+      <span class="mono">Lote 08 · Sale el 12 de diciembre</span>
+      <h2><span class="mask"><span>Reserva</span></span><br><span class="mask"><span><em>tu tarro.</em></span></span></h2>
+      <form id="form" novalidate>
+        <label class="mono" for="email">Correo electrónico</label>
+        <input id="email" name="email" type="email" placeholder="tu@correo.com" autocomplete="email" required>
+        <button class="btn solid magnetic" type="submit"><span class="t">Avisarme</span></button>
+      </form>
+      <p class="note" id="note" role="status"></p>
+    </div>
+    <div class="wordmark" id="wordmark" aria-hidden="true">OMBRA</div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span class="mono">Ombra · Marca ficticia de demostración</span>
+    <span class="mono">Hecho en frío · 2026</span>
+  </div>
+</footer>
+
+<div class="cursor" id="cursor" data-label=""></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lenis@1.1.13/dist/lenis.min.js"></script>
+<script>
+(() => {
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const fine = matchMedia('(hover:hover) and (pointer:fine)').matches;
+  const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+  const motion = !!(window.gsap && window.ScrollTrigger) && !reduce;
+  if (motion) document.documentElement.classList.add('js');
+
+  /* ---------- collection ---------- */
+  const products = [
+    { name: 'Original', note: 'Tueste medio · panela y cacao', price: '9,50 €', bg: '#2a1a12', amb: '#2b1b12', body: '#c9a074', veil: '#f3e6d2', band: '#d39a5c', label: '#f4ede2', notes: ['Panela', 'Cacao', 'Nata'] },
+    { name: 'Doble espresso', note: 'Tueste oscuro · más amargo', price: '10,50 €', bg: '#1b110c', amb: '#0b0705', body: '#8a5a38', veil: '#d9b48a', band: '#efe3d0', label: '#120b08', notes: ['Regaliz', 'Tostado', 'Cacao 85 %'] },
+    { name: 'Caramelo de sal', note: 'Con flor de sal de Añana', price: '11,00 €', bg: '#3a2418', amb: '#3a1e14', body: '#d9b07c', veil: '#f6efe4', band: '#8f2a22', label: '#f4ede2', notes: ['Toffee', 'Sal', 'Avellana'] }
+  ];
+  const jar = (p, i) => `<svg viewBox="0 0 200 260" aria-hidden="true">
+    <clipPath id="cj${i}"><path d="M40 70 h120 v140 a30 30 0 0 1 -30 30 h-60 a30 30 0 0 1 -30 -30 z"/></clipPath>
+    <g clip-path="url(#cj${i})"><rect x="30" y="60" width="140" height="190" fill="${p.body}"/><rect x="30" y="205" width="140" height="45" fill="#3b2116"/>
+    <rect x="30" y="92" width="140" height="22" fill="${p.veil}"/><rect x="30" y="140" width="140" height="40" fill="${p.band}" opacity=".95"/></g>
+    <path d="M40 70 h120 v140 a30 30 0 0 1 -30 30 h-60 a30 30 0 0 1 -30 -30 z" fill="none" stroke="#f4ede2" stroke-opacity=".5" stroke-width="2"/>
+    <rect x="32" y="52" width="136" height="20" rx="6" fill="#120b08" stroke="#f4ede2" stroke-opacity=".5" stroke-width="2"/>
+    <circle cx="100" cy="50" r="18" fill="#8f2a22"/><text x="100" y="56" text-anchor="middle" style="font:italic 600 16px 'Bodoni Moda',Georgia,serif;fill:#f4ede2">O</text>
+    <text x="100" y="165" text-anchor="middle" style="font:600 11px 'JetBrains Mono',monospace;letter-spacing:3px;fill:${p.label}">OMBRA</text></svg>`;
+  $('#cards').innerHTML = products.map((p, i) => `
+    <article class="card" tabindex="0" data-cursor="Ver" data-amb="${p.amb}">
+      <div class="stage" style="background:radial-gradient(80% 70% at 50% 60%, ${p.band}40, transparent 70%), ${p.bg}">${jar(p, i)}
+        <div class="notes">${p.notes.map(n => `<span>${n}</span>`).join('')}</div></div>
+      <div class="row"><h3>${p.name}</h3><span class="price">${p.price}</span></div>
+      <div class="row"><p>${p.note}</p><span class="mono">140 g</span></div>
+    </article>`).join('');
+  const coll = $('.collection');
+  $$('.card').forEach(c => {
+    const on = () => coll.style.backgroundColor = c.dataset.amb, off = () => coll.style.backgroundColor = '';
+    c.addEventListener('pointerenter', on); c.addEventListener('pointerleave', off); c.addEventListener('focus', on); c.addEventListener('blur', off);
+  });
+
+  /* ---------- form (demo) ---------- */
+  $('#form').addEventListener('submit', e => {
+    e.preventDefault();
+    const ok = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test($('#email').value.trim());
+    $('#note').textContent = ok ? 'Anotado en esta página de demostración. Ombra es una marca ficticia, así que no se ha enviado nada.' : 'Escribe un correo con el formato nombre@dominio.com.';
+  });
+
+  /* ---------- wordmark spotlight ---------- */
+  const wm = $('#wordmark');
+  wm.parentElement.addEventListener('pointermove', e => { const r = wm.getBoundingClientRect(); wm.style.setProperty('--mx', (e.clientX - r.left) + 'px'); wm.style.setProperty('--my', (e.clientY - r.top) + 'px'); });
+
+  /* ---------- SIGNATURE: espresso pour + swirl shader ---------- */
+  const canvas = $('#fluid');
+  const gl = canvas.getContext('webgl', { antialias: false });
+  const U = { mx: .62, my: .45, tx: .62, ty: .45, mix: 0, tmix: 0, vel: 0 };
+  if (gl) {
+    const vs = 'attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}';
+    const fs = `precision highp float;uniform vec2 r;uniform float t;uniform vec2 m;uniform float s;uniform float v;
+    float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+    float n(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h(i),h(i+vec2(1,0)),f.x),mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x),f.y);}
+    float fbm(vec2 p){float a=.5,o=0.;for(int i=0;i<5;i++){o+=a*n(p);p*=2.03;a*=.5;}return o;}
+    void main(){
+      float k=min(r.x,r.y);
+      vec2 uv=(gl_FragCoord.xy-.5*r)/k;
+      float ax=r.x/k;
+      vec2 c=vec2(ax>1.2?ax*.5-.62:0.,ax>1.2?0.:.18);
+      vec2 mm=(m-.5)*vec2(ax,-1.);
+      vec2 d=uv-c-(mm-c)*.25;
+      float rad=length(d);
+      float stir=1.6+s*3.2+v*2.;
+      float a=atan(d.y,d.x)+t*.22+(1.4-rad)*stir;
+      vec2 sw=vec2(cos(a),sin(a))*rad;
+      vec2 q=vec2(fbm(sw*2.1+t*.05),fbm(sw*2.1+vec2(5.2,1.3)-t*.04));
+      float f=fbm(sw*2.+q*2.8+mm*.6);
+      float sx=uv.x-c.x-sin(uv.y*6.+t*2.)*.012-(mm.x-c.x)*.08;
+      float sy=smoothstep(-.02,.35,uv.y-c.y);
+      float stream=(1.-smoothstep(.012,.03+max(0.,.5-uv.y)*.01,abs(sx)))*sy*(1.-s*.85);
+      float coffee=.62-s*.22;
+      vec3 espresso=vec3(.10,.055,.035),crema=vec3(.83,.6,.36),milk=vec3(.96,.93,.88),caramel=vec3(.52,.3,.17);
+      vec3 col=mix(milk,crema,smoothstep(coffee-.25,coffee,f));
+      col=mix(col,caramel,smoothstep(coffee-.05,coffee+.1,f));
+      col=mix(col,espresso,smoothstep(coffee+.06,coffee+.22,f));
+      col=mix(col,espresso*1.4,stream);
+      float glint=pow(max(0.,1.-length(uv-c-vec2(-.2,.24)-mm*.1)*1.6),5.);
+      col+=glint*.3*(1.-stream);
+      col*=1.-smoothstep(.55,1.25,rad)*.85;
+      gl_FragColor=vec4(col,1.);
+    }`;
+    const sh = (ty, src) => { const o = gl.createShader(ty); gl.shaderSource(o, src); gl.compileShader(o); return o; };
+    const pr = gl.createProgram(); gl.attachShader(pr, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, fs)); gl.linkProgram(pr); gl.useProgram(pr);
+    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer()); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,1,1]), gl.STATIC_DRAW);
+    const pl = gl.getAttribLocation(pr, 'p'); gl.enableVertexAttribArray(pl); gl.vertexAttribPointer(pl, 2, gl.FLOAT, false, 0, 0);
+    const u = n => gl.getUniformLocation(pr, n), uR = u('r'), uT = u('t'), uM = u('m'), uS = u('s'), uV = u('v');
+    const size = () => { const dpr = Math.min(devicePixelRatio || 1, innerWidth < 700 ? 1.25 : 1.75); canvas.width = canvas.clientWidth * dpr; canvas.height = canvas.clientHeight * dpr; gl.viewport(0, 0, canvas.width, canvas.height); };
+    size(); addEventListener('resize', size);
+    addEventListener('pointermove', e => { const b = canvas.getBoundingClientRect(); U.tx = (e.clientX - b.left) / b.width; U.ty = (e.clientY - b.top) / b.height; }, { passive: true });
+    let vis = true; new IntersectionObserver(([e]) => vis = e.isIntersecting).observe(canvas);
+    const t0 = performance.now();
+    (function draw(now) {
+      requestAnimationFrame(draw); if (!vis) return;
+      U.mx += (U.tx - U.mx) * .06; U.my += (U.ty - U.my) * .06; U.mix += (U.tmix - U.mix) * .08; U.vel *= .94;
+      gl.uniform2f(uR, canvas.width, canvas.height); gl.uniform1f(uT, reduce ? 6 : (now - t0) / 1000);
+      gl.uniform2f(uM, U.mx, U.my); gl.uniform1f(uS, U.mix); gl.uniform1f(uV, Math.min(1, U.vel));
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    })(t0);
+  }
+
+  /* ---------- anatomy layers ---------- */
+  const lis = $$('#layers li'), L = [0, 1, 2, 3].map(i => $('#L' + i)), ph = $('#ph');
+  const setLayers = p => {
+    L.forEach((el, i) => {
+      const k = Math.min(1, Math.max(0, p * 4 - i));
+      if (i < 3) { el.style.transformBox = 'fill-box'; el.style.transformOrigin = '50% 100%'; el.style.transform = `scaleY(${k})`; }
+      else { el.style.opacity = k; el.style.transform = `translateY(${(1 - k) * -40}px)`; }
+      lis[i].classList.toggle('on', k > .5);
+    });
+    ph.textContent = (6.7 - Math.min(1, p) * 2.2).toFixed(1).replace('.', ',');
+  };
+
+  if (!motion) return;
+
+  /* ---------- engine: Lenis + GSAP ---------- */
+  gsap.registerPlugin(ScrollTrigger);
+  let lenis = null;
+  if (window.Lenis) {
+    lenis = new Lenis({ lerp: .085, smoothWheel: true });
+    lenis.on('scroll', ScrollTrigger.update);
+    gsap.ticker.add(t => lenis.raf(t * 1000)); gsap.ticker.lagSmoothing(0);
+    $$('a[href^="#"]').forEach(a => a.addEventListener('click', e => { const id = a.getAttribute('href'); const el = id.length > 1 && $(id); if (!el) return; e.preventDefault(); lenis.scrollTo(el, { duration: 1.6, easing: t => 1 - Math.pow(1 - t, 4) }); }));
+    lenis.stop();
+  }
+
+  /* ---------- preloader: 4 °C → 38 °C, then curtain + hero ---------- */
+  const o = { v: 4 }, ln = $('#ln');
+  const heroIn = () => gsap.timeline({ defaults: { ease: 'expo.out', duration: 1.5 } })
+    .from('#h1 .mask > span', { yPercent: 115, rotate: 4, stagger: .1 })
+    .from('.hero .meta .mono', { y: 18, opacity: 0, stagger: .06, duration: 1 }, .15)
+    .from('#fluid', { scale: 1.25, duration: 2.4 }, 0)
+    .from('.hero .lede, .hero .ctas, .stir', { y: 30, opacity: 0, stagger: .08 }, .45)
+    .from('.nav', { y: -30, opacity: 0, duration: 1 }, .35);
+  gsap.timeline()
+    .to(o, { v: 38, duration: 1.7, ease: 'power3.inOut', onUpdate: () => ln.textContent = Math.round(o.v) })
+    .to('#lbar', { scaleX: 1, duration: 1.7, ease: 'power3.inOut' }, 0)
+    .to('.loader', { clipPath: 'inset(0 0 100% 0)', duration: 1.1, ease: 'power4.inOut' }, '+=.15')
+    .set('.loader', { display: 'none' })
+    .add(heroIn(), '-=.6')
+    .add(() => lenis && lenis.start(), '-=1.2');
+
+  /* hero: scroll mixes the coffee into the cream (the signature) */
+  ScrollTrigger.create({ trigger: '.hero', start: 'top top', end: 'bottom top', scrub: true, onUpdate: s => { U.tmix = s.progress; U.vel += Math.abs(s.getVelocity()) / 6000; } });
+  gsap.to('.hero .wrap', { yPercent: -18, opacity: .2, ease: 'none', scrollTrigger: { trigger: '.hero', start: 'top top', end: 'bottom top', scrub: true } });
+
+  /* marquee reacts to scroll velocity */
+  const mq = $('#mq'); let mx = 0, mv = 0;
+  ScrollTrigger.create({ onUpdate: s => mv = s.getVelocity() / 260 });
+  gsap.ticker.add(() => { mv *= .92; mx -= 1 + Math.abs(mv); const w = mq.scrollWidth / 2; if (mx <= -w) mx += w; mq.style.transform = `translate3d(${mx}px,0,0) skewX(${gsap.utils.clamp(-12, 12, -mv)}deg)`; });
+
+  /* manifesto words */
+  const mp = $('#manifesto'); mp.innerHTML = mp.textContent.trim().split(/\s+/).map(w => `<span class="w">${w}</span>`).join(' ');
+  gsap.fromTo('#manifesto .w', { opacity: .14 }, { opacity: 1, stagger: .05, ease: 'none', scrollTrigger: { trigger: mp, start: 'top 78%', end: 'bottom 50%', scrub: true } });
+
+  /* headings: line masks */
+  $$('.process-head h2, .anatomy h2, .collection-head h2').forEach(h => {
+    h.innerHTML = h.innerHTML.split('<br>').map(l => `<span class="mask"><span>${l}</span></span>`).join('<br>');
+    gsap.from(h.querySelectorAll('.mask > span'), { yPercent: 115, rotate: 3, stagger: .1, duration: 1.4, ease: 'expo.out', scrollTrigger: { trigger: h, start: 'top 85%' } });
+  });
+  gsap.from('.reserve .mask > span', { yPercent: 115, stagger: .12, duration: 1.4, ease: 'expo.out', scrollTrigger: { trigger: '.reserve', start: 'top 75%' } });
+  gsap.from('#wordmark', { yPercent: 40, opacity: 0, duration: 1.6, ease: 'expo.out', scrollTrigger: { trigger: '#wordmark', start: 'top 95%' } });
+
+  /* process */
+  const sec = $('#proceso'), track = $('#track'), steps = $$('.step'), cur = $('#cur'), hrs = $('#hrs'), bar = $('#pbar');
+  const hours = steps.map(s => +s.dataset.h);
+  const setStep = p => { const f = p * (steps.length - 1); const i = Math.round(f); cur.textContent = String(i + 1).padStart(2, '0');
+    const a = Math.floor(f), b = Math.min(steps.length - 1, a + 1); hrs.textContent = Math.round(hours[a] + (hours[b] - hours[a]) * (f - a)); bar.style.transform = `scaleX(${Math.max(.02, p)})`; };
+  const mm = gsap.matchMedia();
+  mm.add('(min-width: 900px)', () => {
+    sec.classList.add('is-pinned');
+    const dist = () => track.scrollWidth - document.documentElement.clientWidth;
+    const pipe = $('#pipe'), base = $('#pipeBase'), draw = $('#pipeDraw');
+    const buildPipe = () => { const w = track.scrollWidth; pipe.setAttribute('width', w); pipe.setAttribute('height', 120); pipe.setAttribute('viewBox', `0 0 ${w} 120`);
+      let d = 'M0 60'; for (let x = 0; x < w; x += 240) d += ` C${x + 80} 0 ${x + 160} 120 ${x + 240} 60`; base.setAttribute('d', d); draw.setAttribute('d', d);
+      const len = draw.getTotalLength(); draw.style.strokeDasharray = len; draw.style.strokeDashoffset = len; return len; };
+    let len = buildPipe();
+    setStep(0);
+    const h = gsap.to(track, { x: () => -dist(), ease: 'none', scrollTrigger: { trigger: sec, start: 'top top', end: () => '+=' + dist(), pin: true, scrub: 1, invalidateOnRefresh: true,
+      onRefresh: () => { len = buildPipe(); }, onUpdate: s => { setStep(s.progress); draw.style.strokeDashoffset = len * (1 - s.progress); } } });
+    steps.forEach(st => {
+      gsap.from(st.querySelector('.illu svg'), { scale: .75, rotate: -6, opacity: .2, ease: 'expo.out', scrollTrigger: { trigger: st, containerAnimation: h, start: 'left 90%', end: 'left 45%', scrub: true } });
+      gsap.from(st.querySelectorAll('.specs b'), { yPercent: 100, opacity: 0, stagger: .1, ease: 'expo.out', scrollTrigger: { trigger: st, containerAnimation: h, start: 'left 70%', end: 'left 40%', scrub: true } });
+    });
+    return () => sec.classList.remove('is-pinned');
+  });
+  mm.add('(max-width: 899px)', () => {
+    steps.forEach((st, i) => {
+      ScrollTrigger.create({ trigger: st, start: 'top 60%', end: 'bottom 60%', onToggle: s => s.isActive && setStep(i / (steps.length - 1)) });
+      gsap.from(st, { y: 60, opacity: 0, duration: 1.2, ease: 'expo.out', scrollTrigger: { trigger: st, start: 'top 90%' } });
+    });
+  });
+
+  /* anatomy: the jar fills as you scroll (desktop) */
+  mm.add('(min-width: 901px)', () => {
+    const an = $('.anatomy'); an.classList.add('is-sticky'); setLayers(0);
+    ScrollTrigger.create({ trigger: an, start: 'top top', end: 'bottom bottom', scrub: true, onUpdate: s => setLayers(s.progress * 1.08) });
+    return () => { an.classList.remove('is-sticky'); setLayers(1); };
+  });
+
+  /* collection */
+  gsap.from('.card', { y: 90, opacity: 0, stagger: .12, duration: 1.4, ease: 'expo.out', scrollTrigger: { trigger: '#cards', start: 'top 85%' } });
+
+  /* figures */
+  $$('[data-count]').forEach(el => { const to = +el.dataset.count, c = { v: 0 };
+    gsap.to(c, { v: to, duration: 2, ease: 'expo.out', scrollTrigger: { trigger: el, start: 'top 90%' }, onUpdate: () => el.textContent = String(Math.round(c.v)).replace(/\B(?=(\d{3})+(?!\d))/g, '.') }); });
+
+  /* cursor + magnetic */
+  if (fine) {
+    const c = $('#cursor'); let x = innerWidth / 2, y = innerHeight / 2, cx = x, cy = y;
+    addEventListener('pointermove', e => { x = e.clientX; y = e.clientY; c.style.opacity = 1; }, { passive: true });
+    gsap.ticker.add(() => { cx += (x - cx) * .18; cy += (y - cy) * .18; c.style.transform = `translate(${cx}px,${cy}px) translate(-50%,-50%)`; });
+    $$('[data-cursor]').forEach(el => { el.addEventListener('pointerenter', () => { c.dataset.label = el.dataset.cursor; c.classList.add('is-big'); }); el.addEventListener('pointerleave', () => c.classList.remove('is-big')); });
+    $$('.magnetic').forEach(el => {
+      el.addEventListener('pointermove', e => { const r = el.getBoundingClientRect(); gsap.to(el, { x: (e.clientX - r.left - r.width / 2) * .3, y: (e.clientY - r.top - r.height / 2) * .4, duration: .6, ease: 'power3.out' }); });
+      el.addEventListener('pointerleave', () => gsap.to(el, { x: 0, y: 0, duration: 1.1, ease: 'elastic.out(1,.4)' }));
+    });
+  }
+
+  addEventListener('load', () => ScrollTrigger.refresh());
+})();
+</script>
