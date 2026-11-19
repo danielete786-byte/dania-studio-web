@@ -28,7 +28,10 @@ export const leonidaDefaults: Props = {
   sources: ['Rockstar Newswire', 'IGN', 'Vandal', '3DJuegos', 'Eurogamer', 'GameSpot', 'VGC', 'GamesRadar+', 'TechRadar', 'Polygon'],
 }
 // 120 BPM -> 1 tiempo = 15 frames. Escenas en múltiplos de 2 tiempos.
-const SC = [90, 90, 150, 90, 90, 90, 120]
+const SC = [90, 150, 150, 120, 120, 105, 120]
+// Locución (voz masculina, una línea por escena) y su duración en segundos
+const VO = [1.47, 4.06, 3.96, 2.74, 3.18, 2.44, 2.48]
+const VO_DELAY = 6
 const T = 12
 export const LEONIDA_PROMO_DURATION = SC.reduce((a, b) => a + b, 0) - (SC.length - 1) * T
 
@@ -250,7 +253,9 @@ const S7Cta: React.FC<{ p: Props }> = ({ p }) => {
 export const LeonidaPromo: React.FC<Props> = (p) => {
   const f = useCurrentFrame(); const { durationInFrames } = useVideoConfig()
   const starts: number[] = []; SC.reduce((acc, d, i) => { starts.push(acc); return acc + d - T }, 0)
-  const vol = (fr: number) => interpolate(fr, [0, 10, durationInFrames - 30, durationInFrames], [0, 0.85, 0.85, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' })
+  const { fps } = useVideoConfig()
+  const talking = (fr: number) => starts.some((st, i) => fr >= st + VO_DELAY - 4 && fr <= st + VO_DELAY + VO[i] * fps + 4)
+  const vol = (fr: number) => interpolate(fr, [0, 10, durationInFrames - 30, durationInFrames], [0, 1, 1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }) * (talking(fr) ? 0.32 : 0.8)
   return (
     <AbsoluteFill style={{ backgroundColor: c.night }}>
       <TransitionSeries>
@@ -273,9 +278,10 @@ export const LeonidaPromo: React.FC<Props> = (p) => {
       <div style={{ position: 'absolute', top: 40, left: 50, font: `400 34px ${F.display}`, color: c.sand, opacity: interpolate(f, [80, 95], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }) }}>LEONIDA WIRE <span style={{ font: `italic 400 30px ${F.serif}`, color: c.pink }}>noticias de GTA VI</span></div>
       <div style={{ position: 'absolute', left: 0, bottom: 0, height: 10, width: `${(f / durationInFrames) * 100}%`, background: `linear-gradient(90deg, ${c.pink}, ${c.sun}, ${c.teal})` }} />
       <Audio src={staticFile('audio/leonida/music.wav')} volume={vol} />
-      {starts.slice(1).map((s, i) => <Sequence key={i} from={s - 4} durationInFrames={20}><Audio src={staticFile('sfx/whoosh.wav')} volume={0.35} /></Sequence>)}
-      <Sequence from={starts[1]} durationInFrames={25}><Audio src={staticFile('sfx/boom.wav')} volume={0.6} /></Sequence>
-      <Sequence from={starts[6]} durationInFrames={25}><Audio src={staticFile('sfx/boom.wav')} volume={0.6} /></Sequence>
+      {starts.map((st, i) => <Sequence key={'vo' + i} from={st + VO_DELAY} durationInFrames={Math.ceil(VO[i] * fps) + 10}><Audio src={staticFile(`audio/leonida/vo${i + 1}.wav`)} volume={1} /></Sequence>)}
+      {starts.slice(1).map((s, i) => <Sequence key={i} from={s - 4} durationInFrames={20}><Audio src={staticFile('sfx/whoosh.wav')} volume={0.22} /></Sequence>)}
+      <Sequence from={starts[1]} durationInFrames={25}><Audio src={staticFile('sfx/boom.wav')} volume={0.4} /></Sequence>
+      <Sequence from={starts[6]} durationInFrames={25}><Audio src={staticFile('sfx/boom.wav')} volume={0.4} /></Sequence>
     </AbsoluteFill>
   )
 }
