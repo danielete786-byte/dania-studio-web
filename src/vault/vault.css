@@ -23,7 +23,7 @@ h2 { font-weight:200; font-size:clamp(30px,4.4vw,58px); letter-spacing:-.04em; l
 .play .row { display:flex; gap:10px; justify-content:center; align-items:center; margin-top:20px; flex-wrap:wrap; }
 body.interactive .play { pointer-events:none; } body.interactive .play button { pointer-events:auto; }
 .count { font-size:13px; color:rgba(244,239,228,.7); margin-right:6px; font-variant-numeric:tabular-nums; } .count b { color:var(--goldl); font-weight:500; }
-button { font:500 13px Inter,sans-serif; color:#0A1330; background:linear-gradient(100deg,#F2C94C,#D4A537 45%,#B8862B); border:0; border-radius:999px; padding:11px 20px; cursor:pointer; }
+button { font:500 13px Inter,sans-serif; color:#0A1330; background:linear-gradient(100deg,#F2C94C,#D4A537 45%,#B8862B); border:0; border-radius:999px; padding:11px 20px; cursor:pointer; white-space:nowrap; }
 button + button { background:rgba(255,255,255,.08); color:var(--ink); border:1px solid rgba(255,255,255,.18); backdrop-filter:blur(10px); }
 button:focus-visible { outline:2px solid var(--goldl); outline-offset:3px; }
 body.interactive #scene { cursor:pointer; }

@@ -20,10 +20,13 @@ const TEX = mobile ? 1024 : 2048
 /* ───────────────────────── renderer ───────────────────────── */
 const canvas = document.getElementById('scene') as HTMLCanvasElement
 let renderer: THREE.WebGLRenderer
-try { renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' }) }
+try { renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance', stencil: false }) }
 catch { document.body.classList.add('no-webgl'); throw new Error('WebGL no disponible') }
-renderer.setPixelRatio(Math.min(devicePixelRatio, mobile ? 1.5 : 1.75))
-renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap
+// calidad adaptativa: la resolución interna baja o sube según los FPS reales
+const DPR_MAX = Math.min(devicePixelRatio, mobile ? 1.5 : 1.5), DPR_MIN = mobile ? .6 : .75
+let dpr = Math.min(DPR_MAX, mobile ? 1.1 : 1.25)
+renderer.setPixelRatio(dpr)
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap; renderer.shadowMap.autoUpdate = false
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = .95
 renderer.outputColorSpace = THREE.SRGBColorSpace
 const aniso = renderer.capabilities.getMaxAnisotropy()
@@ -47,21 +50,21 @@ const floorT = T.polishedFloor(TEX, 11)
 const floorMat = new THREE.MeshStandardMaterial({ map: floorT.map, roughnessMap: floorT.rough, roughness: .9, metalness: 0, color: 0xcfcac2 })
 const brushRing = T.brushed(2048, 256, 5, 70, 160, mobile ? 3000 : 6000)
 const brushFlat = T.brushed(1024, 1024, 8, 80, 160, 4000)
-const steelMat = new THREE.MeshPhysicalMaterial({ color: 0x7d8288, metalness: 1, roughness: .9, roughnessMap: brushRing, bumpMap: brushRing, bumpScale: .25, clearcoat: .15, clearcoatRoughness: .4, side: THREE.DoubleSide })
-const frameMat = new THREE.MeshPhysicalMaterial({ color: 0x6c7076, metalness: 1, roughness: 1, roughnessMap: set(brushFlat.clone(), 2, 2), bumpMap: brushFlat, bumpScale: .2, side: THREE.DoubleSide })
+const steelMat = new THREE.MeshStandardMaterial({ color: 0x7d8288, metalness: 1, roughness: .9, roughnessMap: brushRing, bumpMap: brushRing, bumpScale: .25, side: THREE.DoubleSide })
+const frameMat = new THREE.MeshStandardMaterial({ color: 0x6c7076, metalness: 1, roughness: 1, roughnessMap: set(brushFlat.clone(), 2, 2), bumpMap: brushFlat, bumpScale: .2, side: THREE.DoubleSide })
 const darkSteel = new THREE.MeshStandardMaterial({ color: 0x3a3d42, metalness: .9, roughness: .45, roughnessMap: brushFlat })
-const chrome = new THREE.MeshPhysicalMaterial({ color: 0xe8e8ea, metalness: 1, roughness: .1, clearcoat: 1, clearcoatRoughness: .05 })
-const brass = new THREE.MeshPhysicalMaterial({ color: 0xd9a84e, metalness: 1, roughness: .28, roughnessMap: brushFlat })
+const chrome = new THREE.MeshStandardMaterial({ color: 0xe8e8ea, metalness: 1, roughness: .1 })
+const brass = new THREE.MeshStandardMaterial({ color: 0xd9a84e, metalness: 1, roughness: .28, roughnessMap: brushFlat })
 const plate = T.nameplate()
-const plateMat = new THREE.MeshPhysicalMaterial({ map: plate.map, bumpMap: plate.bump, bumpScale: 3, metalness: 1, roughness: .35 })
-const dialMat = new THREE.MeshPhysicalMaterial({ map: T.dialFace(), metalness: .25, roughness: .35, clearcoat: 1, clearcoatRoughness: .08 })
+const plateMat = new THREE.MeshStandardMaterial({ map: plate.map, bumpMap: plate.bump, bumpScale: 3, metalness: 1, roughness: .35 })
+const dialMat = new THREE.MeshStandardMaterial({ map: T.dialFace(), metalness: .25, roughness: .2 })
 const woodMat = new THREE.MeshStandardMaterial({ map: T.wood(4), roughness: .85, color: 0x8a7a68 })
 const boxes = T.depositBoxes(3)
 const boxesMat = new THREE.MeshStandardMaterial({ map: set(boxes.map, 1, 1), bumpMap: boxes.bump, bumpScale: 3, metalness: .75, roughness: .38, color: 0xc4c2bc })
 const stamp = T.barStamp(17)
-const goldMat = new THREE.MeshPhysicalMaterial({
+const goldMat = new THREE.MeshStandardMaterial({
   color: new THREE.Color(1.0, 0.62, 0.2), metalness: 1, roughness: 1, roughnessMap: stamp.rough,
-  bumpMap: stamp.bump, bumpScale: 3.5, specularIntensity: 1, clearcoat: .2, clearcoatRoughness: .3, envMapIntensity: 1.1 })
+  bumpMap: stamp.bump, bumpScale: 3.5, envMapIntensity: 1.1 })
 
 /* ───────────────────────── geometría base ───────────────────────── */
 const C = new THREE.Vector3(0, 1.32, 0) // centro de la puerta
@@ -299,21 +302,20 @@ scene.add(barMesh)
 }
 
 /* ───────────────────────── luces ───────────────────────── */
-scene.add(new THREE.HemisphereLight(0x8090a0, 0x201810, .25))
+scene.add(new THREE.HemisphereLight(0x8a9ab0, 0x201810, .4))
 const key = new THREE.SpotLight(0xfff0dc, 70, 18, .55, .65, 1.6); key.position.set(-1.6, 4.6, 5.2); key.target.position.copy(C)
-key.castShadow = true; key.shadow.mapSize.set(2048, 2048); key.shadow.bias = -.0004; key.shadow.normalBias = .02; key.shadow.camera.near = 2; key.shadow.camera.far = 14
+key.castShadow = true; key.shadow.mapSize.set(mobile ? 1024 : 1536, mobile ? 1024 : 1536); key.shadow.bias = -.0004; key.shadow.normalBias = .02; key.shadow.camera.near = 2; key.shadow.camera.far = 14
 scene.add(key, key.target)
-const rim = new THREE.SpotLight(0x9fb8ff, 25, 14, .7, .9, 1.5); rim.position.set(4, 3.5, 3); rim.target.position.copy(C); scene.add(rim, rim.target)
 const inside = new THREE.SpotLight(0xffd59a, 0, 9, .95, .55, 1.4); inside.position.set(0, ROOM.h - .15, -3.6); inside.target.position.set(0, 0, -3.8)
-inside.castShadow = true; inside.shadow.mapSize.set(mobile ? 1024 : 2048, mobile ? 1024 : 2048); inside.shadow.bias = -.0003; inside.shadow.normalBias = .015
+inside.castShadow = true; inside.shadow.mapSize.set(mobile ? 1024 : 1536, mobile ? 1024 : 1536); inside.shadow.bias = -.0003; inside.shadow.normalBias = .015
 inside.shadow.camera.near = .5; inside.shadow.camera.far = 5; scene.add(inside, inside.target)
 const shelfLights: THREE.SpotLight[] = []
-for (const x of [-2, 0, 2]) { const s = new THREE.SpotLight(0xffd8a0, 0, 7, .8, .7, 1.5); s.position.set(x, ROOM.h - .1, -6.3); s.target.position.set(x, 1.2, ROOM.z1); scene.add(s, s.target); shelfLights.push(s) }
+{ const s = new THREE.SpotLight(0xffd8a0, 0, 9, 1.1, .8, 1.3); s.position.set(0, ROOM.h - .1, -5.4); s.target.position.set(0, 1.2, ROOM.z1); scene.add(s, s.target); shelfLights.push(s) }
 const glow = new THREE.PointLight(0xffc46b, 0, 6, 1.6); glow.position.set(0, 1.3, -1.6); scene.add(glow)
 
 // Polvo en suspensión
 const dust = (() => {
-  const n = mobile ? 350 : 800, g = new THREE.BufferGeometry(), p = new Float32Array(n * 3)
+  const n = mobile ? 200 : 450, g = new THREE.BufferGeometry(), p = new Float32Array(n * 3)
   for (let i = 0; i < n; i++) { p[i * 3] = (Math.random() - .5) * 6.6; p[i * 3 + 1] = Math.random() * 3.1; p[i * 3 + 2] = -.8 - Math.random() * 7 }
   g.setAttribute('position', new THREE.BufferAttribute(p, 3))
   const m = new THREE.PointsMaterial({ size: .018, map: T.dot(), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, color: 0xffe2b0 })
@@ -323,7 +325,7 @@ const dust = (() => {
 /* ───────────────────────── postproceso ───────────────────────── */
 const composer = new EffectComposer(renderer)
 composer.addPass(new RenderPass(scene, camera))
-const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth / 2, innerHeight / 2), .3, .5, .9)
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth / 4, innerHeight / 4), .3, .5, .9)
 composer.addPass(bloom); composer.addPass(new OutputPass())
 
 /* ───────────────────────── recorrido de cámara ───────────────────────── */
@@ -403,6 +405,7 @@ addEventListener('pointermove', e => pointer.set(e.clientX / innerWidth * 2 - 1,
 
 const _m = new THREE.Matrix4(), _p = new THREE.Vector3(), _hit = new THREE.Vector3()
 function blast(at: THREE.Vector3, dir: THREE.Vector3, power: number, radius: number, direct?: number) {
+  dirtyBars = true
   for (let i = 0; i < bars.length; i++) {
     const b = bars[i].body, dx = b.position.x - at.x, dy = b.position.y - at.y, dz = b.position.z - at.z, dist = Math.hypot(dx, dy, dz)
     if (i !== direct && Math.hypot(dx, dz) < .75) b.wakeUp()
@@ -428,6 +431,7 @@ function ripple(x: number, y: number) {
   document.body.appendChild(r); setTimeout(() => r.remove(), 700)
 }
 function resetBars() {
+  dirtyBars = true
   for (const b of bars) { b.body.position.copy(b.home.p); b.body.quaternion.copy(b.home.q); b.body.velocity.setZero(); b.body.angularVelocity.setZero(); b.body.sleep() }
 }
 ui.reset.addEventListener('click', resetBars)
@@ -439,12 +443,25 @@ ui.sound.addEventListener('click', () => {
 /* ───────────────────────── bucle ───────────────────────── */
 function resize() {
   const w = innerWidth, h = innerHeight
-  renderer.setSize(w, h, false); composer.setSize(w, h); bloom.setSize(w / 2, h / 2); camera.aspect = w / h; camera.updateProjectionMatrix()
+  renderer.setPixelRatio(dpr); composer.setPixelRatio(dpr); renderer.setSize(w, h, false); composer.setSize(w, h); bloom.setSize(w * dpr / 4, h * dpr / 4); camera.aspect = w / h; camera.updateProjectionMatrix()
 }
 addEventListener('resize', resize); resize()
 
 const clock = new THREE.Clock(), look = new THREE.Vector3(), parallax = new THREE.Vector2()
-const dustPos = dust.geometry.attributes.position as THREE.BufferAttribute
+const _q = new THREE.Quaternion(), ONE = new THREE.Vector3(1, 1, 1)
+let frameNo = 0, dirtyBars = true, lastUi = -1, lastShadow = -1
+// mide FPS reales y ajusta resolución y bloom
+let acc = 0, cnt = 0, lastAdapt = 0
+function adapt(dt: number) {
+  acc += dt; cnt++
+  if (cnt < 40 || clock.elapsedTime - lastAdapt < 1.2) return
+  const avg = acc / cnt; acc = 0; cnt = 0; lastAdapt = clock.elapsedTime
+  let nd = dpr
+  if (avg > 1 / 45) nd = Math.max(DPR_MIN, dpr - .15)
+  else if (avg < 1 / 58) nd = Math.min(DPR_MAX, dpr + .1)
+  bloom.enabled = !(nd <= DPR_MIN + .01 && avg > 1 / 40)
+  if (Math.abs(nd - dpr) > .01) { dpr = nd; resize() }
+}
 function frame() {
   const dt = Math.min(clock.getDelta(), 1 / 20), t = clock.elapsedTime
   prog += (target - prog) * Math.min(1, dt * 5)
@@ -461,18 +478,14 @@ function frame() {
   const pop = smooth(range(p, .43, .46)), open = ease(range(p, .45, .64))
   door.position.z = -HINGE.z + pop * .06; doorPivot.rotation.y = open * 1.85
   const lit = smooth(range(p, .43, .6))
-  inside.intensity = lit * 17; shelfLights.forEach(s => (s.intensity = lit * 9)); glow.intensity = lit * 4
+  inside.intensity = lit * 17; shelfLights.forEach(s => (s.intensity = lit * 16)); glow.intensity = lit * 4
   ;(dust.material as THREE.PointsMaterial).opacity = lit * .55
   scene.environmentIntensity = .55 - lit * .15
   key.intensity = 70 - smooth(range(p, .6, .85)) * 55
   bloom.strength = .25 + lit * .12
 
   // polvo
-  for (let i = 0; i < dustPos.count; i++) {
-    let y = dustPos.getY(i) + Math.sin(t * .3 + i) * .0006 + .0004; if (y > 3.1) y = 0
-    dustPos.setY(i, y); dustPos.setX(i, dustPos.getX(i) + Math.cos(t * .2 + i * 1.3) * .0004)
-  }
-  dustPos.needsUpdate = true
+  if (lit > 0) { dust.visible = true; dust.position.y = (t * .02) % .4 - .2; dust.rotation.y = Math.sin(t * .05) * .02 } else dust.visible = false
 
   // cámara
   cameraAt(p)
@@ -486,33 +499,43 @@ function frame() {
   if (nowInteractive !== interactive) { interactive = nowInteractive; document.body.classList.toggle('interactive', interactive) }
 
   // física
-  world.step(1 / 60, dt, 3)
+  frameNo++
+  if (world.hasActiveBodies || dirtyBars) world.step(1 / 60, dt, 2)
   // despierta lingotes cercanos a los que se mueven (evita que queden flotando)
-  for (let i = 0; i < bars.length; i++) {
+  if (frameNo % 3 === 0) for (let i = 0; i < bars.length; i++) {
     const m = bars[i].body; if (m.sleepState !== CANNON.Body.AWAKE || m.velocity.lengthSquared() < .04) continue
     for (let j = 0; j < bars.length; j++) { const o = bars[j].body; if (o.sleepState === CANNON.Body.SLEEPING && o.position.distanceTo(m.position) < .4) o.wakeUp() }
   }
-  let fallen = 0
+  let fallen = 0, moving = false
   for (let i = 0; i < bars.length; i++) {
     const b = bars[i].body
     _p.set(b.position.x, b.position.y, b.position.z)
-    _m.compose(_p, new THREE.Quaternion(b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w), new THREE.Vector3(1, 1, 1))
-    barMesh.setMatrixAt(i, _m)
+    if (b.sleepState === CANNON.Body.SLEEPING && !dirtyBars) { if (b.position.distanceTo(bars[i].home.p) > .15) fallen++; continue }
+    _q.set(b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w); _m.compose(_p, _q, ONE)
+    barMesh.setMatrixAt(i, _m); moving = true
     if (b.position.distanceTo(bars[i].home.p) > .15) fallen++
     if (b.position.y < -2) { b.position.copy(bars[i].home.p); b.velocity.setZero(); b.sleep() }
   }
-  barMesh.instanceMatrix.needsUpdate = true
-  ui.count.textContent = `${fallen} / ${bars.length}`
+  if (moving) barMesh.instanceMatrix.needsUpdate = true
+  dirtyBars = false
+  const txt = `${fallen} / ${bars.length}`; if (ui.count.textContent !== txt) ui.count.textContent = txt
 
   // interfaz
-  ui.bar.style.transform = `scaleX(${p})`
+  const uiKey = Math.round(p * 2000)
+  if (uiKey !== lastUi) { lastUi = uiKey; ui.bar.style.transform = `scaleX(${p})`
   for (const s of ui.steps) {
     const a = +s.dataset.from!, b = +s.dataset.to!, o = Math.min(a === 0 ? 1 : smooth(range(p, a, a + .03)), 1 - smooth(range(p, b - .03, b)))
     s.style.opacity = String(b >= 1 ? smooth(range(p, a, a + .03)) : o); s.style.transform = `translateY(${(1 - o) * 14}px)`
     s.style.visibility = o > .01 || (b >= 1 && p > a) ? 'visible' : 'hidden'
-  }
+  } }
+  // sombras solo cuando algo se mueve
+  const sceneKey = Math.round(p * 4000)
+  if (sceneKey !== lastShadow || moving) { lastShadow = sceneKey; renderer.shadowMap.needsUpdate = true }
+  adapt(dt)
   composer.render()
   requestAnimationFrame(frame)
 }
 document.body.classList.add('ready')
+// precompila todos los shaders antes del primer fotograma para evitar tirones
+cameraAt(0); renderer.compile(scene, camera)
 requestAnimationFrame(frame)
