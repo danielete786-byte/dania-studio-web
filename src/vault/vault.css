@@ -1,0 +1,33 @@
+:root { --gold:#D4A537; --goldl:#F2C94C; --ink:#f4efe4; }
+* { box-sizing:border-box; }
+html,body { margin:0; background:#050505; color:var(--ink); font-family:Inter,system-ui,sans-serif; -webkit-font-smoothing:antialiased; overscroll-behavior:none; }
+#scene { position:fixed; inset:0; width:100vw; height:100vh; height:100lvh; display:block; touch-action:pan-y; }
+.track { height:900vh; }
+.vignette { position:fixed; inset:0; pointer-events:none; background:radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.55) 100%); }
+.top { position:fixed; top:0; left:0; right:0; display:flex; justify-content:space-between; align-items:center; padding:18px 24px; z-index:5; font-size:14px; }
+.brand { color:var(--ink); text-decoration:none; letter-spacing:-.01em; } .brand b { font-weight:500; background:linear-gradient(100deg,#F2C94C,#B8862B); -webkit-background-clip:text; background-clip:text; color:transparent; }
+.tag { font-size:11px; letter-spacing:.28em; text-transform:uppercase; color:rgba(244,239,228,.55); }
+.progress { position:fixed; left:0; right:0; top:0; height:2px; z-index:6; } .progress i { display:block; height:100%; background:linear-gradient(90deg,#B8862B,#F2C94C); transform-origin:0 50%; transform:scaleX(0); }
+.step { position:fixed; z-index:4; opacity:0; visibility:hidden; pointer-events:none; text-shadow:0 2px 24px rgba(0,0,0,.6); }
+.kicker { font-size:11px; letter-spacing:.3em; text-transform:uppercase; color:var(--goldl); font-weight:500; margin:0 0 14px; }
+h1 { font-weight:200; font-size:clamp(56px,11vw,150px); letter-spacing:-.05em; line-height:.92; margin:0; }
+h2 { font-weight:200; font-size:clamp(30px,4.4vw,58px); letter-spacing:-.04em; line-height:1; margin:0; max-width:12ch; }
+.step p:not(.kicker) { color:rgba(244,239,228,.7); font-size:16px; line-height:1.5; max-width:30ch; margin:16px 0 0; }
+.hero { left:0; right:0; bottom:12vh; text-align:center; } .hero .lead { margin:20px auto 0 !important; }
+.scroll-hint { display:flex; flex-direction:column; align-items:center; gap:10px; font-size:10px !important; letter-spacing:.3em; text-transform:uppercase; margin-top:40px !important; max-width:none !important; }
+.scroll-hint span { width:1px; height:44px; background:linear-gradient(var(--goldl),transparent); animation:drip 1.8s ease-in-out infinite; transform-origin:top; }
+@keyframes drip { 0%{transform:scaleY(0)} 50%{transform:scaleY(1)} 100%{transform:scaleY(1); opacity:0} }
+.side { left:clamp(20px,6vw,90px); bottom:14vh; } .side.right { left:auto; right:clamp(20px,6vw,90px); text-align:right; } .side.right h2, .side.right p { margin-left:auto; }
+.play { left:0; right:0; bottom:calc(28px + env(safe-area-inset-bottom)); text-align:center; }
+.play h2 { max-width:none; font-size:clamp(24px,3.2vw,40px); }
+.play .row { display:flex; gap:10px; justify-content:center; align-items:center; margin-top:20px; flex-wrap:wrap; }
+body.interactive .play { pointer-events:none; } body.interactive .play button { pointer-events:auto; }
+.count { font-size:13px; color:rgba(244,239,228,.7); margin-right:6px; font-variant-numeric:tabular-nums; } .count b { color:var(--goldl); font-weight:500; }
+button { font:500 13px Inter,sans-serif; color:#0A1330; background:linear-gradient(100deg,#F2C94C,#D4A537 45%,#B8862B); border:0; border-radius:999px; padding:11px 20px; cursor:pointer; }
+button + button { background:rgba(255,255,255,.08); color:var(--ink); border:1px solid rgba(255,255,255,.18); backdrop-filter:blur(10px); }
+button:focus-visible { outline:2px solid var(--goldl); outline-offset:3px; }
+body.interactive #scene { cursor:pointer; }
+.ripple { position:fixed; z-index:7; width:12px; height:12px; margin:-6px 0 0 -6px; border-radius:50%; border:1.5px solid var(--goldl); pointer-events:none; animation:rip .7s ease-out forwards; }
+@keyframes rip { to { transform:scale(7); opacity:0; } }
+.nogl { display:none; } body.no-webgl .nogl { display:block; position:fixed; inset:auto 20px 40vh; text-align:center; z-index:9; }
+@media (max-width:760px) { .hero { bottom:5vh; } .side, .side.right { left:20px; right:20px; text-align:left; bottom:18vh; } .side.right h2, .side.right p { margin-left:0; } .step p:not(.kicker) { font-size:15px; } }

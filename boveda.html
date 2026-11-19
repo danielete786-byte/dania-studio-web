@@ -1,0 +1,31 @@
+<!doctype html><html lang="es"><head><meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<title>La Bóveda · DanIA Studio</title>
+<meta name="description" content="Experiencia 3D interactiva: abre la caja fuerte con el scroll y derriba los lingotes de oro."/>
+<link rel="icon" type="image/png" href="%BASE_URL%logo/dania-logo-3d.png"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600&display=swap" rel="stylesheet"/>
+</head><body>
+<canvas id="scene" aria-label="Caja fuerte 3D: se abre al hacer scroll; al final toca los lingotes para derribarlos" role="img"></canvas>
+<div class="vignette" aria-hidden="true"></div>
+<header class="top"><a href="./" class="brand">DanIA <b>Studio</b></a><span class="tag">La Bóveda</span></header>
+<div class="progress"><i id="progress"></i></div>
+
+<section class="step hero" data-from="0" data-to=".1">
+  <p class="kicker">Experiencia 3D</p><h1>La Bóveda</h1>
+  <p class="lead">Veinte toneladas de acero. Una combinación. Desliza para abrirla.</p>
+  <p class="scroll-hint"><span></span>Scroll</p>
+</section>
+<section class="step side" data-from=".14" data-to=".3"><p class="kicker">01 · Combinación</p><h2>Derecha, izquierda, derecha.</h2><p>El dial gira hasta que encajan las tres levas.</p></section>
+<section class="step side right" data-from=".32" data-to=".44"><p class="kicker">02 · Manivela</p><h2>Los cerrojos ceden.</h2><p>Doce pernos de acero se retraen al girar la rueda.</p></section>
+<section class="step side" data-from=".47" data-to=".62"><p class="kicker">03 · Apertura</p><h2>La puerta se abre.</h2></section>
+<section class="step side right" data-from=".66" data-to=".84"><p class="kicker">04 · El tesoro</p><h2>Oro de ley 999,9.</h2></section>
+<section class="step play" id="play" data-from=".88" data-to="1">
+  <p class="kicker">Ahora es tuyo</p><h2>Toca los lingotes para derribarlos</h2>
+  <div class="row"><span class="count">Movidos <b id="count">0</b></span>
+  <button id="reset" type="button">Reconstruir</button><button id="sound" type="button">Sonido: sí</button></div>
+</section>
+<p class="nogl">Tu navegador no tiene WebGL activado; esta experiencia 3D no puede mostrarse.</p>
+<div class="track" aria-hidden="true"></div>
+<script type="module" src="/src/vault/main.ts"></script>
+</body></html>
