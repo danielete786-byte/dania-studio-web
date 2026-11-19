@@ -5,6 +5,7 @@ import { LogoIntro, logoIntroSchema } from './compositions/LogoIntro'
 import { BrandPromo, brandPromoSchema, PROMO_DURATION } from './compositions/BrandPromo'
 import { TitleCard, titleCardSchema } from './compositions/TitleCard'
 import { GtaNominado, gtaSchema, gtaDefaults, gtaDuration } from './compositions/GtaNominado'
+import { LeonidaPromo, leonidaPromoSchema, leonidaDefaults, LEONIDA_PROMO_DURATION } from './compositions/LeonidaPromo'
 
 const intro = { title: '', tagline: 'Creamos con IA. Contamos con alma.', kicker: 'Estudio de contenido y vídeo con IA' }
 
@@ -45,6 +46,8 @@ export const RemotionRoot: React.FC = () => (
     <Folder name="Noticias">
       <Composition id="GtaNominado" component={GtaNominado} schema={gtaSchema} defaultProps={gtaDefaults}
         durationInFrames={gtaDuration(gtaDefaults, FPS)} fps={FPS} width={1080} height={1920} />
+      <Composition id="LeonidaPromo" component={LeonidaPromo} schema={leonidaPromoSchema} defaultProps={leonidaDefaults}
+        durationInFrames={LEONIDA_PROMO_DURATION} fps={FPS} width={1080} height={1350} />
     </Folder>
     <Folder name="Rotulos">
       <Composition id="TitleCard" component={TitleCard} schema={titleCardSchema} defaultProps={card}
