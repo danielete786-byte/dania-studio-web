@@ -1,7 +1,25 @@
 {
-  "updatedAt": "2026-11-19T10:35:00Z",
+  "updatedAt": "2026-11-20T07:58:00Z",
   "metascore": 99,
   "news": [
+    {
+      "addedAt": "2026-11-20T07:58:00Z",
+      "date": "2026-11-19",
+      "source": "Deadline",
+      "summary": "Según estimaciones de Sensor Tower recogidas por Deadline, las ventas de GTA VI, reservas incluidas, superaron los 2.000 millones de dólares el día del lanzamiento. Take-Two no ha publicado cifras oficiales.",
+      "tag": "Ventas",
+      "title": "GTA VI supera los 2.000 millones de dólares en ventas el día de su lanzamiento, según estimaciones",
+      "url": "https://deadline.com/2026/11/gta-6-sales-launch-day-surge-videogame-1237229514/"
+    },
+    {
+      "addedAt": "2026-11-20T07:58:00Z",
+      "date": "2026-11-19",
+      "source": "Variety",
+      "summary": "Streams Charts registró un récord de 7,91 millones de espectadores simultáneos en plataformas de streaming, y el operador de intercambio de internet DE-CIX informó de un nuevo máximo de tráfico ligado al lanzamiento.",
+      "tag": "Lanzamiento",
+      "title": "El lanzamiento de GTA VI bate récords de audiencia en streaming y de tráfico de internet",
+      "url": "https://variety.com/2026/gaming/news/gta-6-launch-livestream-internet-traffic-records-1236953145/"
+    },
     {
       "addedAt": "2026-11-19T10:02:00Z",
       "date": "2026-11-19",
