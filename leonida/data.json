@@ -1,7 +1,25 @@
 {
-  "updatedAt": "2026-11-20T10:03:19Z",
+  "updatedAt": "2026-11-21T07:49:35Z",
   "metascore": 99,
   "news": [
+    {
+      "addedAt": "2026-11-21T07:49:35Z",
+      "date": "2026-11-20",
+      "source": "Take-Two Interactive",
+      "summary": "Según el comunicado oficial de Take-Two y Rockstar, GTA VI logró 3.790 millones de dólares en ventas minoristas el día de lanzamiento y 32,5 millones de unidades vendidas antes de su salida, y lo presentan como el mayor estreno de la historia del entretenimiento.",
+      "tag": "Ventas",
+      "title": "Take-Two confirma 3.790 millones de dólares en ventas el primer día y 32,5 millones de copias reservadas",
+      "url": "https://www.take2games.com/ir/news/grand-theft-auto-vi-shatters-entertainment-box-office-records"
+    },
+    {
+      "addedAt": "2026-11-21T07:49:35Z",
+      "date": "2026-11-19",
+      "source": "Vandal",
+      "summary": "Rockstar ha puesto en la web oficial del juego el mapa de Leonida y el póster con la portada de GTA VI en formato imprimible y descarga gratuita.",
+      "tag": "Imágenes",
+      "title": "Rockstar publica el mapa de Leonida y el póster de la portada para descargar e imprimir",
+      "url": "https://vandal.elespanol.com/noticia/2026323037/el-mapa-oficial-de-gta-6-ya-se-puede-descargar-rockstar-publica-el-plano-y-el-poster-en-formato-imprimible/"
+    },
     {
       "addedAt": "2026-11-20T08:20:00Z",
       "date": "2026-11-19",
@@ -161,7 +179,7 @@
       "channel": "Rockstar Games",
       "date": "2026-11-10",
       "kind": "Anuncio",
-      "title": "Grand Theft Auto VI: Pre-Load Now",
+      "title": "Grand Theft Auto VI: Out Now",
       "youtubeId": "_yl5ELcmugI"
     },
     {
