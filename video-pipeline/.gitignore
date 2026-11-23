@@ -3,9 +3,7 @@ remotion/out
 remotion/public/voice.wav
 remotion/public/sfx/
 remotion/public/img/
-stories/*
-!stories/.gitkeep
-!stories/ejemplo-remotion/
-stories/ejemplo-remotion/*
-!stories/ejemplo-remotion/script.json
 __pycache__/
+# de cada historia solo se guarda el guion (nunca vídeos ni audio)
+stories/*/*
+!stories/*/script.json
