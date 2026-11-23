@@ -1,0 +1,11 @@
+remotion/node_modules
+remotion/out
+remotion/public/voice.wav
+remotion/public/sfx/
+remotion/public/img/
+stories/*
+!stories/.gitkeep
+!stories/ejemplo-remotion/
+stories/ejemplo-remotion/*
+!stories/ejemplo-remotion/script.json
+__pycache__/

@@ -1,0 +1,44 @@
+{
+ "segments": [
+  {
+   "id": "hook",
+   "gap": 0.3,
+   "text": "Este vídeo no se ha editado. Se ha programado."
+  },
+  {
+   "id": "lema",
+   "gap": 0.4,
+   "text": "Te lo cuento en menos de un minuto."
+  },
+  {
+   "id": "que",
+   "gap": 0.35,
+   "text": "Se llama Remotion: convierte código de React en vídeo, fotograma a fotograma."
+  },
+  {
+   "id": "agentes",
+   "gap": 0.4,
+   "text": "Y desde enero tiene habilidades para agentes de IA como Claude Code: describes el vídeo con palabras, y la IA escribe el código."
+  },
+  {
+   "id": "cifras",
+   "gap": 0.4,
+   "text": "Ya supera las setenta y cinco mil estrellas en GitHub, y es gratis para particulares y empresas de hasta tres personas."
+  },
+  {
+   "id": "cierre",
+   "gap": 0.0,
+   "text": "¿Lo probarías? Te leo en comentarios."
+  }
+ ],
+ "display": [
+  {
+   "spoken": "setenta y cinco mil",
+   "display": "75.000"
+  },
+  {
+   "spoken": "tres",
+   "display": "3"
+  }
+ ]
+}
