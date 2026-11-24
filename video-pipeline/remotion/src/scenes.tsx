@@ -1,349 +1,257 @@
 /**
- * HISTORIA ACTUAL (se reescribe en cada vídeo).
- * Ejemplo incluido: "Remotion en menos de un minuto" (23 nov 2026).
- * Debe exportar SCENES (una escena por bloque del guion, en orden) y SfxCues.
- * Usa las piezas de ./news (TechBackdrop, NewsBar, HookBadge, Lema, Poll, Counter, CodeWindow)
- * y de ./components (MaskLine, Chip, Stamp, Hand, punch, useShake) y ./art (ilustraciones SVG).
+ * HISTORIA: «Nvidia readmite a Jensen Huang» (IA · 24 nov 2026).
+ * Exporta SCENES (una escena por bloque del guion) y SfxCues.
  */
 import React from "react";
 import { Audio } from "@remotion/media";
 import { AbsoluteFill, interpolate, Sequence, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import { Chip, MaskLine, Stamp, punch, useShake } from "./components";
-import { C, clamp, EASE_IN, EASE_MOVE, FONT_BODY, FONT_HEAD, popSpring, ramp, softSpring, TL, msToF, wordF } from "./lib";
-import { CodeWindow, HookBadge, Lema, MONO, NewsBar, Poll, SceneDef, SceneProps, TechBackdrop } from "./news";
+import { C, clamp, EASE_MOVE, FONT_BODY, FONT_HEAD, popSpring, ramp, softSpring, wordF } from "./lib";
+import { Counter, HookBadge, Lema, NewsBar, Poll, SceneDef, SceneProps, TechBackdrop } from "./news";
 
-const DATE = "23 NOV";
-const Bar: React.FC<{ active: number }> = ({ active }) => <NewsBar active={active} total={4} label="HERRAMIENTAS IA" date={DATE} />;
+const DATE = "24 NOV";
+const Bar: React.FC<{ active: number }> = ({ active }) => <NewsBar active={active} total={4} label="NOTICIA IA" date={DATE} />;
 
-// ---------- timeline de editor de vídeo (lo que NO se usa) ----------
-const EditorTimeline: React.FC<{ w: number }> = ({ w }) => {
-  const frame = useCurrentFrame();
-  const tracks = [
-    [0.02, 0.3, "#8E5CFF"],
-    [0.33, 0.62, "#FF5CA8"],
-    [0.65, 0.95, "#5CFFB0"],
-  ];
-  return (
-    <div style={{ width: w, background: "#1a1d24", borderRadius: 18, padding: 18, boxShadow: "0 20px 50px rgba(0,0,0,0.6)" }}>
-      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-        {Array.from({ length: 12 }, (_, i) => (
-          <div key={i} style={{ flex: 1, height: 10, borderLeft: "2px solid #555" }} />
-        ))}
-      </div>
-      {[0, 1, 2].map((r) => (
-        <div key={r} style={{ position: "relative", height: 56, marginBottom: 10, background: "#22262f", borderRadius: 8 }}>
-          {tracks.map(([a, b, c], k) => (
-            <div
-              key={k}
-              style={{
-                position: "absolute",
-                left: `${((Number(a) + r * 0.07) % 0.9) * 100}%`,
-                width: `${(Number(b) - Number(a)) * 100 * (0.7 + 0.1 * r)}%`,
-                top: 6,
-                bottom: 6,
-                background: String(c),
-                opacity: 0.75,
-                borderRadius: 6,
-              }}
-            />
-          ))}
-        </div>
-      ))}
-      <div style={{ position: "absolute", top: 10, bottom: 10, left: 20 + ((frame * 6) % (w - 40)), width: 4, background: C.red }} />
-    </div>
-  );
-};
+// ---------- silla de CEO (ilustración propia) ----------
+const CeoChair: React.FC<{ w: number; spot: number; glow: number }> = ({ w, spot, glow }) => (
+  <svg viewBox="0 0 500 520" width={w} height={(w * 520) / 500} style={{ filter: glow ? `drop-shadow(0 0 ${30 * glow}px ${C.nv})` : undefined }}>
+    <defs>
+      <radialGradient id="spot" cx="0.5" cy="0.1" r="0.9">
+        <stop offset="0" stopColor="#fff" stopOpacity="0.35" />
+        <stop offset="1" stopColor="#fff" stopOpacity="0" />
+      </radialGradient>
+    </defs>
+    <path d="M 170 0 L 330 0 L 470 520 L 30 520 Z" fill="url(#spot)" opacity={spot} />
+    <ellipse cx="250" cy="490" rx="170" ry="22" fill="#000" opacity="0.6" />
+    <rect x="150" y="90" width="200" height="230" rx="40" fill="#1d1f1c" stroke={C.nv} strokeWidth="5" />
+    <rect x="175" y="115" width="150" height="180" rx="28" fill="#2a2d29" />
+    <rect x="130" y="300" width="240" height="60" rx="26" fill="#1d1f1c" stroke={C.nv} strokeWidth="5" />
+    <rect x="110" y="250" width="40" height="90" rx="16" fill="#1d1f1c" />
+    <rect x="350" y="250" width="40" height="90" rx="16" fill="#1d1f1c" />
+    <rect x="238" y="360" width="24" height="90" fill="#3a3d39" />
+    {[-1, -0.5, 0, 0.5, 1].map((k, i) => (
+      <line key={i} x1="250" y1="450" x2={250 + k * 140} y2={478 - Math.abs(k) * 6} stroke="#3a3d39" strokeWidth="14" strokeLinecap="round" />
+    ))}
+    <rect x="195" y="190" width="110" height="46" rx="8" fill={C.nv} />
+    <text x="250" y="224" textAnchor="middle" fontFamily="Anton" fontSize="34" fill={C.ink}>
+      CEO
+    </text>
+  </svg>
+);
 
 // =====================================================================
-// 1. GANCHO: este vídeo se ha programado
+// 1. GANCHO
 // =====================================================================
 const Hook: React.FC<SceneProps> = ({ startMs }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const w = (q: string) => wordF("hook", q, startMs);
-  const fEdit = w("editado");
-  const fProg = w("programado");
-  const sh = useShake(fProg, 10, 16);
-  const strike = ramp(frame, fProg - 2, 8);
-  const code = softSpring(frame, fps, fProg - 4);
-  const z = punch(frame, fps, fProg, 0.06);
+  const fNv = w("nvidia");
+  const fJen = w("jensen");
+  const fOnce = w("11");
+  const fDim = w("dimitiera");
+  const sh = useShake(fDim, 10, 16);
+  const chair = popSpring(frame, fps, fJen - 4);
+  const back = ramp(frame, fDim - 2, 10);
+  const z = punch(frame, fps, fJen, 0.05) * punch(frame, fps, fDim, 0.07);
   return (
     <AbsoluteFill style={{ scale: String(z), translate: `${sh.x}px ${sh.y}px` }}>
-      <TechBackdrop />
-      <HookBadge label="HERRAMIENTAS IA" date="23 NOV 2026" color={C.nv} blink={false} />
+      <TechBackdrop hue="#0B1A06" />
+      <HookBadge label="ÚLTIMA HORA" date="24 NOV 2026" />
       <div style={{ position: "absolute", left: 80, top: 230 }}>
-        <MaskLine delay={-9} size={140} shadow={C.nv}>
-          Este vídeo
+        <MaskLine delay={-9} size={124} shadow={C.red}>
+          Giro total:
         </MaskLine>
-        <div style={{ position: "relative", display: "inline-block" }}>
-          <MaskLine delay={-5} size={120} shadow={C.ink}>
-            no se ha editado
-          </MaskLine>
-          <div style={{ position: "absolute", left: -6, top: "48%", height: 16, width: `${strike * 104}%`, background: C.red, rotate: "-2deg" }} />
-        </div>
-        <MaskLine delay={fProg - 3} size={122} color={C.nvLight} shadow={C.ink}>
-          Se ha programado
+        <MaskLine delay={fNv - 4} size={124} shadow={C.ink}>
+          <span style={{ color: C.nvLight }}>Nvidia</span> vuelve
+        </MaskLine>
+        <MaskLine delay={fNv + 2} size={124} shadow={C.ink}>
+          a contratar a
+        </MaskLine>
+        <MaskLine delay={fJen - 3} size={140} color={C.nvLight} shadow={C.ink}>
+          Jensen Huang
         </MaskLine>
       </div>
-      <div style={{ position: "absolute", left: 90, top: 790, opacity: 1 - code * 0.85, scale: String(1 - code * 0.1) }}>
-        <EditorTimeline w={900} />
+      <div style={{ position: "absolute", left: 540 - 190, top: 840, scale: String(interpolate(chair, [0, 1], [0.5, 1])), opacity: interpolate(chair, [0, 0.3], [0, 1], clamp) }}>
+        <CeoChair w={380} spot={0.5 + 0.5 * back} glow={back} />
       </div>
-      {frame >= fEdit + 2 && frame < fProg + 6 ? <Stamp text="Sin editor" delay={fEdit + 2} color={C.red} size={96} rotate={-8} style={{ left: 300, top: 860 }} /> : null}
-      <div style={{ position: "absolute", left: 90, top: 780, translate: `${interpolate(code, [0, 1], [1100, 0])}px 0`, rotate: `${interpolate(code, [0, 1], [8, -2])}deg` }}>
-        <CodeWindow
-          width={900}
-          start={fProg - 2}
-          cps={3.2}
-          lines={[
-            { t: "const frame = useCurrentFrame();", c: "#9CDCFE" },
-            { t: "const s = spring({ frame, fps });", c: "#C3E88D" },
-            { t: "return <Escena scale={s} />;", c: "#FFCB6B" },
-          ]}
-        />
-      </div>
+      {frame < fDim - 1 ? <Chip text="Solo 11 días después" delay={fOnce} color={C.white} size={34} style={{ left: 600, top: 1060, rotate: "-4deg" }} /> : null}
+      <Stamp text="De vuelta" delay={fDim} color={C.nvLight} size={110} rotate={-8} style={{ left: 250, top: 950 }} />
     </AbsoluteFill>
   );
 };
 
 // =====================================================================
-// 3. QUÉ ES: React -> vídeo, fotograma a fotograma
+// 3. CONSEJO: unanimidad + seguridad nacional
 // =====================================================================
-const ReactAtom: React.FC<{ w: number; spin: number }> = ({ w, spin }) => (
-  <svg viewBox="-110 -110 220 220" width={w} height={w}>
-    {[0, 60, 120].map((a) => (
-      <ellipse key={a} rx="100" ry="38" fill="none" stroke="#61DAFB" strokeWidth="9" transform={`rotate(${a + spin})`} />
-    ))}
-    <circle r="18" fill="#61DAFB" />
-  </svg>
-);
-
-const FilmStrip: React.FC<{ w: number; offset: number; active: number }> = ({ w, offset, active }) => (
-  <div style={{ width: w, height: 250, background: "#111", borderRadius: 14, overflow: "hidden", position: "relative", boxShadow: "0 20px 40px rgba(0,0,0,0.6)" }}>
-    {[0, 1].map((row) => (
-      <div key={row} style={{ position: "absolute", left: 0, right: 0, top: row ? 222 : 8, height: 20, display: "flex", gap: 14, translate: `${-(offset % 34)}px 0` }}>
-        {Array.from({ length: 20 }, (_, i) => (
-          <div key={i} style={{ width: 20, height: 20, borderRadius: 4, background: "#ddd", flexShrink: 0 }} />
-        ))}
-      </div>
-    ))}
-    <div style={{ position: "absolute", top: 40, bottom: 40, left: 0, display: "flex", gap: 12, translate: `${-(offset % 182)}px 0` }}>
-      {Array.from({ length: 6 }, (_, i) => (
-        <div
-          key={i}
-          style={{
-            width: 170,
-            height: 170,
-            borderRadius: 8,
-            flexShrink: 0,
-            background: `linear-gradient(135deg, ${C.nv}, ${["#8E5CFF", "#FF5CA8", "#5CFFB0"][i % 3]})`,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontFamily: FONT_HEAD,
-            fontSize: 60,
-            color: "#fff",
-            opacity: i === active ? 1 : 0.75,
-          }}
-        >
-          {String(i + 1 + Math.floor(offset / 182)).padStart(2, "0")}
-        </div>
-      ))}
-    </div>
-  </div>
-);
-
-const Que: React.FC<SceneProps> = ({ startMs }) => {
+const Consejo: React.FC<SceneProps> = ({ startMs }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const w = (q: string, n = 0) => wordF("que", q, startMs, n);
-  const fRem = w("remotion");
-  const fCod = w("codigo");
-  const fVid = w("video");
-  const fFot = w("fotograma");
-  const total = msToF(TL.durationMs);
-  const counter = Math.round(interpolate(frame, [fFot, fFot + 40], [1, total], { ...clamp, easing: EASE_IN }));
-  const z = punch(frame, fps, fRem, 0.05);
+  const w = (q: string) => wordF("consejo", q, startMs);
+  const fCons = w("consejo");
+  const fUnan = w("unanimidad");
+  const fAseg = w("asegura");
+  const fRiesgo = w("riesgo");
+  const toB = softSpring(frame, fps, fAseg - 2);
+  const table = popSpring(frame, fps, 0);
+  const seats = Array.from({ length: 8 }, (_, i) => {
+    const a = (i / 8) * Math.PI * 2 - Math.PI / 2;
+    return { x: 540 + Math.cos(a) * 330, y: 740 + Math.sin(a) * 250 };
+  });
+  const z = punch(frame, fps, fUnan, 0.05);
   return (
     <AbsoluteFill style={{ scale: String(z) }}>
       <TechBackdrop />
       <Bar active={1} />
       <div style={{ position: "absolute", left: 0, right: 0, top: 230, textAlign: "center" }}>
-        <MaskLine delay={0} size={70} shadow={C.ink}>
-          Se llama
+        <MaskLine delay={fCons - 2} size={120} shadow={C.ink}>
+          El consejo vota
         </MaskLine>
-        <div style={{ fontFamily: FONT_HEAD, fontSize: 210, lineHeight: 1, color: C.nvLight, textShadow: `0 0 40px ${C.nv}, 8px 8px 0 ${C.ink}`, scale: String(popSpring(frame, fps, fRem - 2)), opacity: frame >= fRem - 2 ? 1 : 0 }}>
-          REMOTION
+      </div>
+      {/* parte A: mesa con todos los votos a favor */}
+      <div style={{ position: "absolute", inset: 0, opacity: 1 - toB, scale: String(1 - toB * 0.2), translate: `0 ${-toB * 80}px` }}>
+        <svg width={1080} height={1920} style={{ position: "absolute", scale: String(table) }}>
+          <ellipse cx={540} cy={740} rx={250} ry={170} fill="#1b2614" stroke={C.nv} strokeWidth={8} />
+          <text x={540} y={770} textAnchor="middle" fontFamily="Anton" fontSize={90} fill={C.nvLight} opacity={0.35}>
+            NVIDIA
+          </text>
+          {seats.map((s, i) => {
+            const sp = popSpring(frame, fps, fUnan - 6 + i * 2);
+            return (
+              <g key={i}>
+                <circle cx={s.x} cy={s.y} r={52} fill="#2b2f2a" stroke="#fff" strokeOpacity={0.4} strokeWidth={4} />
+                <circle cx={s.x} cy={s.y - 8} r={18} fill="#9aa39a" />
+                <path d={`M ${s.x - 28} ${s.y + 30} Q ${s.x} ${s.y} ${s.x + 28} ${s.y + 30} Z`} fill="#9aa39a" />
+                <g opacity={frame >= fUnan - 6 + i * 2 ? 1 : 0} transform={`translate(${s.x} ${s.y}) scale(${sp})`}>
+                  <circle r={52} fill={C.nv} />
+                  <path d="M -22 2 L -6 18 L 24 -16" stroke="#fff" strokeWidth={12} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                </g>
+              </g>
+            );
+          })}
+        </svg>
+        <div style={{ position: "absolute", left: 0, right: 0, top: 1040, textAlign: "center", fontFamily: FONT_HEAD, fontSize: 140, color: C.nvLight, textShadow: `6px 6px 0 ${C.ink}`, scale: String(popSpring(frame, fps, fUnan + 4)), opacity: frame >= fUnan + 4 ? 1 : 0 }}>
+          8 DE 8: SÍ
         </div>
       </div>
-      {/* tubería: React -> película -> vídeo */}
-      <div style={{ position: "absolute", left: 70, top: 640, display: "flex", alignItems: "center", gap: 26 }}>
-        <div style={{ scale: String(popSpring(frame, fps, fCod - 2)), textAlign: "center" }}>
-          <ReactAtom w={210} spin={frame * 3} />
-          <div style={{ fontFamily: FONT_BODY, fontWeight: 900, fontSize: 36, color: "#61DAFB" }}>REACT</div>
-        </div>
-        <svg width={110} height={60} style={{ opacity: ramp(frame, fCod + 4, 8) }}>
-          <path d="M 0 30 H 90 M 70 10 L 95 30 L 70 50" stroke="#fff" strokeWidth={8} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        <div style={{ scale: String(popSpring(frame, fps, fVid - 2)), textAlign: "center" }}>
-          <div style={{ width: 210, height: 210, borderRadius: 30, background: C.nv, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 0 50px ${C.nv}` }}>
-            <svg width={110} height={110} viewBox="0 0 100 100">
-              <path d="M 30 18 L 84 50 L 30 82 Z" fill="#fff" />
+      {/* parte B: escudo de seguridad nacional */}
+      {frame >= fAseg - 4 ? (
+        <div style={{ position: "absolute", inset: 0, opacity: toB }}>
+          <div style={{ position: "absolute", left: 540 - 170, top: 430, scale: String(popSpring(frame, fps, fAseg - 2)) }}>
+            <svg viewBox="0 0 200 230" width={340} height={391}>
+              <path d="M 100 8 L 186 40 V 110 C 186 165 148 205 100 222 C 52 205 14 165 14 110 V 40 Z" fill="#10220a" stroke={C.nv} strokeWidth="8" />
+              <path d="M 62 115 L 90 143 L 142 88" stroke={C.nvLight} strokeWidth="16" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeDasharray={160} strokeDashoffset={160 * (1 - ramp(frame, fRiesgo - 4, 12))} />
             </svg>
           </div>
-          <div style={{ fontFamily: FONT_BODY, fontWeight: 900, fontSize: 36, color: C.white }}>VÍDEO</div>
+          <div style={{ position: "absolute", left: 0, right: 0, top: 880, textAlign: "center" }}>
+            <MaskLine delay={fRiesgo - 4} size={96} shadow={C.ink}>
+              «Sin riesgo para la
+            </MaskLine>
+            <MaskLine delay={fRiesgo} size={96} color={C.nvLight} shadow={C.ink}>
+              seguridad nacional»
+            </MaskLine>
+          </div>
+          <Chip text="Según el consejo de Nvidia" delay={fRiesgo + 10} color={C.white} size={32} style={{ left: 300, top: 1150 }} />
         </div>
-      </div>
-      <div style={{ position: "absolute", left: 90, top: 960, opacity: ramp(frame, fFot - 4, 8) }}>
-        <FilmStrip w={900} offset={Math.max(0, frame - fFot) * 14} active={1} />
-      </div>
-      <div style={{ position: "absolute", right: 90, top: 1225, fontFamily: MONO, fontSize: 34, color: C.nvLight, opacity: frame >= fFot ? 1 : 0 }}>
-        frame {String(counter).padStart(4, "0")} / {total}
-      </div>
+      ) : null}
     </AbsoluteFill>
   );
 };
 
 // =====================================================================
-// 4. AGENTES DE IA: describes -> la IA escribe el código
+// 4. BOLSA: +31 %, mejor día en 23 años, casi 1 billón $
 // =====================================================================
-const Agentes: React.FC<SceneProps> = ({ startMs }) => {
+const Bolsa: React.FC<SceneProps> = ({ startMs }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const w = (q: string, n = 0) => wordF("agentes", q, startMs, n);
-  const fEnero = w("enero");
-  const fHab = w("habilidades");
-  const fClaude = w("claude");
-  const fDesc = w("describes");
-  const fEscr = w("escribe");
-  const prompt = "Hazme un vídeo de 30 s sobre Nvidia, con voz y subtítulos";
-  const typed = prompt.slice(0, Math.max(0, Math.floor((frame - fDesc + 2) * 2.4)));
-  const render = ramp(frame, fEscr + 14, 22, EASE_MOVE);
+  const w = (q: string) => wordF("bolsa", q, startMs);
+  const fDisp = w("disparo");
+  const f31 = w("31");
+  const fMejor = w("mejor");
+  const fBillon = w("billon");
+  // serie ilustrativa: plano y salto del 31 %
+  const pts = [100, 99, 101, 98, 100, 99, 101, 112, 124, 131.5];
+  const X0 = 110,
+    X1 = 970,
+    Y0 = 560,
+    Y1 = 960;
+  const yv = (v: number) => Y0 + ((134 - v) / (134 - 94)) * (Y1 - Y0);
+  const xv = (i: number) => X0 + (i / (pts.length - 1)) * (X1 - X0);
+  const path = pts.map((v, i) => `${i ? "L" : "M"} ${xv(i)} ${yv(v)}`).join(" ");
+  const pd = ramp(frame, fDisp - 10, 30, EASE_MOVE);
+  const sh = useShake(f31, 10, 16);
+  const z = punch(frame, fps, f31, 0.07) * punch(frame, fps, fBillon, 0.05);
+  return (
+    <AbsoluteFill style={{ scale: String(z), translate: `${sh.x}px ${sh.y}px` }}>
+      <TechBackdrop hue="#0E2108" />
+      <Bar active={2} />
+      <div style={{ position: "absolute", left: 80, top: 230, display: "flex", gap: 18, alignItems: "baseline" }}>
+        <div style={{ fontFamily: FONT_HEAD, fontSize: 110, color: C.white }}>NVDA</div>
+        <div style={{ fontFamily: FONT_BODY, fontWeight: 800, fontSize: 30, color: C.white, opacity: 0.75, lineHeight: 1.3 }}>
+          Nasdaq · lunes 23 nov
+          <div style={{ fontSize: 22, opacity: 0.7 }}>Gráfico ilustrativo · cierre: 165,05 $</div>
+        </div>
+      </div>
+      <svg width={1080} height={1920} style={{ position: "absolute" }}>
+        {[0, 1, 2, 3, 4].map((i) => (
+          <line key={i} x1={X0} x2={X1} y1={Y0 + (i * (Y1 - Y0)) / 4} y2={Y0 + (i * (Y1 - Y0)) / 4} stroke="#fff" strokeOpacity={0.1} strokeWidth={2} />
+        ))}
+        <path d={path} fill="none" stroke={C.nvLight} strokeWidth={10} strokeLinejoin="round" strokeDasharray={2400} strokeDashoffset={2400 * (1 - pd)} />
+        {pd > 0.98 ? <circle cx={xv(pts.length - 1)} cy={yv(131.5)} r={16 + 4 * Math.abs(Math.sin(frame / 4))} fill={C.nvLight} /> : null}
+      </svg>
+      <Counter from={0} to={31} start={f31 - 2} dur={14} prefix="+" suffix="%" color={C.nvLight} size={200} style={{ left: 90, top: 990 }} />
+      <Chip text="Mejor día en 23 años" delay={fMejor} color={C.yellow} textColor={C.ink} size={38} style={{ left: 560, top: 1030 }} />
+      <Chip text="≈ +1 billón $ de valor" delay={fBillon - 2} color={C.nv} textColor={C.ink} size={38} style={{ left: 560, top: 1120 }} />
+    </AbsoluteFill>
+  );
+};
+
+// =====================================================================
+// 5. TRUMP + INVESTIGACIÓN ABIERTA
+// =====================================================================
+const Trump: React.FC<SceneProps> = ({ startMs }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const w = (q: string) => wordF("trump", q, startMs);
+  const fConv = w("convencio");
+  const fPero = w("pero");
+  const fInv = w("investigacion");
+  const card = softSpring(frame, fps, 0);
+  const lens = popSpring(frame, fps, fInv - 4);
   return (
     <AbsoluteFill>
-      <TechBackdrop hue="#0D1F3A" />
-      <Bar active={2} />
-      <Chip text="Desde enero 2026" delay={fEnero} color={C.nv} textColor={C.white} size={40} style={{ left: 80, top: 230 }} />
-      <Chip text="Agent Skills" delay={fHab} color={C.yellow} textColor={C.ink} size={40} style={{ left: 560, top: 230 }} />
-      <Chip text="Claude Code · Cursor · Codex" delay={fClaude} color={C.white} textColor={C.ink} size={36} style={{ left: 190, top: 330 }} />
-      {/* titular mientras llega el prompt */}
-      <div
-        style={{
-          position: "absolute",
-          left: 0,
-          right: 0,
-          top: 500,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          opacity: interpolate(frame, [fDesc - 8, fDesc - 2], [1, 0], clamp),
-        }}
-      >
-        <svg width={220} height={220} viewBox="-50 -50 100 100" style={{ scale: String(popSpring(frame, fps, fHab - 4)), rotate: `${frame * 1.5}deg` }}>
-          <path d="M 0 -46 C 6 -10 10 -6 46 0 C 10 6 6 10 0 46 C -6 10 -10 6 -46 0 C -10 -6 -6 -10 0 -46 Z" fill={C.nvLight} />
-          <circle r="8" fill="#fff" />
-        </svg>
-        <MaskLine delay={fHab - 2} size={150} shadow={C.ink}>
-          Agentes
-        </MaskLine>
-        <MaskLine delay={fHab + 3} size={150} color={C.nvLight} shadow={C.ink}>
-          de IA
-        </MaskLine>
-      </div>
-      {/* prompt del usuario */}
+      <TechBackdrop hue="#1d1606" glow={C.yellow} />
+      <Bar active={3} />
+      {/* cita atribuida (parafraseada), no imita ninguna red social */}
       <div
         style={{
           position: "absolute",
           left: 90,
           right: 90,
-          top: 450,
-          background: C.white,
-          borderRadius: "30px 30px 30px 6px",
-          padding: "26px 32px",
-          fontFamily: FONT_BODY,
-          fontWeight: 800,
-          fontSize: 44,
-          color: C.ink,
-          lineHeight: 1.25,
-          minHeight: 170,
-          scale: String(popSpring(frame, fps, fDesc - 4)),
-          opacity: frame >= fDesc - 4 ? 1 : 0,
-          boxShadow: "0 20px 40px rgba(0,0,0,0.5)",
+          top: 260,
+          background: "rgba(255,255,255,0.96)",
+          borderRadius: 30,
+          padding: "34px 40px",
+          translate: `0 ${interpolate(card, [0, 1], [-600, 0])}px`,
+          boxShadow: "0 24px 60px rgba(0,0,0,0.6)",
         }}
       >
-        <div style={{ fontSize: 26, color: "#667", marginBottom: 6 }}>Tú</div>
-        {typed}
-        {typed.length < prompt.length ? <span style={{ color: C.nv }}>▌</span> : null}
-      </div>
-      {/* la IA escribe el código */}
-      <div style={{ position: "absolute", left: 90, top: 760, opacity: frame >= fEscr - 4 ? 1 : 0, translate: `0 ${interpolate(softSpring(frame, fps, fEscr - 4), [0, 1], [200, 0])}px` }}>
-        <CodeWindow
-          width={900}
-          size={30}
-          start={fEscr - 2}
-          cps={6}
-          title="IA escribiendo…"
-          lines={[
-            { t: "<Composition id=\"Noticia\"", c: "#9CDCFE" },
-            { t: "  durationInFrames={990}", c: "#C3E88D" },
-            { t: "  fps={30} width={1080}", c: "#C3E88D" },
-            { t: "  height={1920} />", c: "#9CDCFE" },
-          ]}
-        />
-        <div style={{ marginTop: 22, height: 28, borderRadius: 14, background: "#18304d", overflow: "hidden", opacity: frame >= fEscr + 12 ? 1 : 0 }}>
-          <div style={{ width: `${render * 100}%`, height: "100%", background: `linear-gradient(90deg, ${C.nv}, ${C.nvLight})` }} />
+        <div style={{ fontFamily: FONT_HEAD, fontSize: 96, color: C.ink, lineHeight: 1.05 }}>
+          «Convencí <span style={{ color: C.red }}>a la junta</span>»
         </div>
-        <div style={{ marginTop: 8, fontFamily: MONO, fontSize: 28, color: C.nvLight, opacity: frame >= fEscr + 12 ? 1 : 0 }}>
-          {render < 1 ? `Renderizando… ${Math.round(render * 100)}%` : "✓ video.mp4 listo"}
-        </div>
+        <div style={{ fontFamily: FONT_BODY, fontWeight: 800, fontSize: 30, color: "#555", marginTop: 12 }}>— Donald Trump (parafraseado)</div>
       </div>
-    </AbsoluteFill>
-  );
-};
-
-// =====================================================================
-// 5. CIFRAS: 75.000 estrellas y gratis hasta 3 personas
-// =====================================================================
-const Star: React.FC<{ w: number }> = ({ w }) => (
-  <svg viewBox="0 0 100 100" width={w} height={w}>
-    <path d="M 50 5 L 61 37 L 95 38 L 68 59 L 78 92 L 50 72 L 22 92 L 32 59 L 5 38 L 39 37 Z" fill={C.yellow} stroke="#fff" strokeWidth="3" />
-  </svg>
-);
-
-const Cifras: React.FC<SceneProps> = ({ startMs }) => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const w = (q: string, n = 0) => wordF("cifras", q, startMs, n);
-  const fNum = w("75");
-  const fGit = w("github");
-  const fGratis = w("gratis");
-  const fPart = w("particulares");
-  const fEmp = w("empresas");
-  const v = Math.round(interpolate(frame, [fNum - 2, fNum + 22], [0, 75000], { ...clamp, easing: EASE_IN }));
-  const toB = softSpring(frame, fps, fGratis - 4);
-  const sh = useShake(fGratis, 8, 14);
-  const z = punch(frame, fps, fNum + 10, 0.05) * punch(frame, fps, fGratis, 0.06);
-  return (
-    <AbsoluteFill style={{ scale: String(z), translate: `${sh.x}px ${sh.y}px` }}>
-      <TechBackdrop hue="#1d1a06" glow={C.yellow} />
-      <Bar active={3} />
-      <div style={{ position: "absolute", left: 0, right: 0, top: 260, display: "flex", flexDirection: "column", alignItems: "center", translate: `0 ${-toB * 40}px`, scale: String(1 - toB * 0.25) }}>
-        <div style={{ scale: String(popSpring(frame, fps, fNum - 4)), rotate: `${Math.sin(frame / 10) * 6}deg` }}>
-          <Star w={230} />
-        </div>
-        <div style={{ fontFamily: FONT_HEAD, fontSize: 200, lineHeight: 1, color: C.white, textShadow: `0 0 40px ${C.yellow}88, 8px 8px 0 ${C.ink}`, opacity: frame >= fNum - 2 ? 1 : 0 }}>
-          {v.toLocaleString("es-ES").replace(/\s/g, ".")}
-        </div>
-        <Chip text="Estrellas en GitHub" delay={fGit - 2} color={C.yellow} textColor={C.ink} size={42} style={{ position: "relative" }} />
+      {frame >= fConv ? <Chip text="Él se atribuye el regreso" delay={fConv} color={C.red} textColor={C.white} size={36} style={{ left: 280, top: 560 }} /> : null}
+      {/* lupa: investigación abierta */}
+      <div style={{ position: "absolute", left: 540 - 150, top: 680, scale: String(lens), opacity: frame >= fInv - 4 ? 1 : 0, rotate: `${Math.sin(frame / 6) * 8}deg` }}>
+        <svg viewBox="0 0 200 200" width={300} height={300}>
+          <circle cx="84" cy="84" r="58" fill="#1b1a10" stroke={C.yellow} strokeWidth="14" />
+          <circle cx="84" cy="84" r="40" fill={C.yellow} opacity="0.15" />
+          <line x1="128" y1="128" x2="184" y2="184" stroke={C.yellow} strokeWidth="22" strokeLinecap="round" />
+        </svg>
       </div>
-      {/* gratis */}
-      <Stamp text="Gratis" delay={fGratis} color={C.green} size={140} rotate={-7} style={{ left: 300, top: 820 }} />
-      <div style={{ position: "absolute", left: 90, right: 90, top: 1030, display: "flex", gap: 20, justifyContent: "center" }}>
-        <Chip text="✓ Particulares" delay={fPart} color={C.green} textColor={C.ink} size={38} style={{ position: "relative" }} />
-        <Chip text="✓ Empresas ≤ 3 personas" delay={fEmp} color={C.green} textColor={C.ink} size={38} style={{ position: "relative" }} />
-      </div>
-      <div style={{ position: "absolute", left: 0, right: 0, top: 1140, textAlign: "center", fontFamily: FONT_BODY, fontWeight: 800, fontSize: 28, color: C.white, opacity: frame >= fEmp + 10 ? 0.75 : 0 }}>
-        Empresas más grandes: licencia de pago
-      </div>
+      <Stamp text="Investigación abierta" delay={fInv} color={C.yellow} size={80} rotate={-6} style={{ left: 120, top: 1000 }} />
+      {frame >= fPero ? <Chip text="Congresistas de ambos partidos la cuestionan" delay={fInv + 12} color={C.white} size={30} style={{ left: 140, top: 1160 }} /> : null}
     </AbsoluteFill>
   );
 };
@@ -352,21 +260,19 @@ const Cifras: React.FC<SceneProps> = ({ startMs }) => {
 // 6. CIERRE
 // =====================================================================
 const Cierre: React.FC<SceneProps> = (p) => (
-  <Poll {...p} segId="cierre" line1="¿Lo" line2="probarías?" footer="Este vídeo está hecho con Remotion" bar={<Bar active={4} />} />
+  <Poll {...p} segId="cierre" line1="¿Ha hecho" line2="bien Nvidia?" footer="Fuentes: Nvidia · NPR · PBS · Bloomberg Línea · Yahoo Finance" bar={<Bar active={4} />} />
 );
 
-// ---------- orden de escenas (firstSeg = id del bloque del guion donde empieza) ----------
 export const SCENES: SceneDef[] = [
   { key: "hook", firstSeg: "hook", C: Hook },
   { key: "lema", firstSeg: "lema", C: Lema, flash: C.nv },
-  { key: "que", firstSeg: "que", C: Que, flash: C.nvLight },
-  { key: "agentes", firstSeg: "agentes", C: Agentes, flash: C.nv },
-  { key: "cifras", firstSeg: "cifras", C: Cifras, flash: C.yellow },
+  { key: "consejo", firstSeg: "consejo", C: Consejo, flash: C.nvLight },
+  { key: "bolsa", firstSeg: "bolsa", C: Bolsa, flash: C.nv },
+  { key: "trump", firstSeg: "trump", C: Trump, flash: C.yellow },
   { key: "cierre", firstSeg: "cierre", C: Cierre, flash: C.nv },
 ];
 
-// ---------- efectos de sonido sincronizados con palabras ----------
-// sfx disponibles: impact, whoosh, whoosh_down, riser, pop, ding, glitch, shutter, cash
+// sfx: impact, whoosh, whoosh_down, riser, pop, ding, glitch, shutter, cash
 const Sfx: React.FC<{ at: number; src: string; volume?: number }> = ({ at, src, volume = 0.5 }) => (
   <Sequence from={Math.max(0, at)} durationInFrames={90} layout="none">
     <Audio src={staticFile(`sfx/${src}.wav`)} volume={volume} />
@@ -377,17 +283,16 @@ export const SfxCues: React.FC = () => {
   return (
     <>
       <Sfx at={0} src="impact" volume={0.55} />
-      <Sfx at={at("hook", "editado") + 2} src="glitch" volume={0.4} />
-      <Sfx at={at("hook", "programado") - 2} src="pop" volume={0.5} />
+      <Sfx at={at("hook", "jensen")} src="pop" volume={0.45} />
+      <Sfx at={at("hook", "dimitiera")} src="impact" volume={0.5} />
       <Sfx at={at("lema", "menos")} src="ding" volume={0.4} />
-      <Sfx at={at("que", "remotion") - 2} src="impact" volume={0.45} />
-      <Sfx at={at("que", "fotograma") - 4} src="riser" volume={0.3} />
-      <Sfx at={at("agentes", "describes") - 4} src="pop" volume={0.45} />
-      <Sfx at={at("agentes", "escribe") - 4} src="whoosh" volume={0.35} />
-      <Sfx at={at("agentes", "escribe") + 36} src="ding" volume={0.4} />
-      <Sfx at={at("cifras", "75") - 2} src="riser" volume={0.3} />
-      <Sfx at={at("cifras", "github")} src="impact" volume={0.45} />
-      <Sfx at={at("cifras", "gratis")} src="cash" volume={0.45} />
+      <Sfx at={at("consejo", "unanimidad") - 6} src="pop" volume={0.45} />
+      <Sfx at={at("consejo", "riesgo")} src="ding" volume={0.4} />
+      <Sfx at={at("bolsa", "disparo") - 8} src="riser" volume={0.35} />
+      <Sfx at={at("bolsa", "31")} src="impact" volume={0.5} />
+      <Sfx at={at("bolsa", "billon")} src="cash" volume={0.45} />
+      <Sfx at={at("trump", "convencio")} src="pop" volume={0.45} />
+      <Sfx at={at("trump", "investigacion")} src="glitch" volume={0.4} />
       <Sfx at={at("cierre", "comentarios")} src="pop" volume={0.5} />
     </>
   );

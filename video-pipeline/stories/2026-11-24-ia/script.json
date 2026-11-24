@@ -1,0 +1,15 @@
+{
+ "segments": [
+  {"id": "hook", "gap": 0.3, "text": "Giro total: Nvidia vuelve a contratar a Jensen Huang, solo once días después de que dimitiera."},
+  {"id": "lema", "gap": 0.4, "text": "Te lo cuento en menos de un minuto."},
+  {"id": "consejo", "gap": 0.35, "text": "El consejo lo votó por unanimidad, y asegura que su regreso no supone ningún riesgo para la seguridad nacional."},
+  {"id": "bolsa", "gap": 0.35, "text": "La acción se disparó un treinta y uno por ciento: su mejor día en veintitrés años, y casi un billón de dólares más de valor."},
+  {"id": "trump", "gap": 0.4, "text": "Trump dice que fue él quien convenció a la junta. Pero la investigación sigue abierta."},
+  {"id": "cierre", "gap": 0.0, "text": "¿Ha hecho bien Nvidia? Te leo en comentarios."}
+ ],
+ "display": [
+  {"spoken": "once", "display": "11"},
+  {"spoken": "treinta y uno por ciento", "display": "31%"},
+  {"spoken": "veintitrés", "display": "23"}
+ ]
+}
