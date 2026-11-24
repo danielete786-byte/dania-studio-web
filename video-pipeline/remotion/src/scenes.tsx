@@ -200,8 +200,8 @@ const Bolsa: React.FC<SceneProps> = ({ startMs }) => {
         {pd > 0.98 ? <circle cx={xv(pts.length - 1)} cy={yv(131.5)} r={16 + 4 * Math.abs(Math.sin(frame / 4))} fill={C.nvLight} /> : null}
       </svg>
       <Counter from={0} to={31} start={f31 - 2} dur={14} prefix="+" suffix="%" color={C.nvLight} size={200} style={{ left: 90, top: 990 }} />
-      <Chip text="Mejor día en 23 años" delay={fMejor} color={C.yellow} textColor={C.ink} size={38} style={{ left: 560, top: 1030 }} />
-      <Chip text="≈ +1 billón $ de valor" delay={fBillon - 2} color={C.nv} textColor={C.ink} size={38} style={{ left: 560, top: 1120 }} />
+      <Chip text="Mejor día en 23 años" delay={fMejor} color={C.yellow} textColor={C.ink} size={30} style={{ left: 520, top: 1035 }} />
+      <Chip text="+1 billón $ de valor" delay={fBillon - 2} color={C.nv} textColor={C.ink} size={30} style={{ left: 520, top: 1120 }} />
     </AbsoluteFill>
   );
 };
@@ -251,7 +251,7 @@ const Trump: React.FC<SceneProps> = ({ startMs }) => {
         </svg>
       </div>
       <Stamp text="Investigación abierta" delay={fInv} color={C.yellow} size={80} rotate={-6} style={{ left: 120, top: 1000 }} />
-      {frame >= fPero ? <Chip text="Congresistas de ambos partidos la cuestionan" delay={fInv + 12} color={C.white} size={30} style={{ left: 140, top: 1160 }} /> : null}
+      {frame >= fPero ? <Chip text="Políticos de ambos partidos la cuestionan" delay={fInv + 12} color={C.white} size={26} style={{ left: 130, top: 1165 }} /> : null}
     </AbsoluteFill>
   );
 };
