@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
-import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
+import { studioEnvironment } from './env'
 import { NEON } from './emblem'
 import { gearGeometry, meshPhase as mesh } from './gear'
 
@@ -17,7 +17,7 @@ export default function Gears3D() {
     // el lienzo ocupa su hueco por CSS: nunca fija un ancho en píxeles que desborde la pantalla del móvil
     renderer.domElement.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block'
     const scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(28, 1, 0.1, 100)
-    const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture
+    scene.environment = studioEnvironment(renderer)
     scene.environmentIntensity = 0.9
     const key = new THREE.DirectionalLight(0xffffff, 2); key.position.set(3, 4, 6); scene.add(key)
     const glow = new THREE.PointLight(NEON, 0, 10); glow.position.set(0, 0, 2.5); scene.add(glow)
@@ -61,7 +61,7 @@ export default function Gears3D() {
       glow.position.set(cur.x * 2, -cur.y * 1.5, 2.2); glow.intensity = 4 + boost * 5
       renderer.render(scene, cam) }
     loop()
-    return () => { cancelAnimationFrame(raf); ro.disconnect(); io.disconnect(); removeEventListener('pointermove', onMove); pm.dispose(); renderer.dispose(); el.innerHTML = '' }
+    return () => { cancelAnimationFrame(raf); ro.disconnect(); io.disconnect(); removeEventListener('pointermove', onMove); renderer.dispose(); el.innerHTML = '' }
   }, [])
   return <div ref={host} className="relative h-full w-full overflow-hidden" role="img" aria-label="Engranajes 3D que giran con el ratón y el scroll" />
 }

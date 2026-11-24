@@ -62,6 +62,14 @@ Demo comercial de DanIA Studio. Investigación hecha el 24/11/2026 con buscadore
 
 **Toque especial: lluvia de piezas y maletín.** Hay 36 piezas en 3D (tornillos, tuercas, arandelas de acero y de cobre, rodamientos de bolas y de agujas, muelles, piñones, casquillos de latón, bujías, bulones y anillos elásticos) y todo va ligado al scroll. Al bajar, caen por los laterales, por detrás del contenido; en el pie de página, cada una vuela a su compartimento del maletín. Al subir hacen el camino al revés: salen del maletín y suben. El maletín organizador negro tiene plástico con grano, esquinas reforzadas con tornillos, moldura, bisagras, cierres metálicos con palanca, asa curvada, placa "VEGAWAGEN", y tapa con marco, nervios y junta de goma. Está en un estudio oscuro con foco cenital y sombras, rodeado de piezas ordenadas. Un contador indica cuántas hay guardadas.
 
+**Final del maletín (escena fija):** la última parte de la página se queda fija mientras se hace scroll. Primero entran las piezas en sus compartimentos, luego la tapa se cierra y el maletín gira un poco para enseñarla; los cierres metálicos suben y encajan y, por último, se enciende con un parpadeo el logo de neón de Vegawagen en la tapa, con el texto "Todo en su sitio · Así cuidamos tu coche". Todo va ligado al scroll, así que al subir se reabre.
+
+**Sonido (opcional, empieza en silencio):** botón "Sonido" abajo a la izquierda (en móvil, encima de la barra de llamar). Los sonidos se generan en el navegador, sin archivos: clic metálico al encajar cada pieza del emblema, carraca al enroscar los tornillos, tintineo de cada pieza al caer en su compartimento, golpe de la tapa, chasquido de los cierres y zumbido del neón.
+
+**Reflejos de estudio fotográfico:** el cromo del emblema, el maletín y los engranajes reflejan un estudio hecho por código (softbox cenital grande, tiras de luz laterales, contraluz y softbox frontal), sin descargar ningún HDRI.
+
+**Cita por WhatsApp:** sección "Pide cita" en 4 pasos: marca (VW, Audi, SEAT, Škoda, Cupra u otra), modelo y matrícula; qué necesita (revisión, testigo, frenos, neumáticos, ruidos, pre-ITV, electricidad, aire, otra cosa) y detalles; cuándo le viene bien; y nombre. A la derecha, un móvil muestra el mensaje de WhatsApp redactándose en vivo. Al enviar se abre WhatsApp al 633 044 180 con el mensaje ya escrito. Si falta algo, el formulario lo avisa y el aviso desaparece al corregirlo.
+
 **Archivo para enseñarla sin instalar nada:** `demos/vegawagen/vegawagen-demo.html` (unos 2,5 MB, con todo dentro). Se abre con doble clic o desde el móvil. Para regenerarlo: `node scripts/build-standalone.mjs vegawagen`.
 
 - Código: `demos/vegawagen/index.html` + `src/vegawagen/` (mismo stack que la web de DanIA: Vite, React, Tailwind, GSAP, Lenis y three.js).

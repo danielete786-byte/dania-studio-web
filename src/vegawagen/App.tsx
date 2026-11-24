@@ -4,6 +4,8 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import Lenis from 'lenis'
 import { vw, img } from './content'
 import { Mark, Wordmark, PhoneIco, WaIco } from './brand'
+import Booking from './Booking'
+import SoundToggle from './SoundToggle'
 const Hero = lazy(() => import('./Hero'))
 const Gears3D = lazy(() => import('./Gears3D'))
 const FallingParts = lazy(() => import('./FallingParts'))
@@ -27,7 +29,7 @@ function Nav() {
       <a href="#" className="flex items-center gap-3" aria-label="Vegawagen, inicio"><Mark className="h-8 w-8 md:h-9 md:w-9" /><Wordmark className="text-[12px] sm:text-[15px] md:text-[18px]" /></a>
       <div className="hidden gap-8 text-[14px] text-white/60 lg:flex">
         <a href="#taller-fotos" className="hover:text-white">El taller</a><a href="#servicios" className="hover:text-white">Servicios</a>
-        <a href="#opiniones" className="hover:text-white">Opiniones</a><a href="#taller" className="hover:text-white">Dónde estamos</a></div>
+        <a href="#opiniones" className="hover:text-white">Opiniones</a><a href="#cita" className="hover:text-white">Pide cita</a><a href="#taller" className="hover:text-white">Dónde estamos</a></div>
       <div className="flex items-center gap-2">
         <a href={vw.whatsappHref} target="_blank" rel="noopener" className="btn-ghost hidden !px-4 !py-2.5 text-[13px] md:inline-flex"><WaIco /> WhatsApp</a>
         <a href={vw.phoneHref} className="btn-neon !px-4 !py-2.5 text-[13px] md:!px-5"><PhoneIco /> <span className="hidden sm:inline">{vw.phone}</span><span className="sm:hidden">Llamar</span></a>
@@ -193,6 +195,8 @@ export default function App() {
               <p className="mt-3 text-[15px] leading-relaxed text-white/60">{o.text}</p><Stars /></figure>)}
           </div></div></section>
 
+      <Booking />
+
       <section id="taller" className="mx-auto max-w-7xl px-5 py-28 md:px-8 md:py-40">
         <Head k={vw.location.kicker} t={vw.location.title} />
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1.4fr]">
@@ -225,21 +229,28 @@ export default function App() {
           <div className="min-w-0 md:order-1"><h2 className="reveal h-cond grad-text text-[56px] leading-[0.9] md:text-[104px]">{vw.cta.title}</h2>
             <p className="reveal mt-5 max-w-md text-[18px] text-white/60">{vw.cta.text}</p>
             <div className="reveal mt-9 flex flex-wrap gap-3"><a href={vw.phoneHref} className="btn-neon !px-8 !py-4 text-[16px]"><PhoneIco /> {vw.cta.button}</a>
-              <a href={vw.whatsappHref} target="_blank" rel="noopener" className="btn-ghost !py-4"><WaIco /> WhatsApp</a></div></div>
+              <a href="#cita" className="btn-ghost !py-4"><WaIco /> Pedir cita</a></div></div>
         </div></section>
     </main>
-    <footer className="studio border-t border-white/5 pb-28 pt-20 text-[13px] text-white/40 md:pb-6 md:pt-28">
-      <div className="relative z-10 mx-auto max-w-3xl px-5 text-center">
-        <p className="kicker mb-4">{vw.crate.kicker}</p>
-        <h2 className="h-cond grad-text text-[40px] leading-[0.92] md:text-[72px]">{vw.crate.title}</h2>
-        <p className="mx-auto mt-4 max-w-md text-[15px] text-white/55">{vw.crate.text}</p></div>
-      {/* hueco del maletín: se dibuja en 3D en el canvas de piezas (detrás del contenido) */}
-      <div id="crate" className="case-anchor" aria-label="Maletín organizador donde se guardan las piezas" role="img" />
-      <p className="relative z-10 -mt-2 text-center font-mono text-[12px] uppercase tracking-[0.25em] text-white/50"><span id="crate-count" className="text-neon">0</span> piezas guardadas</p>
-      <div className="relative z-10 mx-auto mt-10 flex max-w-7xl flex-wrap items-center justify-between gap-4 border-t border-white/5 px-5 pt-6 md:px-8">
+    {/* Escena final fija mientras se hace scroll: las piezas entran en el maletín, la tapa se cierra,
+        los cierres encajan y se enciende el logo. El maletín se dibuja en el canvas de piezas (detrás). */}
+    <section id="final" className="studio relative h-[300vh]" aria-label="Maletín de piezas">
+      <div className="studio-pool sticky top-0 h-[100svh]" aria-hidden />
+      <div className="sticky top-0 z-10 -mt-[100svh] flex h-[100svh] flex-col items-center justify-center px-5 pb-24 pt-16 md:pb-4 md:pt-20">
+        <div className="text-center"><p className="kicker mb-3">{vw.crate.kicker}</p>
+          <h2 className="h-cond grad-text text-[32px] leading-[0.92] md:text-[58px]">{vw.crate.title}</h2>
+          <p className="mx-auto mt-3 max-w-md text-[14px] leading-relaxed text-white/55 md:text-[15px]">{vw.crate.text}</p></div>
+        <div id="crate" className="case-anchor" aria-label="Maletín organizador donde se guardan las piezas" role="img" />
+        <p className="text-center font-mono text-[12px] uppercase tracking-[0.25em] text-white/50"><span id="crate-count" className="text-neon">0</span> piezas guardadas</p>
+        <p id="crate-done" className="neon-text mt-2 text-center text-[12px] font-semibold uppercase tracking-[0.3em] opacity-0 md:text-[13px]">Todo en su sitio · Así cuidamos tu coche</p>
+      </div>
+    </section>
+    <footer className="relative z-10 border-t border-white/5 bg-[#030304] pb-28 pt-8 text-[13px] text-white/40 md:pb-8">
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-5 md:px-8">
         <span className="flex items-center gap-2"><Mark className="h-5 w-5" /> {vw.legal} · {vw.address.join(', ')}</span>
         <span>{vw.footer}</span></div>
-      <p className="relative z-10 mx-auto mt-6 max-w-7xl px-5 text-[11px] leading-relaxed text-white/30 md:px-8">{vw.legalNote}</p></footer>
+      <p className="mx-auto mt-6 max-w-7xl px-5 text-[11px] leading-relaxed text-white/30 md:px-8">{vw.legalNote}</p></footer>
+    <SoundToggle />
     <Suspense fallback={null}><FallingParts /></Suspense>
     <div className="fixed inset-x-0 bottom-0 z-50 flex gap-2 border-t border-white/10 bg-ink/90 p-3 backdrop-blur-xl md:hidden" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
       <a href={vw.phoneHref} className="btn-neon flex-1 justify-center"><PhoneIco /> Llamar</a>

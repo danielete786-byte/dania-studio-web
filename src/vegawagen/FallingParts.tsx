@@ -1,20 +1,23 @@
-// Lluvia de piezas ligada al scroll (reversible): al bajar, las piezas caen por los laterales y,
-// al llegar al pie, cada una vuela a su compartimento del maletín; al subir, todo hace el camino al revés.
+// Lluvia de piezas ligada al scroll (reversible): al bajar, las piezas caen por los laterales; en la
+// escena final (fija mientras se hace scroll) cada una vuela a su compartimento del maletín, la tapa
+// se cierra, los cierres encajan y se enciende el logo de neón de la tapa. Al subir, todo al revés.
 // Se dibuja en un canvas fijo detrás del contenido, en coordenadas de píxel de la pantalla.
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
-import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { buildCase } from './case'
 import { TYPES, PartType } from './parts'
+import { studioEnvironment } from './env'
+import { sound } from './sound'
 
 type Part = {
   t: PartType; obj: THREE.Object3D; slot: THREE.Vector3; restQ: THREE.Quaternion; side: number
   lane: number; sway: number; ph: number; rot0: THREE.Euler; spin: THREE.Vector3
-  s: number; l: number // scroll (px) donde empieza a caer por el lateral y donde empieza a entrar en el maletín
+  s: number; l: number; prev: number // scroll (px) donde cae por el lateral y donde entra en el maletín
 }
 
 const TILT = 0.66, YAW = -0.38, N = 36, PREFILL = 2
 const clamp = (v: number) => Math.min(1, Math.max(0, v))
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t
 const inOut = (t: number) => t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2
 let seed = 11
 const rnd = (a: number, b: number) => { seed = (seed * 16807) % 2147483647; return a + ((seed - 1) / 2147483646) * (b - a) }
@@ -23,27 +26,29 @@ export default function FallingParts({ crateId = 'crate', countId = 'crate-count
   const cv = useRef<HTMLCanvasElement>(null)
   useEffect(() => {
     const canvas = cv.current!, anchor = document.getElementById(crateId), counter = document.getElementById(countId)
-    if (!anchor) return
+    const finale = document.getElementById('final'), done = document.getElementById('crate-done')
+    if (!anchor || !finale) return
     const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
     let renderer: THREE.WebGLRenderer
     try { renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true }) } catch { return }
     renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75)); renderer.toneMapping = THREE.ACESFilmicToneMapping
     renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap
     const scene = new THREE.Scene(), cam = new THREE.OrthographicCamera(-1, 1, 1, -1, -3000, 3000)
-    const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture
-    scene.environmentIntensity = 0.5
-    // luz general para las piezas que caen + foco de estudio sobre el maletín (con sombras) + contraluz
-    const key = new THREE.DirectionalLight(0xffffff, 1.2); key.position.set(-400, 900, 700); scene.add(key)
+    scene.environment = studioEnvironment(renderer); scene.environmentIntensity = 0.75
+    // luz general para las piezas que caen + foco de estudio sobre el maletín (con sombras) + contraluz + luz del neón
+    const key = new THREE.DirectionalLight(0xffffff, 1.1); key.position.set(-400, 900, 700); scene.add(key)
     const spot = new THREE.SpotLight(0xfff4e6, 3.6, 0, 0.62, 0.65, 0); spot.castShadow = true
     spot.shadow.mapSize.set(2048, 2048); spot.shadow.bias = -0.0004; spot.shadow.normalBias = 1.2; spot.shadow.radius = 5
     scene.add(spot, spot.target)
     const back = new THREE.DirectionalLight(0x9fb4cc, 0.9); scene.add(back, back.target)
+    const glow = new THREE.PointLight(0x22e1ee, 0, 0, 0); scene.add(glow)
 
     let W = 1, H = 1, mobile = innerWidth < 768, casePx = 1
-    const { root, comps, slot } = buildCase(mobile)
+    const { root, comps, slot, lid, levers, logoMat } = buildCase(mobile)
     const caseG = new THREE.Group(); caseG.rotation.set(TILT, YAW, 0); caseG.add(root); scene.add(caseG)
     const pick = (k: string) => comps.filter(c => c.key === k).sort((a, b) => a.used - b.used)[0]
     const restOf = (t: PartType) => new THREE.Quaternion().setFromEuler(new THREE.Euler(0, rnd(-0.25, 0.25), 0)).multiply(new THREE.Quaternion().setFromEuler(t.rest))
+    const OFF = new THREE.Color(0x3a3d42), ON = new THREE.Color(0xffffff)
 
     // cada compartimento empieza con un par de piezas para que el maletín no se vea vacío
     for (const c of comps) for (let i = 0; i < PREFILL; i++) {
@@ -55,12 +60,13 @@ export default function FallingParts({ crateId = 'crate', countId = 'crate-count
     const parts: Part[] = Array.from({ length: N }, (_, i) => {
       const t = TYPES[order[i % order.length]], comp = pick(t.key)
       return { t, obj: t.build(), slot: slot(comp, t, comp.used++), restQ: restOf(t), side: i % 2 ? 1 : -1, lane: 0, sway: rnd(6, 16), ph: rnd(0, 6.28),
-        rot0: new THREE.Euler(rnd(0, 6), rnd(0, 6), rnd(0, 6)), spin: new THREE.Vector3(rnd(-7, 7), rnd(-6, 6), rnd(-8, 8)), s: 0, l: 0 }
+        rot0: new THREE.Euler(rnd(0, 6), rnd(0, 6), rnd(0, 6)), spin: new THREE.Vector3(rnd(-7, 7), rnd(-6, 6), rnd(-8, 8)), s: 0, l: 0, prev: 0 }
     })
     parts.forEach(p => { p.obj.visible = false; scene.add(p.obj) })
 
-    // reparto de las piezas a lo largo del scroll de la página
-    let R = 1, RL = 1, maxScroll = 1
+    // reparto a lo largo del scroll: caída por los laterales en el cuerpo de la página;
+    // en la escena final: piezas al maletín (0–50 %), tapa (55–80 %), cierres (80–88 %), neón (86–96 %)
+    let R = 1, RL = 1, F0 = 0, PIN = 1
     const measure = () => {
       W = innerWidth; H = innerHeight; mobile = W < 768
       renderer.setSize(W, H, false); cam.left = -W / 2; cam.right = W / 2; cam.top = H / 2; cam.bottom = -H / 2; cam.updateProjectionMatrix()
@@ -68,9 +74,9 @@ export default function FallingParts({ crateId = 'crate', countId = 'crate-count
       const sc = spot.shadow.camera; sc.near = 50; sc.far = 6000; sc.updateProjectionMatrix()
       const hero = document.querySelector<HTMLElement>('section[aria-label="Presentación"]')
       const heroEnd = hero ? hero.offsetTop + hero.offsetHeight - H * 0.5 : H
-      maxScroll = document.documentElement.scrollHeight - H
-      const landStart = Math.min(r.top + scrollY - H * 0.85, maxScroll - 200), landEnd = maxScroll - 8
-      R = H * (mobile ? 0.95 : 0.85); RL = Math.min(H * 0.55, (landEnd - landStart) * 0.55)
+      F0 = finale.offsetTop; PIN = Math.max(1, finale.offsetHeight - H)
+      const landStart = F0 - H * 0.45, landEnd = F0 + PIN * 0.5
+      R = H * (mobile ? 0.95 : 0.85); RL = Math.min(H * 0.6, (landEnd - landStart) * 0.3)
       const fallEnd = landStart - R * 0.6
       parts.forEach((p, i) => {
         p.s = fallEnd > heroEnd ? heroEnd + (fallEnd - heroEnd) * (i / (N - 1)) + rnd(-40, 40) : Infinity
@@ -88,22 +94,40 @@ export default function FallingParts({ crateId = 'crate', countId = 'crate-count
     const bodyRO = new ResizeObserver(remeasure); bodyRO.observe(document.body)
 
     const v = new THREE.Vector3(), q = new THREE.Quaternion(), caseQ = new THREE.Quaternion(), fallQ = new THREE.Quaternion(), e3 = new THREE.Euler()
-    let raf = 0, lastY = NaN, lastTop = NaN
+    let raf = 0, lastY = NaN, lastTop = NaN, prevLid = 0, prevLatch = 0, prevNeon = 0
     const frame = () => {
       raf = requestAnimationFrame(frame)
-      const S = reduced ? maxScroll : scrollY, r = anchor.getBoundingClientRect()
+      const S = reduced ? F0 + PIN : scrollY, r = anchor.getBoundingClientRect()
       if (S === lastY && r.top === lastTop && !dirty) return
+      const forward = S > lastY
       lastY = S; lastTop = r.top; dirty = false
 
-      // maletín anclado a su hueco del pie de página, con el foco encima
-      caseG.position.set(r.left + r.width / 2 - W / 2, H / 2 - (r.top + r.height * 0.7), 0)
+      // escena final: tapa, cierres y neón
+      const pin = (S - F0) / PIN
+      const pc = inOut(clamp((pin - 0.55) / 0.25)), pk = inOut(clamp((pin - 0.8) / 0.08)), pn = clamp((pin - 0.86) / 0.1)
+      lid.rotation.x = lerp(-1.95, 0, pc)
+      levers.forEach((lv, i) => { lv.rotation.x = lerp(-0.25, -3.08, clamp(pk * 1.15 - i * 0.15)) })
+      const flicker = pn > 0 && pn < 0.6 ? (Math.sin(pn * 90) > -0.2 ? 1 : 0.15) : 1, lit = pn * flicker
+      logoMat.color.copy(OFF).lerp(ON, lit); logoMat.opacity = lerp(0.5, 1, lit)
+      if (forward && prevLid < 1 && pc >= 1) sound.clunk()
+      if (forward && prevLatch < 1 && pk >= 1) sound.latch()
+      if (forward && prevNeon === 0 && pn > 0) sound.neon()
+      prevLid = pc; prevLatch = pk; prevNeon = pn
+      if (done) done.style.opacity = String(pn)
+
+      // maletín anclado a su hueco; al cerrarse gira un poco para enseñar la tapa
+      caseG.rotation.set(lerp(TILT, 0.98, pc), lerp(YAW, -0.16, pc), 0)
+      caseG.position.set(r.left + r.width / 2 - W / 2, H / 2 - (r.top + r.height * lerp(0.7, 0.62, pc)), 0)
       caseG.updateMatrixWorld(true); caseG.getWorldQuaternion(caseQ)
       caseG.localToWorld(spot.position.set(0.15, 2.3, 1.1)); spot.target.position.copy(caseG.position)
       caseG.localToWorld(back.position.set(0.3, 1.2, -2.5)); back.target.position.copy(caseG.position)
+      caseG.localToWorld(glow.position.set(0, 0.95, -0.1)); glow.intensity = lit * 0.9
 
       let stored = 0
       for (const p of parts) {
         const pl = clamp((S - p.l) / RL), pf = clamp((S - p.s) / R), size = fallSize(p.t)
+        if (forward && p.prev < 1 && pl >= 1) sound.clink(0.75 + (0.09 - p.t.rel) * 6)
+        p.prev = pl
         if (pl >= 1) { // guardada en su compartimento
           if (p.obj.parent !== root) root.add(p.obj)
           p.obj.position.copy(p.slot); p.obj.quaternion.copy(p.restQ); p.obj.scale.setScalar(p.t.rel); p.obj.visible = true; stored++
@@ -129,7 +153,7 @@ export default function FallingParts({ crateId = 'crate', countId = 'crate-count
       renderer.render(scene, cam)
     }
     frame()
-    return () => { cancelAnimationFrame(raf); removeEventListener('resize', remeasure); bodyRO.disconnect(); pm.dispose(); renderer.dispose() }
+    return () => { cancelAnimationFrame(raf); removeEventListener('resize', remeasure); bodyRO.disconnect(); renderer.dispose() }
   }, [crateId, countId])
   return <canvas ref={cv} aria-hidden className="pointer-events-none fixed inset-0 z-[5] h-[100vh] w-[100vw]" />
 }

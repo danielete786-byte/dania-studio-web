@@ -40,6 +40,23 @@ function nameplate() {
   g.fillText('VEGAWAGEN', 256, 50)
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t
 }
+// logo de neón para la tapa (marca W en hexágono + VEGAWAGEN), con halo pintado en la textura
+function lidLogoTexture() {
+  const c = document.createElement('canvas'); c.width = 1024; c.height = 512
+  const g = c.getContext('2d')!, cx = 512, cy = 210, R = 120
+  const draw = (width: number, color: string, blur: number) => {
+    g.strokeStyle = color; g.lineWidth = width; g.lineJoin = 'round'; g.shadowColor = '#22e1ee'; g.shadowBlur = blur
+    g.beginPath(); for (let k = 0; k <= 6; k++) { const a = k * Math.PI / 3; const x = cx + Math.cos(a) * R, y = cy - Math.sin(a) * R; k ? g.lineTo(x, y) : g.moveTo(x, y) } g.stroke()
+    const w = [[-0.92, 0.55], [-0.47, -0.59], [0, 0.24], [0.47, -0.59], [0.92, 0.55]].map(([x, y]) => [cx + x * R * 0.78, cy - y * R * 0.78])
+    g.beginPath(); w.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.lineJoin = 'miter'; g.stroke()
+    const font = document.fonts?.check('60px Michroma') ? 'Michroma' : 'sans-serif'
+    g.font = `600 64px ${font}`; g.textAlign = 'center'; g.textBaseline = 'middle'
+    ;(g as CanvasRenderingContext2D & { letterSpacing?: string }).letterSpacing = '8px'
+    g.lineWidth = width * 0.45; g.strokeText('VEGAWAGEN', cx, 420)
+  }
+  draw(16, 'rgba(34,225,238,.35)', 40); draw(9, '#5be9f2', 24); draw(4, '#e9fdff', 8)
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t
+}
 // suelo del estudio: negro satinado con un círculo de luz que se funde con el fondo
 function floorAlpha() {
   const c = document.createElement('canvas'); c.width = c.height = 512
@@ -80,11 +97,13 @@ export function buildCase(mobile: boolean) {
   const dh = WALL_TOP - BASE_Y, dy = BASE_Y + dh / 2
   body.add(box(0.93, dh, 0.012, 0, dy, -0.09, plasticIn, 0.005), box(0.93, dh, 0.012, 0, dy, 0.09, plasticIn, 0.005), box(0.018, dh + 0.006, 0.56, 0, dy + 0.003, 0, plasticIn, 0.006))
   for (const c of comps) if (c.x1 < 0.45 && Math.abs(c.x1) > 0.01) body.add(box(0.012, dh, c.z1 - c.z0, c.x1, dy, (c.z0 + c.z1) / 2, plasticIn, 0.005))
-  // cierres metálicos abiertos (placa, eje y palanca colgando)
+  // cierres metálicos (placa y eje fijos; la palanca cuelga abierta y sube al cerrar el maletín)
+  const levers: THREE.Group[] = []
   for (const sx of [-0.33, 0.33]) {
     body.add(box(0.085, 0.07, 0.012, sx, 0.125, 0.316, darkMetal, 0.006), cylX(0.009, 0.08, sx, 0.112, 0.326))
-    const lever = box(0.07, 0.085, 0.01, sx, 0.072, 0.334, metal, 0.006); lever.rotation.x = 0.22; body.add(lever)
-    body.add(box(0.04, 0.012, 0.012, sx, 0.035, 0.342, metal, 0.004))
+    const lever = new THREE.Group(); lever.position.set(sx, 0.112, 0.33)
+    lever.add(box(0.07, 0.085, 0.01, 0, -0.04, 0.004, metal, 0.006), box(0.04, 0.012, 0.012, 0, -0.077, 0.012, metal, 0.004))
+    lever.rotation.x = -0.25; body.add(lever); levers.push(lever)
   }
   // asa curvada con soportes
   const path = new THREE.CatmullRomCurve3([new THREE.Vector3(-0.13, 0.08, 0.318), new THREE.Vector3(-0.115, 0.05, 0.37), new THREE.Vector3(0, 0.042, 0.388), new THREE.Vector3(0.115, 0.05, 0.37), new THREE.Vector3(0.13, 0.08, 0.318)])
@@ -107,6 +126,9 @@ export function buildCase(mobile: boolean) {
   lid.add(box(0.96, 0.006, 0.008, 0, -0.002, 0.018, rubber, 0.003), box(0.96, 0.006, 0.008, 0, -0.002, 0.602, rubber, 0.003),
     box(0.008, 0.006, 0.58, -0.478, -0.002, 0.31, rubber, 0.003), box(0.008, 0.006, 0.58, 0.478, -0.002, 0.31, rubber, 0.003))
   for (const sx of [-0.33, 0.33]) lid.add(box(0.06, 0.03, 0.02, sx, 0.02, 0.625, darkMetal, 0.006))
+  // logo en la cara exterior de la tapa: apagado mientras está abierta, se enciende al cerrarse
+  const logoMat = new THREE.MeshBasicMaterial({ map: lidLogoTexture(), transparent: true, depthWrite: false, toneMapped: false, color: 0x3a3d42, opacity: 0.55 })
+  const logo = new THREE.Mesh(new THREE.PlaneGeometry(0.56, 0.28), logoMat); logo.rotation.x = -Math.PI / 2; logo.position.set(0, 0.0515, 0.3); lid.add(logo)
 
   // ── piezas ordenadas alrededor (estáticas, fusionadas por material para que pese poco)
   const decor = new THREE.Group(), place = (key: string, x: number, z: number, yaw = 0) => {
@@ -139,5 +161,5 @@ export function buildCase(mobile: boolean) {
     const z = c.z0 + m + (d - rws * fz) / 2 + fz * (row + 0.5) + (layer % 2) * fz * 0.25
     return new THREE.Vector3(x, BASE_Y + t.h * s * (layer + 0.5) + 0.002, z)
   }
-  return { root, comps, slot }
+  return { root, comps, slot, lid, levers, logoMat }
 }

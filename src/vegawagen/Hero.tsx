@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
-import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
@@ -8,6 +7,8 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { buildBadge } from './badge'
+import { studioEnvironment } from './env'
+import { sound } from './sound'
 import { vw, img } from './content'
 import { PhoneIco, WaIco, Wordmark } from './brand'
 
@@ -39,9 +40,9 @@ export default function Hero() {
     // ── estudio negro: sin guías ni cuadrícula, solo un reflejo muy tenue en el suelo
     const scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(30, 1, 0.1, 200)
     scene.background = new THREE.Color(0x020203)
-    const pm = new THREE.PMREMGenerator(renderer)
-    scene.environment = pm.fromScene(new RoomEnvironment(), 0.02).texture
-    scene.environmentIntensity = 0.9
+    // reflejos de estudio fotográfico (softbox cenital, tiras laterales y contraluz)
+    scene.environment = studioEnvironment(renderer)
+    scene.environmentIntensity = 1
     const key = new THREE.DirectionalLight(0xffffff, 1.4); key.position.set(-3, 5, 5); scene.add(key)
     const fill = new THREE.DirectionalLight(0xd6e0ec, 0.6); fill.position.set(5, 1, 3); scene.add(fill)
     const rim = new THREE.DirectionalLight(0xbfd2e8, 1.6); rim.position.set(0, 3, -6); scene.add(rim)
@@ -83,7 +84,7 @@ export default function Hero() {
 
     let visible = true, raf = 0, last = performance.now(), time = 0, lastCount = -1
     const io = new IntersectionObserver(([e]) => { visible = e.isIntersecting }); io.observe(host)
-    const from = new THREE.Vector3(), Y = new THREE.Vector3(0, 1, 0)
+    const from = new THREE.Vector3(), Y = new THREE.Vector3(0, 1, 0), prevF = pieces.map(() => 0), prevTick = pieces.map(() => 0)
 
     const frame = () => {
       raf = requestAnimationFrame(frame)
@@ -100,6 +101,10 @@ export default function Hero() {
         const e0 = lerp(EXPLODE[0], EXPLODE[1], 1 - u[i]), a0 = lerp(ASSEMBLE[0], ASSEMBLE[1], u[i])
         const f = inOut(clamp((prog - e0) / DUR)) - inOut(clamp((prog - a0) / DUR))
         if (f < 0.02) inPlace++
+        // sonido: clic al encajar cada pieza y carraca de los tornillos
+        if (prevF[i] >= 0.02 && f < 0.02) p.kind === 'housing' ? sound.clunk(0.6) : sound.click(p.kind === 'ring' || p.kind === 'letter' ? 1 : 0.6, p.kind === 'letter' ? 0.85 : 1.1)
+        if (p.kind === 'screw') { const tk = Math.floor(f * 14); if (tk !== prevTick[i]) { sound.tick(1 + (i % 3) * 0.08); prevTick[i] = tk } }
+        prevF[i] = f
         from.set(p.home.x + (p.from.x - p.home.x) * k, p.home.y + (p.from.y - p.home.y) * k, p.home.z + (p.from.z - p.home.z) * k)
         p.obj.position.lerpVectors(p.home, from, f)
         p.obj.position.y += Math.sin(time * 0.8 + p.phase) * 0.035 * f
@@ -116,7 +121,7 @@ export default function Hero() {
       const Dd = mobile ? Math.max(1.45 / th, 2.2 / tv) : Math.max(2.25 / tv, 2.9 / th)
       const D = lerp(Dd, Dx, E)
       rig.position.set(lerp(mobile ? 0 : Dd * th * 0.5, 0, a), lerp(mobile ? -0.95 : -0.05, lerp(0.05, -0.2, E), a), 0)
-      group.rotation.y = lerp(lerp(-0.42, -0.62, E), 0, smooth(0.62, 0.9, prog)) + m.x * 0.45 + Math.sin(time * 0.45) * 0.22 * show
+      group.rotation.y = lerp(lerp(-0.3, -0.6, E), 0, smooth(0.62, 0.9, prog)) + m.x * 0.45 + Math.sin(time * 0.45) * 0.22 * show
       group.rotation.x = 0.06 * E + m.y * 0.2
       cam.position.set(-m.x * 0.6, 0.85 - m.y * 0.3, D)
       cam.lookAt(0, -0.05, 0)
@@ -134,7 +139,7 @@ export default function Hero() {
     }
     frame()
     return () => { cancelAnimationFrame(raf); st.kill(); ro.disconnect(); io.disconnect(); removeEventListener('pointermove', onMove)
-      pm.dispose(); composer.dispose(); renderer.dispose(); host.innerHTML = '' }
+      composer.dispose(); renderer.dispose(); host.innerHTML = '' }
   }, [])
 
   return (

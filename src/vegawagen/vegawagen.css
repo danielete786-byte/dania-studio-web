@@ -45,10 +45,12 @@ html.lenis, html.lenis body { height:auto; }
 @media (prefers-reduced-motion: reduce) { *{ animation:none!important; transition:none!important; } }
 
 /* Hueco del maletín del pie de página (el maletín se dibuja en el canvas de piezas) */
-.case-anchor { position:relative; width:min(900px, 96vw); aspect-ratio:1.6; margin:0 auto; }
-@media (max-width:767px) { .case-anchor { aspect-ratio:1.05; } }
+.case-anchor { position:relative; flex:none; width:min(900px, 96vw, calc((100svh - 330px) * 1.6)); aspect-ratio:1.6; margin:0 auto; }
+@media (max-width:767px) { .case-anchor { width:min(96vw, calc((100svh - 330px) * 1.05)); aspect-ratio:1.05; } }
 
 /* Estudio oscuro del pie de página: va por detrás del canvas del maletín */
-.studio { background:
-  radial-gradient(55% 42% at 50% 58%, #26282c 0%, #141518 38%, #08090a 70%, #030304 100%),
-  #030304; }
+.studio { background:linear-gradient(180deg, rgba(3,3,4,0) 0%, #030304 8%), #030304; }
+/* foco de luz del estudio: capa fija sin z-index, queda por detrás del canvas (z-5) */
+.studio-pool { background:radial-gradient(60% 46% at 50% 60%, #2a2c31 0%, #141518 38%, #08090a 70%, rgba(3,3,4,0) 100%); }
+.eq { height:100%; animation:eq .9s ease-in-out infinite alternate; transform-origin:bottom; }
+@keyframes eq { 0% { transform:scaleY(.3) } 100% { transform:scaleY(1) } }
