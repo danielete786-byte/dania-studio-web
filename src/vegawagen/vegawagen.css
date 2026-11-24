@@ -45,5 +45,10 @@ html.lenis, html.lenis body { height:auto; }
 @media (prefers-reduced-motion: reduce) { *{ animation:none!important; transition:none!important; } }
 
 /* Hueco del maletín del pie de página (el maletín se dibuja en el canvas de piezas) */
-.case-anchor { position:relative; width:min(900px, 96vw); aspect-ratio:1.45; margin:0 auto; }
-@media (max-width:767px) { .case-anchor { aspect-ratio:1; } }
+.case-anchor { position:relative; width:min(900px, 96vw); aspect-ratio:1.6; margin:0 auto; }
+@media (max-width:767px) { .case-anchor { aspect-ratio:1.05; } }
+
+/* Estudio oscuro del pie de página: va por detrás del canvas del maletín */
+.studio { background:
+  radial-gradient(55% 42% at 50% 58%, #26282c 0%, #141518 38%, #08090a 70%, #030304 100%),
+  #030304; }

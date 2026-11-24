@@ -33,7 +33,7 @@ export const vw = {
     kicker: 'Taller multimarca · Churriana de la Vega',
     title: ['Tu coche,', 'en buenas manos.'],
     text: 'Mecánica, electrónica y diagnosis con precio claro y sin sorpresas. Desde 2010 en la Vega de Granada.',
-    scroll: 'Desliza y mira cómo se monta',
+    scroll: 'Desliza: lo desmontamos y lo volvemos a montar',
     outro: 'Volkswagen · Audi · SEAT · Škoda · Cupra · y todas las marcas',
   },
 

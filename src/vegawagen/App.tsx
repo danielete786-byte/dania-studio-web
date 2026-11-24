@@ -228,7 +228,7 @@ export default function App() {
               <a href={vw.whatsappHref} target="_blank" rel="noopener" className="btn-ghost !py-4"><WaIco /> WhatsApp</a></div></div>
         </div></section>
     </main>
-    <footer className="border-t border-white/5 pb-28 pt-20 text-[13px] text-white/40 md:pb-10 md:pt-28">
+    <footer className="studio border-t border-white/5 pb-28 pt-20 text-[13px] text-white/40 md:pb-6 md:pt-28">
       <div className="relative z-10 mx-auto max-w-3xl px-5 text-center">
         <p className="kicker mb-4">{vw.crate.kicker}</p>
         <h2 className="h-cond grad-text text-[40px] leading-[0.92] md:text-[72px]">{vw.crate.title}</h2>
@@ -236,7 +236,7 @@ export default function App() {
       {/* hueco del maletín: se dibuja en 3D en el canvas de piezas (detrás del contenido) */}
       <div id="crate" className="case-anchor" aria-label="Maletín organizador donde se guardan las piezas" role="img" />
       <p className="relative z-10 -mt-2 text-center font-mono text-[12px] uppercase tracking-[0.25em] text-white/50"><span id="crate-count" className="text-neon">0</span> piezas guardadas</p>
-      <div className="relative z-10 mx-auto mt-16 flex max-w-7xl flex-wrap items-center justify-between gap-4 border-t border-white/5 px-5 pt-8 md:px-8">
+      <div className="relative z-10 mx-auto mt-10 flex max-w-7xl flex-wrap items-center justify-between gap-4 border-t border-white/5 px-5 pt-6 md:px-8">
         <span className="flex items-center gap-2"><Mark className="h-5 w-5" /> {vw.legal} · {vw.address.join(', ')}</span>
         <span>{vw.footer}</span></div>
       <p className="relative z-10 mx-auto mt-6 max-w-7xl px-5 text-[11px] leading-relaxed text-white/30 md:px-8">{vw.legalNote}</p></footer>

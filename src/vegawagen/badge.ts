@@ -12,7 +12,6 @@ export type BadgePiece = {
   from: THREE.Vector3; fromQ: THREE.Quaternion
   t0: number; t1: number; phase: number
   kind: 'ring' | 'letter' | 'field' | 'housing' | 'bracket' | 'screw' | 'spring'
-  line?: THREE.Line
   screwAxis?: THREE.Vector3
 }
 
@@ -89,8 +88,7 @@ export function buildBadge() {
     group.add(obj)
     const home = obj.position.clone(), homeQ = obj.quaternion.clone(), from = home.clone().add(offset)
     const fromQ = rot ? new THREE.Quaternion().setFromEuler(rot).multiply(homeQ) : homeQ.clone()
-    const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([home, from]), mat.line); line.computeLineDistances(); group.add(line)
-    pieces.push({ obj, home, homeQ, from, fromQ, t0, t1: t0 + dur, phase: rnd() * TAU, kind, line, screwAxis })
+    pieces.push({ obj, home, homeQ, from, fromQ, t0, t1: t0 + dur, phase: rnd() * TAU, kind, screwAxis })
   }
 
   // 1 · carcasa trasera de plástico negro con nervios, postes y pestañas
@@ -148,13 +146,7 @@ export function buildBadge() {
     add(s, 'screw', new THREE.Vector3(Math.cos(a) * 1.05, Math.sin(a) * 1.05, 0), 0.67 + k * 0.012, 0.09, undefined, new THREE.Vector3(Math.cos(a), Math.sin(a), 0))
   }
 
-  // ejes discontinuos del despiece (horizontal y vertical)
-  const axes = new THREE.Group()
-  for (const pts of [[new THREE.Vector3(-3.2, 0, 0), new THREE.Vector3(3.6, 0, 0)], [new THREE.Vector3(0, -2.2, 0), new THREE.Vector3(0, 2.4, 0)]]) {
-    const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), mat.line); l.computeLineDistances(); axes.add(l)
-  }
-  group.add(axes)
-  return { group, pieces, materials: mat, axes }
+  return { group, pieces, materials: mat }
 }
 
 // Fondo de estudio gris azulado, como la imagen de referencia
