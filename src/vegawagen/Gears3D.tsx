@@ -14,6 +14,8 @@ export default function Gears3D() {
     try { renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }) } catch { return }
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.toneMapping = THREE.ACESFilmicToneMapping
     renderer.outputColorSpace = THREE.SRGBColorSpace; el.appendChild(renderer.domElement)
+    // el lienzo ocupa su hueco por CSS: nunca fija un ancho en píxeles que desborde la pantalla del móvil
+    renderer.domElement.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block'
     const scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(28, 1, 0.1, 100)
     const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture
     scene.environmentIntensity = 0.9
@@ -38,7 +40,7 @@ export default function Gears3D() {
     const box = new THREE.Box3().setFromObject(group), c = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3())
     group.children.forEach(o => o.position.sub(c))
 
-    const resize = () => { const w = el.clientWidth, h = el.clientHeight; renderer.setSize(w, h); cam.aspect = w / h; cam.updateProjectionMatrix()
+    const resize = () => { const w = Math.max(1, el.clientWidth), h = Math.max(1, el.clientHeight); renderer.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix()
       const tv = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)); cam.position.z = Math.max(size.x / 2 / (tv * cam.aspect), size.y / 2 / tv) * 1.18 + 0.4 }
     resize(); const ro = new ResizeObserver(resize); ro.observe(el)
     const mouse = { x: 0, y: 0 }, cur = { x: 0, y: 0 }
@@ -61,5 +63,5 @@ export default function Gears3D() {
     loop()
     return () => { cancelAnimationFrame(raf); ro.disconnect(); io.disconnect(); removeEventListener('pointermove', onMove); pm.dispose(); renderer.dispose(); el.innerHTML = '' }
   }, [])
-  return <div ref={host} className="h-full w-full" role="img" aria-label="Engranajes 3D que giran con el ratón y el scroll" />
+  return <div ref={host} className="relative h-full w-full overflow-hidden" role="img" aria-label="Engranajes 3D que giran con el ratón y el scroll" />
 }

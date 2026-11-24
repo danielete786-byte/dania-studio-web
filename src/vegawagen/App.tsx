@@ -67,7 +67,7 @@ function Diagnosis() {
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) tl.progress(1)
     return () => { st.kill(); tl.kill() }
   }, [])
-  return <section id="diagnosis" className="mx-auto grid max-w-7xl items-center gap-12 px-5 py-28 md:grid-cols-2 md:gap-16 md:px-8 md:py-40">
+  return <section id="diagnosis" className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-12 px-5 py-28 md:grid-cols-2 md:gap-16 md:px-8 md:py-40">
     <div><Head k={vw.diag.kicker} t={vw.diag.title} className="!mb-8" />
       <p className="reveal max-w-lg text-[17px] leading-relaxed text-white/60">{vw.diag.text}</p>
       <figure className="reveal relative mt-10 aspect-[16/9] overflow-hidden rounded-3xl border border-white/10">
@@ -158,7 +158,7 @@ export default function App() {
       <section id="servicios" className="border-t border-white/5">
         <div className="mx-auto max-w-7xl px-5 py-28 md:px-8 md:py-40">
           <Head k={vw.services.kicker} t={vw.services.title} />
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {vw.services.items.map((s, i) => <article key={s.title} className="svc card flex min-h-[260px] flex-col p-7 md:p-9">
               <div className="flex items-start justify-between"><Icon n={s.icon} /><span className="font-mono text-xs text-white/30">0{i + 1}</span></div>
               <h3 className="h-cond mt-auto pt-12 text-[30px] leading-none">{s.title}</h3>
@@ -195,7 +195,7 @@ export default function App() {
 
       <section id="taller" className="mx-auto max-w-7xl px-5 py-28 md:px-8 md:py-40">
         <Head k={vw.location.kicker} t={vw.location.title} />
-        <div className="grid gap-4 lg:grid-cols-[1fr_1.4fr]">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1.4fr]">
           <div className="reveal panel flex flex-col gap-8 p-7 md:p-9">
             <p className="text-[16px] leading-relaxed text-white/60">{vw.location.text}</p>
             <div><p className="kicker mb-3">Dirección</p><p className="text-[18px] leading-snug">{vw.address[0]}<br /><span className="text-white/60">{vw.address[1]}</span></p></div>
@@ -220,9 +220,9 @@ export default function App() {
 
       <section id="contacto" className="relative overflow-hidden border-t border-white/5 pb-32 pt-20 md:pb-28 md:pt-24">
         <div className="pointer-events-none absolute left-1/2 top-10 h-[560px] w-[900px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(34,225,238,.13),transparent)]" />
-        <div className="relative mx-auto grid max-w-7xl items-center gap-6 px-5 md:grid-cols-2 md:px-8">
-          <div className="h-[300px] md:order-2 md:h-[480px]"><Suspense fallback={null}><Gears3D /></Suspense></div>
-          <div className="md:order-1"><h2 className="reveal h-cond grad-text text-[56px] leading-[0.9] md:text-[104px]">{vw.cta.title}</h2>
+        <div className="relative mx-auto grid max-w-7xl grid-cols-1 items-center gap-6 px-5 md:grid-cols-2 md:px-8">
+          <div className="h-[300px] min-w-0 md:order-2 md:h-[480px]"><Suspense fallback={null}><Gears3D /></Suspense></div>
+          <div className="min-w-0 md:order-1"><h2 className="reveal h-cond grad-text text-[56px] leading-[0.9] md:text-[104px]">{vw.cta.title}</h2>
             <p className="reveal mt-5 max-w-md text-[18px] text-white/60">{vw.cta.text}</p>
             <div className="reveal mt-9 flex flex-wrap gap-3"><a href={vw.phoneHref} className="btn-neon !px-8 !py-4 text-[16px]"><PhoneIco /> {vw.cta.button}</a>
               <a href={vw.whatsappHref} target="_blank" rel="noopener" className="btn-ghost !py-4"><WaIco /> WhatsApp</a></div></div>
