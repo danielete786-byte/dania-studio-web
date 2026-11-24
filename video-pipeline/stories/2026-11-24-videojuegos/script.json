@@ -1,0 +1,18 @@
+{
+ "segments": [
+  {"id": "hook", "gap": 0.3, "text": "GTA seis rompe la historia de PlayStation: más de treinta y nueve millones de jugadores en solo cuatro días."},
+  {"id": "lema", "gap": 0.4, "text": "Te lo cuento en menos de un minuto."},
+  {"id": "horas", "gap": 0.35, "text": "Según Sony, ya suman seiscientos ochenta y tres millones de horas: más de diecisiete horas por jugador."},
+  {"id": "record", "gap": 0.35, "text": "Además, batió el récord de jugadores simultáneos en PlayStation. Y fue lo primero que se jugó en siete de cada diez consolas nuevas."},
+  {"id": "ojo", "gap": 0.4, "text": "Ojo: son jugadores, no copias vendidas."},
+  {"id": "cierre", "gap": 0.0, "text": "¿Tú ya lo estás jugando? Te leo en comentarios."}
+ ],
+ "display": [
+  {"spoken": "GTA seis", "display": "GTA 6"},
+  {"spoken": "treinta y nueve millones", "display": "39 millones"},
+  {"spoken": "cuatro días", "display": "4 días"},
+  {"spoken": "seiscientos ochenta y tres millones", "display": "683 millones"},
+  {"spoken": "diecisiete", "display": "17"},
+  {"spoken": "siete de cada diez", "display": "7 de cada 10"}
+ ]
+}
