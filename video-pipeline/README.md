@@ -93,7 +93,7 @@ Reglas de diseño:
 - Citas de redes sociales: como cita traducida y atribuida, **nunca imitando la interfaz** de la red social.
 - Gráficos aproximados: indícalo en pantalla («gráfico ilustrativo»).
 
-**Miniatura (`Thumbnail`)**: portada estática 1080×1920 para TikTok. Titular enorme de 2 palabras (Anton 250-300 px), la cifra o dato más llamativo, la ilustración protagonista y una etiqueta «ÚLTIMA HORA». Todo lo importante dentro de la franja central **y 240-1680** (en el perfil de TikTok la portada se recorta a 3:4). Sin animaciones (es un solo fotograma). Modelo: la miniatura de Nvidia en el historial de git (`stories/2026-11-24-ia`, commit «miniatura»).
+**Miniatura (`Thumbnail`)**: portada estática 1080×1920 para TikTok. Titular enorme de 2 palabras (Anton 250-300 px), la cifra o dato más llamativo, la ilustración protagonista y una etiqueta «ÚLTIMA HORA». Todo lo importante dentro de la franja central **y 240-1680** (en el perfil de TikTok la portada se recorta a 3:4). Sin animaciones (es un solo fotograma). Modelo: `Thumbnail` en `remotion/examples/nvidia-vuelve-scenes.tsx` (que además es el mejor ejemplo completo de historia).
 
 ### 5. Revisar antes de renderizar
 ```bash
