@@ -1,15 +1,25 @@
 // Demo comercial para Vegawagen (taller mecánico, Churriana de la Vega).
 // Todos los textos y datos se editan aquí. Los datos salen de directorios públicos
-// (noviembre 2026): confírmalos con el taller antes de publicar (busca `TODO`).
+// y de las fotos de su ficha de Google (noviembre 2026): confírmalos con el taller (busca `TODO`).
+import neon from './img/neon.jpg'
+import fachada from './img/fachada.jpg'
+import motor from './img/motor.jpg'
+import mecanico from './img/mecanico.jpg'
+import mercedes from './img/mercedes.jpg'
+import bmw from './img/bmw.jpg'
+import cupra from './img/cupra.jpg'
+
+export const img = { neon, fachada, motor, mecanico, mercedes, bmw, cupra }
+
 export const vw = {
   name: 'Vegawagen',
   legal: 'Vegawagen C.B.',
   since: 2010,
   phone: '958 55 44 41',
   phoneHref: 'tel:+34958554441',
-  // TODO: pedir un móvil con WhatsApp y su email; si no hay, borrar
-  whatsapp: '',
-  email: '',
+  // Número que aparece con el icono de WhatsApp en la pared del taller. TODO: confirmar
+  whatsapp: '633 044 180',
+  whatsappHref: 'https://wa.me/34633044180?text=' + encodeURIComponent('Hola, quería pedir cita en Vegawagen.'),
   address: ['C. Dalí, 7 · Nave 1', '18194 Churriana de la Vega, Granada'],
   mapsLink: 'https://www.google.com/maps/search/?api=1&query=Vegawagen+C.+Dal%C3%AD+7+Churriana+de+la+Vega',
   mapsEmbed: 'https://maps.google.com/maps?q=C.%20Dal%C3%AD%207%2C%2018194%20Churriana%20de%20la%20Vega%2C%20Granada&z=16&output=embed',
@@ -20,15 +30,12 @@ export const vw = {
   reviews: 150,
 
   hero: {
-    kicker: 'Taller mecánico · Churriana de la Vega',
+    kicker: 'Taller multimarca · Churriana de la Vega',
     title: ['Tu coche,', 'en buenas manos.'],
-    text: 'Mecánica, diagnosis y mantenimiento con precio claro y sin sorpresas. Desde 2010 en la Vega de Granada.',
-    cta: 'Pide cita',
-    scroll: 'Desliza: lo revisamos pieza a pieza',
-    outro: ['Cada pieza,', 'revisada.'],
+    text: 'Mecánica, electrónica y diagnosis con precio claro y sin sorpresas. Desde 2010 en la Vega de Granada.',
+    scroll: 'Desliza y mira cómo se monta',
+    outro: 'Montado pieza a pieza · Desde 2010',
   },
-  // Etiquetas que aparecen sobre la rueda despiezada (en este orden: neumático, frenos, suspensión, buje)
-  heroLabels: ['Neumáticos', 'Frenos', 'Suspensión', 'Mecánica'],
 
   trust: [
     { value: 4.7, decimals: 1, prefix: '', suffix: '★', label: 'Nota en Google' },
@@ -36,6 +43,17 @@ export const vw = {
     { value: 2010, decimals: 0, prefix: '', suffix: '', label: 'Abiertos desde', plain: true },
     { value: 6, decimals: 0, prefix: '', suffix: '', label: 'Servicios bajo un techo' },
   ],
+
+  // Marcas que aparecen en la pared del taller junto a "Trabajamos todas las marcas"
+  brands: ['Volkswagen', 'Audi', 'SEAT', 'Škoda', 'Cupra', 'y todas las marcas'],
+
+  gallery: { kicker: 'El taller', title: 'Así trabajamos en Vegawagen.', items: [
+    { src: 'cupra', alt: 'Cupra Ateca en la zona de recepción del taller', tag: 'Recepción', span: 'wide' },
+    { src: 'mecanico', alt: 'Mecánico de Vegawagen trabajando en el paso de rueda de un coche rojo', tag: 'Mecánica', span: 'tall' },
+    { src: 'bmw', alt: 'BMW X5 azul en la entrada del taller', tag: 'Todas las marcas', span: 'normal' },
+    { src: 'neon', alt: 'Rótulo de neón cian con el nombre Vegawagen', tag: 'Vegawagen', span: 'wide' },
+    { src: 'mercedes', alt: 'Mercedes Clase C clásico en el taller', tag: 'Clásicos también', span: 'normal' },
+  ] },
 
   services: { kicker: 'Servicios', title: 'Todo lo que tu coche necesita, en un solo taller.', items: [
     { icon: 'wrench', title: 'Mantenimiento', text: 'Revisiones, cambios de aceite y filtros, distribución y puesta a punto según el plan del fabricante.' },
@@ -58,7 +76,7 @@ export const vw = {
     ] },
 
   process: { kicker: 'Cómo trabajamos', title: 'Sin sorpresas, de principio a fin.', steps: [
-    { title: 'Llamas o vienes', text: 'Nos cuentas qué notas en el coche y buscamos hueco.' },
+    { title: 'Llamas o escribes', text: 'Por teléfono o WhatsApp: nos cuentas qué notas y buscamos hueco.' },
     { title: 'Diagnóstico', text: 'Revisamos el coche y localizamos el problema real.' },
     { title: 'Presupuesto claro', text: 'Te decimos qué hay que hacer y cuánto cuesta. Tú decides.' },
     { title: 'Recoges tu coche', text: 'Reparado, revisado y con la explicación de lo que hemos hecho.' },
@@ -72,6 +90,9 @@ export const vw = {
     { title: 'Resuelven lo que otros no', text: 'Averías complicadas que otros talleres no habían encontrado, solucionadas aquí.' },
   ] },
 
-  cta: { title: 'Trae tu coche a la Vega.', text: 'Llámanos, cuéntanos qué le pasa y te damos cita.', button: 'Llamar ahora' },
+  location: { kicker: 'Dónde estamos', title: 'Busca la fachada roja de Castrol Service.',
+    text: 'En Churriana de la Vega, a un paso de Granada. La puerta grande con el cartel de Vegawagen.' },
+
+  cta: { title: 'Trae tu coche a la Vega.', text: 'Llámanos o escríbenos por WhatsApp, cuéntanos qué le pasa y te damos cita.', button: 'Llamar ahora' },
   footer: 'Propuesta de web realizada por DanIA Studio.',
 }
