@@ -111,7 +111,7 @@ export const Lema: React.FC<SceneProps> = ({ dur }) => {
 };
 
 // ---------- cierre con encuesta Sí/No + burbuja de comentario ----------
-export const Poll: React.FC<SceneProps & { line1: string; line2: string; segId: string; commentWord?: string; footer?: string; bar?: React.ReactNode }> = ({
+export const Poll: React.FC<SceneProps & { line1: string; line2: string; segId: string; commentWord?: string; footer?: string; bar?: React.ReactNode; size1?: number; size2?: number }> = ({
   startMs,
   line1,
   line2,
@@ -119,6 +119,8 @@ export const Poll: React.FC<SceneProps & { line1: string; line2: string; segId: 
   commentWord = "comentarios",
   footer,
   bar,
+  size1 = 170,
+  size2 = 180,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -128,10 +130,10 @@ export const Poll: React.FC<SceneProps & { line1: string; line2: string; segId: 
       <TechBackdrop />
       {bar}
       <div style={{ position: "absolute", left: 0, right: 0, top: 300, textAlign: "center" }}>
-        <MaskLine delay={0} size={170} shadow={C.ink}>
+        <MaskLine delay={0} size={size1} shadow={C.ink}>
           {line1}
         </MaskLine>
-        <MaskLine delay={4} size={180} color={C.nvLight} shadow={C.ink}>
+        <MaskLine delay={4} size={size2} color={C.nvLight} shadow={C.ink}>
           {line2}
         </MaskLine>
       </div>

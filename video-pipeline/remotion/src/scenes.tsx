@@ -191,7 +191,7 @@ const Ojo: React.FC<SceneProps> = ({ startMs }) => {
 // 6. CIERRE
 // =====================================================================
 const Cierre: React.FC<SceneProps> = (p) => (
-  <Poll {...p} segId="cierre" line1="¿Ya lo" line2="estás jugando?" footer="Fuentes: PlayStation · HotHardware · Mixed · VGTimes" bar={<Bar active={4} />} />
+  <Poll {...p} segId="cierre" line1="¿Ya lo estás" line2="jugando?" size1={130} size2={190} footer="Fuentes: PlayStation · HotHardware · Mixed · VGTimes" bar={<Bar active={4} />} />
 );
 
 // =====================================================================
