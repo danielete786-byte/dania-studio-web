@@ -15,3 +15,5 @@ Cada demo es una página más del mismo build (ver `build.rollupOptions.input` e
 - `demos/vegawagen/`: taller Vegawagen (Churriana de la Vega). El código está en `src/vegawagen/`, los textos en `src/vegawagen/content.ts`, y la investigación y los argumentos de venta en `demos/vegawagen/NOTAS.md`.
   En local: `npm run dev` y abre `http://localhost:5173/dania-studio-web/demos/vegawagen/`
   Versión de un solo archivo (para enseñarla sin servidor): `node scripts/build-standalone.mjs vegawagen` → `demos/vegawagen/vegawagen-demo.html`
+  Publicada en https://danielete786-byte.github.io/dania-studio-web/demos/vegawagen/ (con `noindex`).
+  Para actualizarla: `node scripts/build-demo.mjs vegawagen` y copia `dist-demos/vegawagen/` a `demos/vegawagen/` en la rama `gh-pages`, sin tocar el resto de la rama.
