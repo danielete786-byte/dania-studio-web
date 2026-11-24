@@ -263,6 +263,36 @@ const Cierre: React.FC<SceneProps> = (p) => (
   <Poll {...p} segId="cierre" line1="¿Ha hecho" line2="bien Nvidia?" footer="Fuentes: Nvidia · NPR · PBS · Bloomberg Línea · Yahoo Finance" bar={<Bar active={4} />} />
 );
 
+// =====================================================================
+// MINIATURA (portada TikTok 1080×1920; zona clave y 240-1680)
+// =====================================================================
+export const Thumbnail: React.FC = () => (
+  <AbsoluteFill>
+    <TechBackdrop hue="#0E2108" />
+    <AbsoluteFill style={{ background: `radial-gradient(circle at 50% 62%, ${C.nv}55 0%, transparent 45%)` }} />
+    <div style={{ position: "absolute", left: 0, right: 0, top: 250, textAlign: "center" }}>
+      <div style={{ display: "inline-block", fontFamily: FONT_BODY, fontWeight: 900, fontSize: 44, color: C.white, background: C.red, padding: "10px 26px", borderRadius: 10, letterSpacing: "0.08em" }}>
+        ● ÚLTIMA HORA
+      </div>
+      <div style={{ fontFamily: FONT_HEAD, fontSize: 250, lineHeight: 0.95, color: C.white, marginTop: 30, textShadow: `10px 10px 0 ${C.ink}` }}>HUANG</div>
+      <div style={{ fontFamily: FONT_HEAD, fontSize: 300, lineHeight: 0.95, color: C.nvLight, textShadow: `0 0 60px ${C.nv}, 10px 10px 0 ${C.ink}` }}>VUELVE</div>
+      <div style={{ display: "inline-block", marginTop: 26, fontFamily: FONT_BODY, fontWeight: 900, fontSize: 54, color: C.ink, background: C.white, padding: "10px 30px", borderRadius: 999, rotate: "-3deg" }}>
+        11 DÍAS DESPUÉS
+      </div>
+    </div>
+    <div style={{ position: "absolute", left: 60, top: 1080 }}>
+      <CeoChair w={500} spot={1} glow={1} />
+    </div>
+    <div style={{ position: "absolute", right: 70, top: 1160, textAlign: "right" }}>
+      <div style={{ fontFamily: FONT_HEAD, fontSize: 230, lineHeight: 1, color: C.nvLight, textShadow: `8px 8px 0 ${C.ink}` }}>+31%</div>
+      <div style={{ fontFamily: FONT_BODY, fontWeight: 900, fontSize: 40, color: C.white, marginTop: 4 }}>EN BOLSA EN UN DÍA</div>
+    </div>
+    <div style={{ position: "absolute", left: 0, right: 0, top: 1620, textAlign: "center", fontFamily: FONT_BODY, fontWeight: 900, fontSize: 40, color: C.white, opacity: 0.9 }}>
+      NVIDIA · TE LO CUENTO EN 1 MINUTO
+    </div>
+  </AbsoluteFill>
+);
+
 export const SCENES: SceneDef[] = [
   { key: "hook", firstSeg: "hook", C: Hook },
   { key: "lema", firstSeg: "lema", C: Lema, flash: C.nv },

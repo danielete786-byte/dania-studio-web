@@ -77,7 +77,7 @@ Revisa la salida: cada toma muestra `sim` (fidelidad según Whisper) y la transc
 
 ### 4. Escenas → `remotion/src/scenes.tsx` (+ `theme.ts`)
 - Pon el color de la categoría en `remotion/src/theme.ts`.
-- Reescribe `scenes.tsx`: **una escena por bloque del guion**, exporta `SCENES` (orden y `firstSeg` = id del bloque) y `SfxCues`.
+- Reescribe `scenes.tsx`: **una escena por bloque del guion**, exporta `SCENES` (orden y `firstSeg` = id del bloque), `SfxCues` y **`Thumbnail`** (la miniatura).
 - Reutiliza `news.tsx`: `TechBackdrop`, `NewsBar`, `HookBadge` («ÚLTIMA HORA»), `Lema` (cronómetro, úsalo tal cual), `Poll` (cierre Sí/No), `Counter`, `CodeWindow`.
 - Y `components.tsx`: `MaskLine` (titulares), `Chip`, `Stamp` (sellos), `Hand`, `punch`, `useShake`; `art.tsx`: ilustraciones SVG.
 - Mira `remotion/examples/nvidia-scenes.tsx` (noticia de empresa/bolsa) y `remotion-scenes.tsx` (herramienta) como modelo.
@@ -93,6 +93,8 @@ Reglas de diseño:
 - Citas de redes sociales: como cita traducida y atribuida, **nunca imitando la interfaz** de la red social.
 - Gráficos aproximados: indícalo en pantalla («gráfico ilustrativo»).
 
+**Miniatura (`Thumbnail`)**: portada estática 1080×1920 para TikTok. Titular enorme de 2 palabras (Anton 250-300 px), la cifra o dato más llamativo, la ilustración protagonista y una etiqueta «ÚLTIMA HORA». Todo lo importante dentro de la franja central **y 240-1680** (en el perfil de TikTok la portada se recorta a 3:4). Sin animaciones (es un solo fotograma). Modelo: la miniatura de Nvidia en el historial de git (`stories/2026-11-24-ia`, commit «miniatura»).
+
 ### 5. Revisar antes de renderizar
 ```bash
 ./still.sh 0 60 150 300 450 600 750 900      # elige fotogramas de cada escena y de los momentos clave
@@ -103,10 +105,10 @@ Abre `remotion/out/sheet.jpg` (herramienta Read) y corrige: texto que se sale, s
 ```bash
 ./render.sh stories/<carpeta> <Nombre-Del-Video>
 ```
-Deja `stories/<carpeta>/<Nombre>.mp4` y `.srt`. Comprueba que la duración es ≤ 35 s.
+Deja `stories/<carpeta>/<Nombre>.mp4`, `.srt` y `<Nombre>-miniatura.jpg`. Comprueba que la duración es ≤ 35 s y mira la miniatura con Read.
 
 ### 7. Entregar (no se publica nada automáticamente)
-Con **SendUserFile** (status `proactive`) envía el `.mp4` y el `.srt`. En el mensaje, en español:
+Con **SendUserFile** (status `proactive`) envía el `.mp4`, el `.srt` y la **miniatura** `.jpg`. En el mensaje, en español:
 1. La noticia en 2-3 líneas + **fuentes con enlace**.
 2. **TikTok**: título, descripción y 6-10 hashtags.
 3. **X**: un texto de ≤ 280 caracteres con 2-3 hashtags.
