@@ -6,6 +6,7 @@ import { vw, img } from './content'
 import { Mark, Wordmark, PhoneIco, WaIco } from './brand'
 const Hero = lazy(() => import('./Hero'))
 const Gears3D = lazy(() => import('./Gears3D'))
+const FallingParts = lazy(() => import('./FallingParts'))
 gsap.registerPlugin(ScrollTrigger)
 
 const ICONS: Record<string, JSX.Element> = {
@@ -36,7 +37,7 @@ function Nav() {
 
 const Head = ({ k, t, center, className = '' }: { k: string; t: string; center?: boolean; className?: string }) =>
   <div className={`reveal mb-12 max-w-3xl md:mb-16 ${center ? 'mx-auto text-center' : ''} ${className}`}><p className="kicker mb-4">{k}</p>
-    <h2 className="h-cond text-[44px] leading-[0.92] md:text-[80px]">{t}</h2></div>
+    <h2 className="h-cond grad-text text-[44px] leading-[0.92] md:text-[80px]">{t}</h2></div>
 
 function Stat({ s }: { s: typeof vw.trust[number] }) {
   const r = useRef<HTMLSpanElement>(null)
@@ -48,7 +49,7 @@ function Stat({ s }: { s: typeof vw.trust[number] }) {
       gsap.to(o, { v: s.value, duration: 2, ease: 'power3.out', onUpdate: () => { r.current!.textContent = fmt(o.v) } }) })
     return () => st.kill() }, [s])
   return <div className="reveal border-l border-neon/25 pl-5 md:pl-7">
-    <div className="h-cond text-[56px] leading-none text-white md:text-[84px]">{s.prefix}<span ref={r}>0</span><span className="ml-1 align-top text-[0.55em] text-neon">{s.suffix}</span></div>
+    <div className="h-cond text-[56px] leading-none md:text-[84px]"><span className="grad-text">{s.prefix}<span ref={r}>0</span></span><span className="ml-1 align-top text-[0.55em] text-neon">{s.suffix}</span></div>
     <p className="mt-2 text-[12px] uppercase tracking-[0.22em] text-white/50">{s.label}</p></div>
 }
 
@@ -100,7 +101,7 @@ function Gallery() {
   return <section id="taller-fotos" className="mx-auto max-w-7xl px-5 pb-28 md:px-8 md:pb-40">
     <Head k={vw.gallery.kicker} t={vw.gallery.title} />
     <div className="grid auto-rows-[170px] grid-cols-2 gap-3 [grid-auto-flow:dense] sm:auto-rows-[220px] md:auto-rows-[250px] md:grid-cols-4 md:gap-4">
-      {vw.gallery.items.map(g => <figure key={g.src} className={`ph relative overflow-hidden rounded-3xl border border-white/10 bg-steel ${SPAN[g.span]}`}>
+      {vw.gallery.items.map(g => <figure key={g.src} className={`ph relative overflow-hidden rounded-3xl border border-white/10 bg-[#121417] ${SPAN[g.span]}`}>
         <img src={img[g.src as keyof typeof img]} alt={g.alt} loading="lazy" className="ph-img h-full w-full object-cover" />
         <figcaption className="absolute bottom-3 left-3 rounded-full bg-ink/75 px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-white/85 backdrop-blur md:text-[11px]">{g.tag}</figcaption></figure>)}
       <div className="ph col-span-2 flex flex-col justify-center rounded-3xl md:col-span-4 md:flex-row md:items-end md:justify-between md:gap-10 border border-neon/20 bg-[radial-gradient(120%_120%_at_0%_0%,rgba(34,225,238,.14),transparent_60%)] p-6 md:p-9">
@@ -141,10 +142,10 @@ export default function App() {
 
   return <>
     <Nav />
-    <main>
+    <main className="relative z-10">
       <Suspense fallback={<section className="h-[100svh] bg-ink" />}><Hero /></Suspense>
 
-      <div className="relative overflow-hidden border-y border-neon/15 bg-steel py-5" aria-label="Marcas con las que trabajamos">
+      <div className="grad-band relative overflow-hidden border-y border-white/10 py-5" aria-label="Marcas con las que trabajamos">
         <div className="marquee flex w-max gap-10 whitespace-nowrap">
           {[0, 1, 2, 3].map(r => <div key={r} className="flex gap-10" aria-hidden={r > 0}>{vw.brands.map(t => <span key={t} className="h-cond flex items-center gap-10 text-[28px] uppercase tracking-[0.06em] text-white/80 md:text-[34px]">{t}<span className="text-neon">✦</span></span>)}</div>)}
         </div></div>
@@ -154,7 +155,7 @@ export default function App() {
 
       <Gallery />
 
-      <section id="servicios" className="border-t border-white/5 bg-steel/50">
+      <section id="servicios" className="border-t border-white/5">
         <div className="mx-auto max-w-7xl px-5 py-28 md:px-8 md:py-40">
           <Head k={vw.services.kicker} t={vw.services.title} />
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -177,7 +178,7 @@ export default function App() {
             <p className="mt-3 max-w-[260px] text-[15px] leading-relaxed text-white/55">{s.text}</p></li>)}
         </ol></section>
 
-      <section id="opiniones" className="border-y border-white/5 bg-steel/50 py-28 md:py-40">
+      <section id="opiniones" className="border-y border-white/5 py-28 md:py-40">
         <div className="mx-auto max-w-7xl px-5 md:px-8">
           <div className="flex flex-wrap items-end justify-between gap-8">
             <Head k={vw.opinions.kicker} t={vw.opinions.title} className="!mb-0" />
@@ -221,16 +222,31 @@ export default function App() {
         <div className="pointer-events-none absolute left-1/2 top-10 h-[560px] w-[900px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(34,225,238,.13),transparent)]" />
         <div className="relative mx-auto grid max-w-7xl items-center gap-6 px-5 md:grid-cols-2 md:px-8">
           <div className="h-[300px] md:order-2 md:h-[480px]"><Suspense fallback={null}><Gears3D /></Suspense></div>
-          <div className="md:order-1"><h2 className="reveal h-cond text-[56px] leading-[0.9] md:text-[104px]">{vw.cta.title}</h2>
+          <div className="md:order-1"><h2 className="reveal h-cond grad-text text-[56px] leading-[0.9] md:text-[104px]">{vw.cta.title}</h2>
             <p className="reveal mt-5 max-w-md text-[18px] text-white/60">{vw.cta.text}</p>
             <div className="reveal mt-9 flex flex-wrap gap-3"><a href={vw.phoneHref} className="btn-neon !px-8 !py-4 text-[16px]"><PhoneIco /> {vw.cta.button}</a>
               <a href={vw.whatsappHref} target="_blank" rel="noopener" className="btn-ghost !py-4"><WaIco /> WhatsApp</a></div></div>
         </div></section>
     </main>
-    <footer className="border-t border-white/5 pb-28 pt-10 text-[13px] text-white/40 md:pb-10">
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-5 md:px-8">
+    <footer className="border-t border-white/5 pb-28 pt-20 text-[13px] text-white/40 md:pb-10 md:pt-28">
+      <div className="relative z-10 mx-auto max-w-3xl px-5 text-center">
+        <p className="kicker mb-4">{vw.crate.kicker}</p>
+        <h2 className="h-cond grad-text text-[40px] leading-[0.92] md:text-[72px]">{vw.crate.title}</h2>
+        <p className="mx-auto mt-4 max-w-md text-[15px] text-white/55">{vw.crate.text}</p></div>
+      {/* caja: el fondo va por detrás de las piezas (canvas z-5) y el frontal por delante */}
+      <div className="crate mt-12 md:mt-16">
+        <div className="crate-back" aria-hidden />
+        <div id="crate" className="crate-inner" />
+        <div className="crate-front" aria-hidden>
+          <span className="crate-rivet left-3 top-3" /><span className="crate-rivet right-3 top-3" />
+          <span className="crate-label"><Wordmark className="text-[11px] md:text-[14px]" /><span className="mt-1 block text-[10px] uppercase tracking-[0.35em] text-white/50">Piezas · Recambios</span></span>
+        </div>
+      </div>
+      <p className="relative z-10 mt-5 text-center font-mono text-[12px] uppercase tracking-[0.25em] text-white/50"><span id="crate-count" className="text-neon">0</span> piezas guardadas</p>
+      <div className="relative z-10 mx-auto mt-16 flex max-w-7xl flex-wrap items-center justify-between gap-4 border-t border-white/5 px-5 pt-8 md:px-8">
         <span className="flex items-center gap-2"><Mark className="h-5 w-5" /> {vw.legal} · {vw.address.join(', ')}</span>
         <span>{vw.footer}</span></div></footer>
+    <Suspense fallback={null}><FallingParts /></Suspense>
     <div className="fixed inset-x-0 bottom-0 z-50 flex gap-2 border-t border-white/10 bg-ink/90 p-3 backdrop-blur-xl md:hidden" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
       <a href={vw.phoneHref} className="btn-neon flex-1 justify-center"><PhoneIco /> Llamar</a>
       <a href={vw.whatsappHref} target="_blank" rel="noopener" className="btn-ghost flex-1 justify-center"><WaIco /> WhatsApp</a></div>

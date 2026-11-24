@@ -58,6 +58,12 @@ Demo comercial de DanIA Studio. Investigación hecha el 24/11/2026 con buscadore
 
 **Por qué no se usa el logo de Volkswagen:** es una marca registrada y Vegawagen no es concesionario oficial. Ponerlo como animación principal podría traerles una reclamación y hacer creer a los clientes que es un servicio oficial. Por eso se monta su propia W, que ya recuerda a VW. Las marcas (Volkswagen, Audi, SEAT, Škoda, Cupra) solo aparecen como texto, igual que en su pared ("Trabajamos todas las marcas").
 
+**Seña de identidad DanIA (degradados):** en esta web, degradados de negro a gris. Van en el fondo de toda la página (cambia de negro a gris según bajas), en los títulos (efecto metálico), en tarjetas y botones, en la franja de marcas y en el fondo de la escena 3D. El cian queda solo como acento del neón de Vegawagen.
+
+**Toque especial: lluvia de piezas.** Al pasar la portada, por los laterales van cayendo piezas de coche en 3D (tuercas, arandelas, engranajes, discos de freno, ruedas, tornillos, muelles, pistones, bujías, llaves, válvulas y amortiguadores), unas 26–36 según la longitud de la página. Caen por detrás del contenido. Al llegar al pie de página aparece una caja metálica y las piezas caen dentro y se apilan con física real (matter-js); un contador muestra cuántas hay guardadas. Con "reducir movimiento" activado en el dispositivo, la caja aparece ya llena y sin animación.
+
+**Mejoras de la animación del emblema:** las piezas llegan describiendo curvas, hacen un pequeño "clic" al encajar, saltan chispas al apretar los tornillos y al encajar la W, la cámara gira alrededor mientras se monta y, con el neón encendido, un brillo recorre el cromo.
+
 **Archivo para enseñarla sin instalar nada:** `demos/vegawagen/vegawagen-demo.html` (unos 2,5 MB, con todo dentro). Se abre con doble clic o desde el móvil. Para regenerarlo: `node scripts/build-standalone.mjs vegawagen`.
 
 - Código: `demos/vegawagen/index.html` + `src/vegawagen/` (mismo stack que la web de DanIA: Vite, React, Tailwind, GSAP, Lenis y three.js).

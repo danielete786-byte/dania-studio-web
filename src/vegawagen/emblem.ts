@@ -12,6 +12,7 @@ export type Piece = {
   obj: THREE.Object3D
   home: THREE.Vector3; homeQ: THREE.Quaternion
   from: THREE.Vector3; fromQ: THREE.Quaternion
+  ctrl: THREE.Vector3 // punto de control: las piezas llegan describiendo una curva
   axis: THREE.Vector3; phase: number
   t0: number; t1: number
   kind: 'gear' | 'plate' | 'bezel' | 'w' | 'neon' | 'bolt'
@@ -107,7 +108,9 @@ export function buildEmblem() {
       : home.clone().addScaledVector(dir, dist).add(new THREE.Vector3(0, 0, (rnd() - 0.4) * 5 * spread))
     const fromQ = kind === 'bolt' ? homeQ.clone()
       : new THREE.Quaternion().setFromEuler(new THREE.Euler((rnd() - 0.5) * TAU, (rnd() - 0.5) * TAU, (rnd() - 0.5) * TAU)).multiply(homeQ)
-    pieces.push({ obj, home, homeQ, from, fromQ, axis: new THREE.Vector3(rnd() - 0.5, rnd() - 0.5, rnd() - 0.5).normalize(), phase: rnd() * TAU, t0, t1: t0 + dur, kind })
+    const side = new THREE.Vector3(-(from.y - home.y), from.x - home.x, 0).normalize().multiplyScalar(from.distanceTo(home) * 0.3 * (rnd() < 0.5 ? -1 : 1))
+    const ctrl = kind === 'bolt' ? home.clone().add(new THREE.Vector3(0, 0, 1.4)) : home.clone().lerp(from, 0.5).add(side).add(new THREE.Vector3(0, 0, 1 + rnd() * 1.4))
+    pieces.push({ obj, home, homeQ, from, fromQ, ctrl, axis: new THREE.Vector3(rnd() - 0.5, rnd() - 0.5, rnd() - 0.5).normalize(), phase: rnd() * TAU, t0, t1: t0 + dur, kind })
   }
 
   // 1 · engranaje trasero (asoma por los lados del hexágono)
@@ -148,4 +151,44 @@ export function buildEmblem() {
     add(b, 'bolt', 0.6 + k * 0.022, 0.1)
   }
   return { group, pieces, gear, materials: mat }
+}
+
+// fondo degradado negro ↔ gris (seña de identidad)
+export function backdropTexture() {
+  const c = document.createElement('canvas'); c.width = 1024; c.height = 1024
+  const g = c.getContext('2d')!, r = g.createRadialGradient(560, 470, 40, 512, 512, 720)
+  r.addColorStop(0, '#454a51'); r.addColorStop(0.32, '#23262b'); r.addColorStop(0.7, '#0b0c0e'); r.addColorStop(1, '#040405')
+  g.fillStyle = r; g.fillRect(0, 0, 1024, 1024)
+  const l = g.createLinearGradient(0, 0, 0, 1024); l.addColorStop(0, 'rgba(0,0,0,0)'); l.addColorStop(0.7, 'rgba(0,0,0,0)'); l.addColorStop(1, 'rgba(40,43,48,.55)')
+  g.fillStyle = l; g.fillRect(0, 0, 1024, 1024)
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t
+}
+
+// chispas al encajar las piezas (partículas aditivas con gravedad)
+export function createSparks(max = 500) {
+  const pos = new Float32Array(max * 3), col = new Float32Array(max * 3), vel = new Float32Array(max * 3), life = new Float32Array(max), maxLife = new Float32Array(max)
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('color', new THREE.BufferAttribute(col, 3))
+  const mat = new THREE.PointsMaterial({ size: 0.045, vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })
+  mat.color.setScalar(2.2) // por encima de 1 para que el bloom las haga brillar
+  const points = new THREE.Points(geo, mat); points.frustumCulled = false
+  let head = 0
+  const emit = (at: THREE.Vector3, n: number, speed = 3) => {
+    for (let k = 0; k < n; k++) {
+      const i = head = (head + 1) % max, a = Math.random() * TAU, up = Math.random()
+      pos.set([at.x, at.y, at.z], i * 3)
+      vel.set([Math.cos(a) * speed * (0.4 + Math.random()), Math.sin(a) * speed * (0.4 + Math.random()) + 1.2, speed * (0.3 + up)], i * 3)
+      life[i] = maxLife[i] = 0.35 + Math.random() * 0.45
+    }
+  }
+  const update = (dt: number) => {
+    for (let i = 0; i < max; i++) {
+      if (life[i] <= 0) { col[i * 3] = col[i * 3 + 1] = col[i * 3 + 2] = 0; continue }
+      life[i] -= dt; vel[i * 3 + 1] -= 7 * dt
+      for (let j = 0; j < 3; j++) pos[i * 3 + j] += vel[i * 3 + j] * dt
+      const f = Math.max(0, life[i] / maxLife[i])
+      col[i * 3] = f; col[i * 3 + 1] = f * (0.55 + 0.35 * f); col[i * 3 + 2] = f * f * 0.45
+    }
+    geo.attributes.position.needsUpdate = true; geo.attributes.color.needsUpdate = true
+  }
+  return { points, emit, update }
 }

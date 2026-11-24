@@ -6,7 +6,7 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
-import { buildEmblem, glowTexture, NEON } from './emblem'
+import { buildEmblem, glowTexture, backdropTexture, createSparks, NEON } from './emblem'
 import { vw, img } from './content'
 import { PhoneIco, WaIco, Wordmark } from './brand'
 
@@ -14,6 +14,7 @@ const clamp = (v: number, a = 0, b = 1) => Math.min(b, Math.max(a, v))
 const smooth = (a: number, b: number, v: number) => { const t = clamp((v - a) / (b - a)); return t * t * (3 - 2 * t) }
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t
 const ease = (t: number) => 1 - (1 - t) ** 3
+const back = (t: number, s = 1.25) => 1 + (s + 1) * (t - 1) ** 3 + s * (t - 1) ** 2 // pequeño rebote al encajar
 
 export default function Hero() {
   const wrap = useRef<HTMLElement>(null), stage = useRef<HTMLDivElement>(null)
@@ -33,7 +34,7 @@ export default function Hero() {
     host.appendChild(renderer.domElement)
 
     const scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(30, 1, 0.1, 100)
-    scene.background = new THREE.Color(0x07090c)
+    scene.background = backdropTexture()
     const pm = new THREE.PMREMGenerator(renderer)
     scene.environment = pm.fromScene(new RoomEnvironment(), 0.03).texture
     scene.environmentIntensity = 0.75
@@ -41,9 +42,14 @@ export default function Hero() {
     const rimL = new THREE.DirectionalLight(0x9ad8ff, 0.8); rimL.position.set(-6, 2, -3); scene.add(rimL)
     const cyanA = new THREE.PointLight(NEON, 0, 9), cyanB = new THREE.PointLight(NEON, 0, 9)
     cyanA.position.set(-2.2, 1.6, 2.4); cyanB.position.set(2.4, -1.4, 2.2); scene.add(cyanA, cyanB)
+    // luz que barre el cromo cuando el emblema ya está montado, como en un escaparate
+    const sweep = new THREE.PointLight(0xffffff, 0, 7); scene.add(sweep)
 
     const { group, pieces, gear, materials } = buildEmblem()
     const rig = new THREE.Group(); rig.add(group); scene.add(rig)
+    const sparks = createSparks(); scene.add(sparks.points)
+    const prevT = pieces.map(() => 0), tmp = new THREE.Vector3(), bez = new THREE.Vector3(), a0 = new THREE.Vector3(), c0 = new THREE.Vector3()
+    let shake = 0
     // halo de neón detrás del emblema
     const halo = new THREE.Mesh(new THREE.PlaneGeometry(9, 9), new THREE.MeshBasicMaterial({ map: glowTexture(), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }))
     halo.position.z = -1.4; rig.add(halo)
@@ -90,16 +96,30 @@ export default function Hero() {
       // montaje: cada pieza vuela desde su posición inicial hasta su sitio
       const k = mobile ? 0.72 : 0.85
       let placed = 0
-      for (const p of pieces) {
+      pieces.forEach((p, i) => {
         const t = clamp((prog - p.t0) / (p.t1 - p.t0)), e = ease(t), free = 1 - e
         if (t >= 1) placed++
-        p.obj.position.set(lerp(p.home.x + (p.from.x - p.home.x) * k, p.home.x, e), lerp(p.home.y + (p.from.y - p.home.y) * k, p.home.y, e), lerp(p.from.z, p.home.z, e))
-        p.obj.position.y += Math.sin(time * 0.9 + p.phase) * 0.12 * free
+        // curva de Bézier: origen → punto de control → su sitio
+        a0.set(p.home.x + (p.from.x - p.home.x) * k, p.home.y + (p.from.y - p.home.y) * k, p.from.z)
+        c0.set(p.home.x + (p.ctrl.x - p.home.x) * k, p.home.y + (p.ctrl.y - p.home.y) * k, p.ctrl.z)
+        bez.copy(a0).multiplyScalar(free * free).addScaledVector(c0, 2 * free * e).addScaledVector(p.home, e * e)
+        bez.z -= 0.07 * Math.sin(Math.PI * clamp((t - 0.8) / 0.2)) // "clic": se hunde un poco al encajar
+        bez.y += Math.sin(time * 0.9 + p.phase) * 0.12 * free
+        p.obj.position.copy(bez)
         idle.setFromAxisAngle(p.axis, time * 0.35 * free)
-        q.copy(p.fromQ).multiply(idle).slerp(p.homeQ, e)
+        q.copy(p.fromQ).multiply(idle).slerp(p.homeQ, t >= 1 ? 1 : back(t))
         p.obj.quaternion.copy(q)
         if (p.kind === 'bolt') p.obj.rotateOnAxis(Z, (1 - e) * Math.PI * 6) // se enrosca al entrar
-      }
+        // al encajar (solo hacia delante): chispas y una pequeña sacudida
+        if (prevT[i] < 1 && t >= 1 && target > prevT[i] && !reduced) {
+          tmp.copy(p.home); group.localToWorld(tmp)
+          const n = p.kind === 'bolt' ? 26 : p.kind === 'w' ? 16 : p.kind === 'neon' ? 0 : 8
+          if (n) sparks.emit(tmp, n, p.kind === 'bolt' ? 3.4 : 2.4)
+          shake = Math.min(1, shake + (p.kind === 'bolt' || p.kind === 'gear' ? 0.5 : p.kind === 'w' ? 0.3 : 0.12))
+        }
+        prevT[i] = t
+      })
+      sparks.update(dt)
       gear.rotateOnAxis(Z, gearAngle)
 
       // encendido del neón con parpadeo, como un rótulo de verdad
@@ -109,6 +129,7 @@ export default function Hero() {
       cyanA.intensity = cyanB.intensity = glow * 1.6
       ;(halo.material as THREE.MeshBasicMaterial).opacity = 0.04 + glow * (mobile ? 0.14 : 0.3)
       bloom.strength = 0.18 + glow * (mobile ? 0.3 : 0.5)
+      sweep.intensity = smooth(0.82, 0.9, prog) * 2.2; sweep.position.set(Math.sin(time * 0.7) * 3, 1.1 + Math.cos(time * 0.45) * 0.5, 2.6)
 
       // composición: a la derecha del título al principio, centrado al montarse, en vitrina al final
       const a = smooth(0.04, 0.3, prog), show = smooth(0.8, 0.95, prog)
@@ -116,12 +137,15 @@ export default function Hero() {
       const D = mobile ? Math.max(2.05 / (th * 0.9), 1.95 / (tv * 0.42)) : Math.max(1.95 / (tv * 0.56), 1.95 / (th * 0.6))
       rig.position.set(lerp(mobile ? 0 : D * th * 0.42, 0, a), lerp(mobile ? -D * tv * 0.42 : 0, D * tv * (mobile ? 0.1 : 0.12), a), 0)
       rig.scale.setScalar(lerp(0.82, 1, a))
-      group.rotation.y = m.x * 0.5 + Math.sin(time * 0.5) * 0.32 * show + lerp(-0.35, 0, a)
-      group.rotation.x = m.y * 0.3 + lerp(0.15, 0, a) - 0.06 * show
+      const orbit = smooth(0.04, 0.78, prog)
+      group.rotation.y = m.x * 0.5 + Math.sin(time * 0.5) * 0.3 * show + lerp(mobile ? -0.5 : -0.8, 0, orbit)
+      group.rotation.x = m.y * 0.3 + lerp(0.32, 0, orbit) - 0.06 * show
+      group.rotation.z = lerp(0.12, 0, orbit)
       const ds = dustGeo.attributes.position as THREE.BufferAttribute
       for (let i = 0; i < N; i++) { let y = ds.getY(i) + dt * 0.08; if (y > 4.5) y = -4.5; ds.setY(i, y) }
       ds.needsUpdate = true
-      cam.position.set(-m.x * 0.5, -m.y * 0.35, D)
+      shake *= Math.exp(-dt * 9)
+      cam.position.set(-m.x * 0.5 + (Math.random() - 0.5) * shake * 0.05, -m.y * 0.35 + (Math.random() - 0.5) * shake * 0.05, D * lerp(1.1, 1, orbit))
       cam.lookAt(0, 0, 0)
       composer.render(dt)
 

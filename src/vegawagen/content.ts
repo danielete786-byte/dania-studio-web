@@ -93,6 +93,9 @@ export const vw = {
   location: { kicker: 'Dónde estamos', title: 'Busca la fachada roja de Castrol Service.',
     text: 'En Churriana de la Vega, a un paso de Granada. La puerta grande con el cartel de Vegawagen.' },
 
+  crate: { kicker: 'Hasta la última pieza', title: 'Cada pieza, en su sitio.',
+    text: 'Las piezas que han ido cayendo mientras bajabas acaban aquí. En el taller pasa igual: nada se pierde y todo se revisa.' },
+
   cta: { title: 'Trae tu coche a la Vega.', text: 'Llámanos o escríbenos por WhatsApp, cuéntanos qué le pasa y te damos cita.', button: 'Llamar ahora' },
   footer: 'Propuesta de web realizada por DanIA Studio.',
 }
