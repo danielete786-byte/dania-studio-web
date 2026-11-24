@@ -34,7 +34,7 @@ export const vw = {
     title: ['Tu coche,', 'en buenas manos.'],
     text: 'Mecánica, electrónica y diagnosis con precio claro y sin sorpresas. Desde 2010 en la Vega de Granada.',
     scroll: 'Desliza y mira cómo se monta',
-    outro: 'Montado pieza a pieza · Desde 2010',
+    outro: 'Volkswagen · Audi · SEAT · Škoda · Cupra · y todas las marcas',
   },
 
   trust: [
@@ -98,4 +98,6 @@ export const vw = {
 
   cta: { title: 'Trae tu coche a la Vega.', text: 'Llámanos o escríbenos por WhatsApp, cuéntanos qué le pasa y te damos cita.', button: 'Llamar ahora' },
   footer: 'Propuesta de web realizada por DanIA Studio.',
+  // Aviso de marcas: el emblema de la portada reproduce el logotipo de Volkswagen
+  legalNote: 'Vegawagen es un taller independiente, no un servicio oficial. Volkswagen, Audi, SEAT, Škoda y Cupra y sus logotipos son marcas registradas de sus titulares y se citan solo para indicar los vehículos que reparamos.',
 }

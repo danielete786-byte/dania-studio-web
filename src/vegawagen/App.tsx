@@ -233,19 +233,13 @@ export default function App() {
         <p className="kicker mb-4">{vw.crate.kicker}</p>
         <h2 className="h-cond grad-text text-[40px] leading-[0.92] md:text-[72px]">{vw.crate.title}</h2>
         <p className="mx-auto mt-4 max-w-md text-[15px] text-white/55">{vw.crate.text}</p></div>
-      {/* caja: el fondo va por detrás de las piezas (canvas z-5) y el frontal por delante */}
-      <div className="crate mt-12 md:mt-16">
-        <div className="crate-back" aria-hidden />
-        <div id="crate" className="crate-inner" />
-        <div className="crate-front" aria-hidden>
-          <span className="crate-rivet left-3 top-3" /><span className="crate-rivet right-3 top-3" />
-          <span className="crate-label"><Wordmark className="text-[11px] md:text-[14px]" /><span className="mt-1 block text-[10px] uppercase tracking-[0.35em] text-white/50">Piezas · Recambios</span></span>
-        </div>
-      </div>
-      <p className="relative z-10 mt-5 text-center font-mono text-[12px] uppercase tracking-[0.25em] text-white/50"><span id="crate-count" className="text-neon">0</span> piezas guardadas</p>
+      {/* hueco del maletín: se dibuja en 3D en el canvas de piezas (detrás del contenido) */}
+      <div id="crate" className="case-anchor" aria-label="Maletín organizador donde se guardan las piezas" role="img" />
+      <p className="relative z-10 -mt-2 text-center font-mono text-[12px] uppercase tracking-[0.25em] text-white/50"><span id="crate-count" className="text-neon">0</span> piezas guardadas</p>
       <div className="relative z-10 mx-auto mt-16 flex max-w-7xl flex-wrap items-center justify-between gap-4 border-t border-white/5 px-5 pt-8 md:px-8">
         <span className="flex items-center gap-2"><Mark className="h-5 w-5" /> {vw.legal} · {vw.address.join(', ')}</span>
-        <span>{vw.footer}</span></div></footer>
+        <span>{vw.footer}</span></div>
+      <p className="relative z-10 mx-auto mt-6 max-w-7xl px-5 text-[11px] leading-relaxed text-white/30 md:px-8">{vw.legalNote}</p></footer>
     <Suspense fallback={null}><FallingParts /></Suspense>
     <div className="fixed inset-x-0 bottom-0 z-50 flex gap-2 border-t border-white/10 bg-ink/90 p-3 backdrop-blur-xl md:hidden" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
       <a href={vw.phoneHref} className="btn-neon flex-1 justify-center"><PhoneIco /> Llamar</a>
