@@ -89,7 +89,8 @@ Reglas de diseño:
 - Titulares en Anton: cada letra ocupa ~0,5 × tamaño → una línea de 120 px admite ~15 caracteres. Parte las líneas largas.
 - Un elemento protagonista por escena; un cambio o efecto cada 2-4 s (sello, chip, contador, punch-in, temblor).
 - Primer fotograma con texto ya visible (gancho inmediato).
-- **Sin logotipos, capturas ni vídeos de terceros.** Ilustraciones propias en SVG. Solo se pueden usar imágenes oficiales de prensa de los hosts permitidos en el entorno (p. ej. rockstargames.com) en `remotion/public/img/`.
+- **Logos reales**: usa `BrandLogo` de `news.tsx` (`<BrandLogo slug="spotify" size={120} />`), que tira del paquete `simple-icons`. Solo para identificar a las empresas de la noticia: sin deformarlos ni sugerir patrocinio. Si la marca no está en el paquete (p. ej. Xbox, Nintendo, OpenAI, Microsoft, Amazon, Capcom), `BrandLogo` muestra el nombre escrito. Comprueba el slug con `node -e 'const si=require("simple-icons");console.log(Object.values(si).find(i=>i.slug==="SLUG"))'`.
+- **Imágenes reales**: siempre que la empresa protagonista tenga imágenes oficiales de prensa en un host permitido del entorno (Rockstar, Nintendo, Capcom, Take-Two, The Game Awards…), úsalas como fondo con `Bg` (en `remotion/public/img/`, no se suben a git) y cita la fuente en el cierre. Nunca fotos de medios de comunicación ni capturas de otras webs o vídeos.
 - Citas de redes sociales: como cita traducida y atribuida, **nunca imitando la interfaz** de la red social.
 - Gráficos aproximados: indícalo en pantalla («gráfico ilustrativo»).
 

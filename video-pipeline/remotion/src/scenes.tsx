@@ -7,7 +7,7 @@ import { Audio } from "@remotion/media";
 import { AbsoluteFill, interpolate, random, Sequence, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import { Chip, MaskLine, Stamp, punch, useShake } from "./components";
 import { C, clamp, EASE_MOVE, FONT_BODY, FONT_HEAD, popSpring, ramp, softSpring, wordF } from "./lib";
-import { Counter, HookBadge, Lema, NewsBar, Poll, SceneDef, SceneProps, TechBackdrop } from "./news";
+import { BrandLogo, Counter, HookBadge, Lema, NewsBar, Poll, SceneDef, SceneProps, TechBackdrop } from "./news";
 
 const DATE = "25 NOV";
 const Bar: React.FC<{ active: number }> = ({ active }) => <NewsBar active={active} total={5} label="NOTICIA IA" date={DATE} />;
@@ -61,7 +61,10 @@ const Hook: React.FC<SceneProps> = ({ startMs }) => {
     <AbsoluteFill style={{ scale: String(z), translate: `${sh.x}px ${sh.y}px` }}>
       <TechBackdrop />
       <HookBadge label="ÚLTIMA HORA" date="25 NOV 2026" />
-      <div style={{ position: "absolute", left: 80, top: 230 }}>
+      <div style={{ position: "absolute", left: 80, top: 230, display: "flex", alignItems: "center", gap: 30 }}>
+        <div style={{ scale: String(popSpring(frame, fps, -6)) }}>
+          <BrandLogo slug="tidal" size={140} />
+        </div>
         <MaskLine delay={-9} size={150} shadow={C.red}>
           Tidal borra
         </MaskLine>
@@ -254,8 +257,8 @@ const Otras: React.FC<SceneProps> = ({ startMs }) => {
         </MaskLine>
       </div>
       {[
-        { t: "SPOTIFY", at: fSp, x: 80 },
-        { t: "APPLE MUSIC", at: fAp, x: 560 },
+        { t: "SPOTIFY", slug: "spotify", at: fSp, x: 80 },
+        { t: "APPLE MUSIC", slug: "applemusic", at: fAp, x: 560 },
       ].map((b) => (
         <div
           key={b.t}
@@ -277,8 +280,8 @@ const Otras: React.FC<SceneProps> = ({ startMs }) => {
             opacity: frame >= b.at - 2 ? 1 : 0,
           }}
         >
-          <Note s={90} color={C.white} />
-          <div style={{ fontFamily: FONT_HEAD, fontSize: 70, color: C.white }}>{b.t}</div>
+          <BrandLogo slug={b.slug} size={130} />
+          <div style={{ fontFamily: FONT_HEAD, fontSize: 64, color: C.white }}>{b.t}</div>
         </div>
       ))}
       <div style={{ position: "absolute", left: 0, right: 0, top: 830, textAlign: "center", scale: String(toB), opacity: toB }}>
@@ -310,7 +313,10 @@ export const Thumbnail: React.FC = () => (
       <div style={{ fontFamily: FONT_HEAD, fontSize: 200, lineHeight: 1.08, color: C.white, marginTop: 40, textShadow: `10px 10px 0 ${C.ink}` }}>ADIÓS A LA</div>
       <div style={{ fontFamily: FONT_HEAD, fontSize: 230, lineHeight: 1.08, color: C.nvLight, textShadow: `0 0 60px ${C.nv}, 10px 10px 0 ${C.ink}` }}>MÚSICA IA</div>
       <div style={{ display: "inline-block", marginTop: 26, fontFamily: FONT_BODY, fontWeight: 900, fontSize: 52, color: C.ink, background: C.yellow, padding: "10px 30px", borderRadius: 999, rotate: "-3deg" }}>
-        TIDAL BORRA 27 MILLONES
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 16 }}>
+          <BrandLogo slug="tidal" size={56} color={C.ink} />
+          TIDAL BORRA 27 MILLONES
+        </span>
       </div>
       <div style={{ marginTop: 18, fontFamily: FONT_BODY, fontWeight: 900, fontSize: 36, color: C.white }}>DE CANCIONES HECHAS 100% CON IA</div>
     </div>

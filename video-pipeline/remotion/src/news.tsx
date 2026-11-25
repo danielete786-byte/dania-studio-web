@@ -3,6 +3,7 @@
  * Úsalas en scenes.tsx: TechBackdrop, NewsBar, HookBadge, Lema, Poll, Counter, CodeWindow.
  */
 import React from "react";
+import * as SI from "simple-icons";
 import { AbsoluteFill, interpolate, random, useCurrentFrame, useVideoConfig } from "remotion";
 import { CommentBubble } from "./art";
 import { MaskLine, TopBar } from "./components";
@@ -234,5 +235,27 @@ export const CodeWindow: React.FC<{ lines: { t: string; c?: string }[]; start: n
         })}
       </div>
     </div>
+  );
+};
+
+// ---------- logos reales de marcas (paquete simple-icons, CC0; las marcas son de sus dueños) ----------
+// Úsalos solo para IDENTIFICAR a la empresa de la noticia: sin deformarlos, recolorearlos de forma rara
+// ni sugerir patrocinio. Si una marca no está en el paquete, se muestra su nombre escrito.
+type SiIcon = { slug: string; title: string; hex: string; path: string };
+const ICONS: SiIcon[] = (Object.values(SI) as unknown[]).filter((x): x is SiIcon => !!x && typeof x === "object" && "slug" in (x as object) && "path" in (x as object));
+export const brandIcon = (slug: string) => ICONS.find((i) => i.slug === slug);
+const isDark = (hex: string) => {
+  const n = parseInt(hex, 16);
+  return ((n >> 16) & 255) * 0.299 + ((n >> 8) & 255) * 0.587 + (n & 255) * 0.114 < 60;
+};
+export const BrandLogo: React.FC<{ slug: string; size: number; color?: string; style?: React.CSSProperties }> = ({ slug, size, color, style }) => {
+  const icon = brandIcon(slug);
+  if (!icon)
+    return <div style={{ fontFamily: FONT_HEAD, fontSize: size * 0.5, color: color ?? C.white, lineHeight: 1, ...style }}>{slug.toUpperCase()}</div>;
+  const fill = color ?? (isDark(icon.hex) ? "#FFFFFF" : `#${icon.hex}`);
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} style={style} role="img" aria-label={icon.title}>
+      <path d={icon.path} fill={fill} />
+    </svg>
   );
 };
