@@ -177,7 +177,7 @@ export const Thumbnail: React.FC = () => (
       <div style={{ display: "inline-block", fontFamily: FONT_BODY, fontWeight: 900, fontSize: 44, color: C.white, background: C.red, padding: "10px 26px", borderRadius: 10, letterSpacing: "0.08em" }}>
         ● ÚLTIMA HORA
       </div>
-      <div style={{ fontFamily: FONT_HEAD, fontSize: 150, lineHeight: 1.05, color: C.white, marginTop: 30, textShadow: `8px 8px 0 ${C.ink}` }}>GTA 6 PC «FAN»</div>
+      <div style={{ fontFamily: FONT_HEAD, fontSize: 150, lineHeight: 1.05, color: C.white, marginTop: 30, textShadow: `8px 8px 0 ${C.ink}` }}>GTA 6 PC "FAN"</div>
       <div
         style={{
           fontFamily: FONT_HEAD,
