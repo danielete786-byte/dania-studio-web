@@ -1,0 +1,346 @@
+# Decisions: 03 Hook title
+
+## v2 concept
+- **The one idea.** The hook is the title card of the edit. It lands with the first cut, and its keyword is the payoff hit on that cut. It is not a caption floating on a clip.
+- **Shots and cuts.** Both variants are full-bleed vertical 4K shots (`-v.mp4`) with a linear 6% push across the whole piece.
+  - v0 Boxed lines (r09): bright from first frame to last. s011 highway (0–1.1), **cut 1.1** to s027 sunset dock (payoff; held 2.3 s at 0.79× so the lit slab gets its hold on the sunset), 3.4 s012 muscle beach (re-hit), 5.5 Trailer 2's opening shot, a Keys stilt house and a vintage car under open blue sky (re-hit, exit). That last one is `assets/clips/s001-stilt-house-v.mp4`, cut from the 4K master with the shot library's own crop and grade, framed right so the stack sits in the sky.
+  - v1 Official caps (r08): bright day to golden hour, no night. s011 highway (0–0.4, in-point 1.3), **cut 0.4** to s135 skydive over Vice City (payoff), 1.9 s074 "The Keys" sign (in 0.3), 2.5 s064 jetski under open blue sky, 3.15 s012 muscle beach, 5.5 s026 sunset pier. Every shot has open sky or foliage top-left for the lockup, and every in/out point was chosen so no subject enters the title zone.
+- **Where the type sits and why.**
+  - v0 (r09): a centred stack, a lead-in tab on two keyword slabs (x 154–926), y 232–740. It sits over sky, string lights, palms and the stilt house's roofline. Every face is below it (the nearest, the bench-presser on s012, is at about y 1000).
+  - v1: a left-aligned lockup in the sky, ink-aligned at x 96, y 262–551, like Rockstar's own date and feature cards set over a city. On the payoff shot the skydiver falls through the frame below it (her head peaks at about y 570–640). The source stamp sits bottom-left at y 1384, over a soft bottom smoke and a soft spot.
+- **Hero size and face.**
+  - v0 (r09): Inter 800 display, tracking −0.042em. Lead-in "GTA 6 details" 72 px; "nobody" and "noticed" about 196 px (2.7 : 1). The slabs give the ink room: 40 px each side and 24 px above the ascender and below the baseline or descender on the keyword lines, and 26 / 14 px on the tab. Radius 14. The two keyword slabs snap to one 772 px width (89% of the safe width).
+  - v1 (r08): Archivo wide 800 caps. Both lines' unkerned ink is fitted to 784 px: "WHAT YOU" about 104 px, "MISSED" about 153 px, and both end at x 880. The kicker and the stamp are Archivo 600 wide at 30 px. One family, three sizes (30 / 104 / 153; hero : label = 5.1 : 1).
+- **Payoff hit.**
+  - v0 at **1.1 s**, on the cut to the sunset dock (r09). The "nobody" slab slams 1.12 → 1 (0.32 s expo.out) as its paper fills with the Leonida sunset left to right (clip wipe, a hot light edge riding the front), with a 16 px RGB split. The footage takes a warm flash (.5), shake and 1.04 punch-zoom, and the variant's one light leak sweeps across it. The slab's light then falls outside it: a screened pink/amber bloom on the footage, a plain pink bloom on the sunset sky (payoff shot only) and a bounce on the paper above and below. A sheen crosses it at 1.38 s, and it re-hits on the 3.4 and 5.5 s cuts.
+  - v1 at **0.4 s**, on the cut from the highway to the skydive. WHAT YOU has read since 0.3 s. MISSED rises from 0.28 s and lands on the cut: it slams 1.06 → 1 from its left edge with a 16 px RGB split, a flash and shake on the footage, and an anamorphic light streak through the word (pink → white → amber, gone by 1.1 s). Its screened light comes up on the sky from 0.76 s, and a sheen crosses it from 0.86 to 1.46 s.
+
+## v2 key decisions
+- **v1 look thrown away.** The merged TikTok outline with a highlighter chip, and the 82–94 px auto-fit, were tidy but read as a caption widget. Kept from v1:
+  - the job;
+  - the "GTA 6 details nobody noticed" hook (v0);
+  - the measure-with-the-face-that-paints font wait;
+  - the no-opacity-on-white rule;
+  - the trailer-source honesty (a kicker or stamp that names a trailer must match the footage under it).
+- **v0 is the TikTok text box, made an object** (revised r06, r07, r08, r09).
+  - The slabs are opaque warm paper (#FFFAF3 → #F6EEE4, matched to the sunset light). **Each slab gives its line room** (r09; r08 hugged at 28 / 10 px, which the critic called template-grade): 40 px side and 24 px top/bottom padding on the keyword lines, 26 / 14 px on the 72 px tab, measured from the real Inter ink (canvas `actualBoundingBox*`, same tracking), with a 14 px radius. A line can override `padX` / `padY`.
+  - **TikTok's merged corners** (r08). Neighbours whose widths differ by less than 4 × radius snap to one width, so there are no hairline steps. Where a narrower slab sits on a wider one, the wider slab keeps square inner corners and the narrower one gets concave fillets (each with its own night and bounce layers). A 1 px overlap means the slabs meet with no seam, even under the hold push.
+  - **Hierarchy** (r08): a 72 px lead-in tab over two keyword lines set at 200 px. A line only shrinks if its slab would pass `maxWidth`. r09: 772, so "nobody" sets at about 196 px and the stack stays inside x 936 through the hold push.
+  - **One object, lit** (r09). Two shadows on the merged outline, so the fillets are included: a tight contact (`0 2px 4px`, .18) and a soft plum-black lift (`0 24px 48px rgba(10,4,20,.38)`, the critic's spec). Every slab has a 1 px lit top edge (white .6, fading at the ends). The sunset slab has a soft gloss from the top and a touch of shade at the bottom.
+  - **The keyword slab is the light source, and its light leaves it** (r09; reverses r08's "light stays inside", at the critic's request). Its bloom lives in `#light` (between the footage and the type), screened on plate: pink spills off its left side and amber off its right, peaking on the cut and settling to .55. Re-hits lift it again. On a bright sunset sky a screened light barely shows, so the payoff shot also gets a plain `Look.bloom`-style pink (#F84FA4, .45) inside the stack, which leaves on the 3.4 cut. The paper above and below catches a bounce in the colour of the part of the slab it faces (the fillets too). r07's "smudge" was a blurred copy of the gradient painted over the footage; this is screened light plus a light tint on the payoff shot only.
+  - **The paper matches the shot** (r07). On a night cut the paper and fillets dim to street-lit #E8E3DA → #DED8CE and the lift deepens to .5. r09: the sample has no night shot, so `night` is `null`; the mechanism stays for creators.
+  - **The hold keeps the beat** (r07). The lit slab re-hits on every later cut (pulse 1 → 1.03 → 1, a quicker sheen and a lift of its light), and the whole stack pushes in linearly 1.00 → 1.02.
+  - Every line is optically centred in its slab: cap/ascender top to baseline, or to the descender when there is one.
+- **v1 is Rockstar's card language set in the image** (r07 rebuild of the layout).
+  - Full-bleed footage, not a letterbox: DESIGN reserves the letterbox for jobs where cinematic framing is the point, and the r06 critic named it the library's converged look. The lockup is set left in the sky, the way Rockstar sets its own date cards ("NOVEMBER 19, 2026") over a city.
+  - A plum-black sky grade (`#scrim.sky`: a top gradient plus a soft left-weighted spot behind the lockup) gives the white caps contrast over bright clouds. It lives in the stage, under MISSED's light.
+  - **MISSED's light falls on the footage.** A copy of the keyword's glyphs (same split, same transforms) carries the bloom in a layer between the stage and the type, screen-blended, so the light brightens the sky around the word instead of painting a haze. The type layer can't do this itself: it is its own stacking context, so its blends never reach the footage.
+  - Ink-aligned left edge: the kicker's G, the W and the M have different side bearings, so each line is shifted by its canvas-measured bearing and all three inks start at x 96 (skipped if the canvas can't draw the wide face).
+  - **Locked measure** (r08): both hero lines are fitted by their unkerned ink to one width, so WHAT YOU and MISSED end on the same right edge and MISSED, the hero, is never the narrower line. The canvas measures with `fontKerning = "none"` because `Look.reveal` puts every char in its own inline-block, so the painted line has no kerning.
+  - **The payoff's light moment** (r08, retimed r09): an anamorphic streak on the cut, the way a trailer title catches the lens. It has a soft glow, a hot 5 px core and a hotspot in the word's own colours, screen-blended above everything, plate only. r09: it rides 18 px over MISSED's cap line (in the gap between the lines, not across the x-height). It travels across the word in 0.22 s, drifts on and is gone by 0.95 s.
+  - **Top smoke on the palest skies** (r09): a `.lk-scrim-top` at .35 down to y 640 on s011 and s135 only (0–1.9 s), so WHAT YOU no longer relies on its lift shadow over the haze.
+  - The kicker keeps the 2 px #EE08F2 offset and bloom. The stamp row is one face (Archivo 600 wide, tabular figures), not mono.
+- **Different content per variant.**
+  - v0: "GTA 6 details / nobody / noticed". It makes no trailer claim, so it can run over any GTA 6 shots.
+  - v1: "GTA 6 · Every trailer / WHAT YOU / MISSED". The sample shots come from three trailers, so the kicker names none, and each shot's stamp names its own trailer and time (r08): Features Trailer 0:43 (s135), Launch Trailer 0:02 (s074 + 0.3), Trailer 2 2:20 (s064), Trailer 2 0:38 (s012 + 0.3), Trailer 2 1:21 (s026). The 0.4 s highway opener carries no stamp: the row enters on the payoff cut. Source times are from `shots.json` plus `data-media-start`. Trailer titles are from `research/gta6/meta` (`8L0CzL2V72c` = Features Trailer, `rz1B4B2yBZY` = Launch Trailer, `VQRLujxTm3c` = Trailer 2).
+- **Motion.**
+  - v0 entrance: each slab wipes in on a straight clip edge while travelling −46 → 0 px with directional motion blur. Its line is inside the same wipe, rising from 50% below (the slab is the mask), so a slab is never seen empty. 110 ms per slab from 0.0 s, all in by about 0.7 s.
+  - v0 exit: a mask-out to the right, carrying the line with it, 60 ms apart; the glow fades with the lit slab.
+  - v1 (r08): the kicker focuses in from frame 0 (half-lit, blurred). WHAT YOU rises by characters from 0.06 s (18 ms stagger, 0.42 s) and MISSED from 0.28 s (12 ms, 0.36 s), so the whole hook reads by 0.5 s. The stamp blurs in on the payoff cut, and each later roll fires 0.07 s before its cut so the new source is in on the cut's first frame. Exit: the light goes first, then the kicker blurs out, the caps drop back up through their masks, the stamp blurs out and the sky grade lifts.
+  - One leak per variant: v0 on the payoff cut (1.1, 1.2 s); v1 at 1.75, across the 1.9 and 2.5 cuts.
+- **Finishing.**
+  - `Look.install` runs on plate renders. Its grain and vignette are then **re-parented**: the grain goes to `#root` (z 90) and the vignette into `#stage`. In the kit's wrapper the grain's overlay blend had no backdrop (the wrapper is its own stacking context), so it composited as flat grey noise.
+  - `#stage` has `z-index: 0`, so the flash, leak and vignette inside it light the footage only, never the type.
+- **bg:none.**
+  - No footage, flash, leak, grain, vignette, night paper, stamps, bottom smoke, top smoke or light streak; only the type and its own shadows, glow, chroma and sheen. Checked by rendering both variants to WebM: alpha is 0 outside the type. r09: v0's bloom and payoff tint stay at half strength (normal blend, there's no footage to screen onto); alpha is 0 below y 800.
+  - v1 bakes a top smoke into the transparent export (`scrimNone` 0.45; set 0 for none), so the white caps survive pale creator clips. MISSED's light composites normally there (no footage to screen onto).
+
+## v2 round 9 (critic r08: v0 7, v1 8; both won the blind pick)
+No defects or hard caps. Biggest gap: v0's still frame was TikTok's built-in text background with a gradient (10 px padding, flat slabs with no depth or light, a payoff that only showed as a chroma split). v1 passed; it gets the two nitpicks.
+- **v0 room** (fix 1). Padding went from 28 / 10 to 40 / 24 px on the keyword lines (26 / 14 on the tab, so the small line isn't swamped). `maxWidth` went from 820 to 772, so the 89%-wide slabs stay inside x 936 through the hold push. The b/d ascenders now sit 24 px under the slab top, and the y descender sits 24 px above the nobody/noticed edge. The slabs still meet with a 1 px overlap, so there's no seam. The stack is now y 232–740 (was 236–680).
+- **v0 object and light** (fix 2).
+  - The critic's lift shadow `0 24px 48px rgba(10,4,20,.38)` plus a tight contact, both on the merged outline.
+  - A 1 px rgba(255,255,255,.6) top edge on every slab, plus a gloss and a bottom shade on the sunset slab.
+  - The lit slab's bloom now leaves the slab: pink left, amber right, screened onto the footage from `#light`. It copies the stack's transforms (`.lh` hold push, `.lw` slam and re-hits).
+  - The critic's `Look.bloom` #F84FA4 at .35 is there as a plain pink tint, at .45, on the payoff shot only. It paints the pink onto the sunset sky, where screened light barely shows.
+  - The paper above and below takes a bounce of the slab's light.
+  - Checked at 1.4–2.0 s: pink haze on the sky beside the slab's left end and amber at its right. On s012 and the stilt-house sky the screened bloom reads as light.
+- **v0 payoff hit** (fix 3). On the 1.1 cut the nobody slab slams 1.12 → 1 (0.32 s expo.out) and `Look.impact` fires (flash .5, zoom 1.04). The variant's single leak (#FE8E4E / #F84FA4, 1.2 s) moved from 2.55 to the same frame, and the RGB split went from 14 to 16 px.
+  - The slam's 1.12 is set 2 ms before the hit, so a backward seek puts the slab back to 1 (a fromTo whose start value is 1.12 would leave it at 1.12 before the hit).
+  - Frames 33–36: on frame 33 the slab is 1.12 and 25% lit, on 34 there's the split and the light edge, and it has settled by 36.
+  - Self-check: the light edge used to fade over 0.26 s from ig + 0.14 and parked as a white bar on the slab's right end at 1.2–1.3 s. It now fades over 0.16 s from ig + 0.1.
+- **v0 tail recast** (fix 4). The near-black s014 tail is gone, along with its night paper (`night: null`). The critic's s027 hold extension is in: s027 runs 1.1–3.4 at 0.79× (source 0.02–1.83, under its 1.87 s length). Then come s012 (3.4–5.5, in 0.5) and, for 5.5–7.0, Trailer 2's opening shot: the Keys stilt house and a vintage car under open blue sky. Neither of the critic's tail suggestions worked under a stack that ends at y 740:
+  - **s075 marina aerial**: its "BRIAN'S MARINA" sign sits at y 600–740. The stack hid everything but a red "N'S" at x 0–160, right next to "noticed", so it read as "N'S noticed". A right-side 4K re-crop (sea only) was clean but dim teal.
+  - **s135 skydive**: the skydiver's head is inside y 580–730 from 0.8 s, so the noticed slab would hide her head. It's also v1's payoff shot.
+  - **The stilt house** (`VQRLujxTm3c` 8.20–9.73, the library's own S001 cut points) was cut with `build_shots.py`'s crop height, scale and grade, at crop x 2400. Its title zone is open sky, a power line and the roofline, and it's the brightest frame of the piece. It lives in this project's `assets/clips/`, like a pre-slowed clip; `_shared` is untouched.
+  - New cuts: 1.1 / 2.3 / 2.1 / 1.5 s; re-hits at 3.4 and 5.5.
+- **v1 streak** (fix 5). `cy` is now MISSED's cap top minus 18 px. The cap top is `l2R` mid − 0.366 × size, calibrated on the r08 render (line middle at y 498, M's cap top at y 442). The streak opens at x −260, travels to +200 in 0.22 s (power3.out) and drifts another 120 px. It holds full strength while it travels, then eases out (sine.inOut) to 0 by 0.95 s. Glow height went from 90 to 60 px. Checked frames 12–30: the line sits in the gap about 20 px above the caps and is gone by frame 24 (0.8 s).
+- **v1 top smoke** (fix 6). `.lk-scrim-top` at .35 down to y 640, in the stage, from 0 s and off on the 1.9 cut (s011 + s135 only). It isn't in bg:none.
+- **Kept:**
+  - v0: the entrance wipe with motion blur, the merged corners, the sunset ignite and light edge, the re-hits, the mask-out exit and the hook text;
+  - v1: everything else (lockup, measure, stamps, light layer, exit, cuts).
+- **Hero time: 1.5 s.**
+  - v0: the lit slab on the sunset dock with its pink and amber spill.
+  - v1: the skydiver under the lockup, now with the top smoke.
+- **Checked frames:**
+  - v0:
+    - the entrance sheet;
+    - frames 31–36 (cut and slam);
+    - 1.4, 1.5, 2.0 (hold);
+    - frames 100–103 and 163–166 (re-hits);
+    - 5.6, 6.2;
+    - frames 189–209 (exit).
+  - v1:
+    - frames 0, 6 (entrance);
+    - 12–30 (payoff, streak);
+    - 56/57 (top-smoke cut);
+    - 120, 195;
+    - hero and strip.
+  - bg:none WebM for v0 at 1.5 and 4.0 s: alpha only around the stack (x 79–998, y 216–798), 0 below y 900.
+
+## v2 round 8 (critic r07: v0 7, v1 7; both won the blind pick)
+A usage-limit pause had left a half-finished r08 (an edited `index.html` and a partial capture). I reviewed those edits frame by frame against the critique, kept what met it, fixed what didn't, and re-captured r08 from scratch.
+- **[defect] v1 hook unreadable until 0.95 s.**
+  - The s011 opener was cut from 0.8 to 0.4 s and the payoff moved from 0.8 to **0.4 s**, on the cut into s135.
+  - WHAT YOU's reveal starts at 0.06 s (chars, 18 ms, 0.42 s expo.out); MISSED's starts at 0.28 s, so it lands with the chroma and impact on the cut.
+  - Checked: WHAT YOU reads at 0.3 s, and MISSED is in (RGB split) at 0.43 s.
+- **[defect] v1 stamp lag.** Each roll fires `stamps.lead` (0.07 s) before its cut, and the row enters on the payoff cut. Checked the frame before and the frame of every cut (1.833/1.9, 2.467/2.5, 3.1/3.15, 5.433/5.5): the outgoing stamp only starts to roll on the last frame of its own shot, and the new one is in on the first frame of the next.
+- **[defect] v0 pink bloom smudge.** The blurred-sunset bloom and the 140 px halo are gone (critic's second option). The light stays inside the slab: an inset amber glow, plus a 120 px screen-blended light edge that rides the wipe front during the ignite (same ease and time, hottest point on the front). Checked 1.067–1.267 s and the hold: no colour outside the slab.
+- **v0 hierarchy and object** (fix 6). This is the critic's spec:
+  - a 72 px lead-in, with "nobody" and "noticed" at 200 px;
+  - slabs that hug their own ink (28 / 10 px padding, 14 px radius), with TikTok's merged corners (snap within 4 × radius, concave fillets);
+  - the stack starting at y 236;
+  - one contact shadow on the merged outline, deepening on the night cut.
+
+  The punch went from 1.075 to 1.05, so the 758 px lit slab keeps its type inside x 936 at peak.
+- **v1 footage was murky for half its runtime** (fix 2). The night shots (s055, s123, s039) are gone; the run is now bright day to golden hour (see v2 concept).
+  - **Critic's s100 not used.** Its pink smoke trail crosses the title zone behind MISSED (pink on pink) for most of the shot, and later sits behind WHAT YOU.
+  - **s064 jetski** is used for 0.65 s only, from 0 s. The riders' heads reach about y 590 at 0.65 s and climb into the lockup from about 0.75 s.
+  - **s074 "The Keys"** comes in at 0.3 s, as the dark boat trailer is clearing the foreground, and goes out at 0.9 s. A 1.15 s out-point put the sign's top edge on MISSED's baseline (measured at y 544–555).
+  - **Grade:** the sky grade peaks at .45 at the top (linear) plus a .2 spot behind the lockup, down from about .74. Grain went from .16 to .12.
+- **v1 measure** (fix 3).
+  - The half-finished attempt already fitted ink rather than advance, but it measured with kerning. `Look.reveal` puts every char in its own inline-block, so the painted line is unkerned, and WHAT YOU (AT, YO) painted about 19 px wider than it measured: the U ended at x 899 and the D at x 881.
+  - The canvas now measures with `fontKerning = "none"`. In the r08 hero both lines end at x 879–880. MISSED is about 153 px, WHAT YOU about 104 px.
+- **v1 stamp over white water** (found in self-review). At y 1384 the bottom smoke is only about 10% dark, so on the jetski shot the label went grey on white.
+  - Added `stamps.spot`: a soft plum-black ellipse (600 × 130 px, .5 peak, no edge) behind the row. It arrives with the row and leaves with it.
+  - Smoke went from .5 to .62, with a slightly deeper text shadow.
+- **v1 light moment** (critique: "no light moment beyond the stock sheen and leak"). Added the anamorphic streak on the payoff cut (`flare`: peak .9, 1500 px). It opens from the word's centre, drifts 70 px right and is gone by 1.1 s.
+  - The sheen moved to 0.86–1.46 s (`timing.sheenDur` 0.6), so every light effect sits on the payoff and the hold shows the clean fill.
+- **Kept:**
+  - v0: the cuts, the entrance wipe with motion blur, the exit mask-out, the re-hits and the night paper;
+  - v1: the kicker, the masked char rise, the sunset fill, the screened light, the sky lockup position and the exit;
+  - both: the grain and vignette re-parenting.
+- **Hero time: 1.5 s.**
+  - v0: the lit slab on the sunset dock, before the sheen reaches it.
+  - v1: the skydiver spread-eagled under the Vice City skyline. The lockup is clean; the streak and sheen have finished.
+- **Checked frames:**
+  - v1:
+    - 0.1, 0.3, 0.433, 0.6 (entrance, payoff, streak);
+    - 0.9, 1.2, 1.5 (light, hero);
+    - 1.833/1.9, 2.2, 2.467/2.5, 2.8, 3.1/3.15, 3.6, 4.4, 5.433/5.5 (cuts, stamp rolls);
+    - 6.0, 6.3, 6.45, 6.6, 6.85 (exit).
+  - v0:
+    - the 0–1.5 s entrance sheet;
+    - 1.067–1.267 (ignite, punch, light edge);
+    - 1.5, 1.6, 2.0 (hold);
+    - 2.9/3.0 (re-hit);
+    - 4.7/4.8 (night);
+    - 6.0, 6.35, 6.5, 6.75 (exit).
+  - bg:none WebM for both variants at 1.5 s: v0 alpha only around the stack; v1 only the type and the baked top smoke (alpha 0 below y 1090).
+
+## v2 round 7 (critic r06: v0 8, v1 7; both won the blind pick)
+- **v1 biggest gap: the library's converged look (letterbox on black, wide caps, sunset word, s018).** Rebuilt the layout, kept the type craft the critic praised.
+  - The 1080×608 band is gone. All five shots run full-bleed `-v.mp4`, and the lockup is set left in the sky at x 96 (critic's fix 1). It sits at y 262–545, not 290–600: on the payoff shot the skydiver's head rises to about y 570–640 at 1.3–1.9 s, and a 290 top put the type on her.
+  - **Recast the payoff** (fix 2): s018 Lucia is gone; the 0.8 s cut goes to **s135 skydive over Vice City**. I chose it over s075 because s075 has no open sky in the type zone (the marina sign and houses fill it). The other shots were cast for negative space in the title zone, checked frame by frame: s064 jetski was dropped because the riders' heads rise into the title zone from 0.5 s, and s039 is cut before its close-ups.
+  - **Honesty.** s135 and s123 are from the Features Trailer, not Trailer 2, so the kicker "GTA 6 · Trailer 2" would have lied. It now reads "GTA 6 · Every trailer", and each stamp names its own trailer ("FEATURES TRAILER · 0:43").
+  - **MISSED's light on the footage** (fix 2): a screened copy of the glyphs carries the bloom (see Key decisions). At the critic's .55, screened onto the graded sky, the footage moved by only about +5 in red, so the light runs at 1.15, and each glyph's bloom takes its own fill colour (pink M → amber D) instead of a flat #F84FA4. MISSED's dark lift was cut to a contact shadow so it doesn't shadow out its own light.
+  - **Self-check fix:** the light first faded in at h + 0.12, and its static glyphs showed as a faint ghost above the still-rising chars (seen at 0.95 s). It now comes up at h + 0.36, after every glyph has landed and the RGB split has decayed.
+  - **Stamp row** (fix 5): one face, Archivo 600 wide with tabular figures, instead of JetBrains Mono. The row is now "— TRAILER 2 · 2:01" (the " · " stops "TRAILER 2 2:01" reading as one number). It moved from under the lockup to bottom-left (y 1384, over a 0.6 bottom smoke) because under MISSED it crossed the skydiver's head. The kicker and stamp went from 34 to 30 px so "FEATURES TRAILER · 0:43" fits inside x 936.
+  - **Sky grade instead of `.lk-scrim-top` at .5:** at .5 the scrim darkened the white clouds behind "WHAT YOU" by only about 20%. A plum-black top gradient plus a soft spot behind the lockup gives the caps contrast on s011 and s135 clouds.
+- **v0 hold was static from 1.5 to 6.3 s** (fix 3).
+  - The lit slab re-hits on the 2.9 and 4.7 s cuts: a 1 → 1.03 → 1 pulse (0.06 s up, 0.28 s expo.out down) and a 0.6 s sheen.
+  - The hold push went from 1.015 to 1.025, linear from 0.95 s to the exit. At 1.025 the stack spans x 171–909.
+- **v0 paper lit the same on day and night** (fix 4). At the 4.7 s night cut, a night layer inside each paper slab fades in over 0.2 s (#E8E3DA → #DED8CE, about the suggested #E4DFD6), and the slab shadow tweens to `0 18px 40px -14px rgba(0,0,0,.55)`. Plate only.
+- **v0 bloom spill** (fix 4). Two causes:
+  - The row's open clip stopped the light 60 px out. The lit row now opens to a 180 px clip once its entrance ends.
+  - The 14 / 42 / 110 px orange stack only lit about 25 px of footage beside the slab (measured on the 5.2 s night frame). The light is now the slab's own sunset gradient blurred behind it (40 × strength = 24 px blur on a slab-plus-16 px layer), plus a faint 140 px halo in #FE8E4E; strength is 0.6.
+  - Measured at 5.2 s on the row through the slab's middle: the footage is lifted from about 35 to 174 / 124 / 91 / 69 at 10 / 30 / 40 / 50 px left of the slab, pink on the left and amber on the right.
+- **Kept:**
+  - the v0 type stack, entrance, exit, cuts and 1.1 s payoff;
+  - the v1 caps craft (kicker offset, masked char rise, sunset fill, chroma slam, sheen);
+  - the 0.8 s v1 payoff time;
+  - the grain and vignette re-parenting.
+- **Hero time: 1.8 s.** v0: the lit slab on the sunset dock with the sheen mid-crossing. v1: the skydiver spread-eagled over Vice City under the lit lockup.
+- **Checked frames:**
+  - v1: 0, 0.1, 0.3, 0.5 (entrance); 0.8, 0.84, 0.87, 0.9, 0.95, 1.0, 1.05, 1.1, 1.2, 1.35, 1.5 (payoff, light); 1.8 (hero); 2.4, 2.45, 4.2, 5.0, 5.6 (stamp rolls, night); 6.25–6.95 (exit).
+  - v0: 0, 0.1, 0.2, 0.35 (entrance); 1.05–1.3 (ignite, punch); 2.85–3.1 (re-hit); 4.65–4.8 and 5.2 (night paper, spill); 6.3–6.8 (exit).
+  - bg:none WebM frames with alpha for both variants: the alpha is 0 below the type.
+
+## v2 round 6 (critic r05: v0 7, v1 8; both won the blind pick)
+- **[defect] v0 ragged right edge** ("noticed" had about 80 px of right padding against 42 px).
+  - All lines are now fitted to one measure. `heroSize` / `maxFit` / `fit` gave way to `width: 720` and `maxSize: 220`. That's the critic's "fit:true on all three lines, heroSize 180, W about 720", expressed as the measure itself, so a creator's own words stay justified.
+  - Sizes are now in 0.1 px steps: integer flooring left "GTA 6 details" 3 px short.
+  - Measured in the r06 hero: the ink runs x 221–857/858 on all three slabs inside the slab x 179–901, so padding is 42 px left and 43–44 px right on every line.
+- **[defect] v0 keyword slab lost on the s014 night shot.** The dark ink slab is gone. The keyword slab is now paper that fills with the sunset on the cut (see Key decisions), so on the dark mural it is the brightest object in the frame. Checked at 5.6 s and 6.4 s.
+- **[defect] v1 near-black first frame.**
+  - The letterbox now opens from `inset(30% 0 30% 0)` (`openFrom: 30`), so frame 0 shows a 243 px band of the highway shot.
+  - The kicker now starts at 0.0 s from a half-lit, 6 px blurred, 1.05× state rather than from opacity 0, so frame 0 also carries type.
+  - v0 got the same treatment: its entrance moved from 0.1 to 0.0 s, so the first slab is visible from frame 1.
+- **v0 biggest gap: the white slabs read as TikTok's native text tool.**
+  - The keyword slab is now the light source (sunset fill, bloom, sheen).
+  - The paper is warmed and carries one tinted shadow.
+  - The radius went from 12 to 6 px, and the inset hairline is gone.
+- **v1 single accent and a shorter incomplete beat.**
+  - The white glow on "WHAT YOU" is removed (only the 0 4px 16px lift remains), so only MISSED glows.
+  - The l1 reveal moved from 0.20 to 0.38 s, so "WHAT YOU" is alone for 0.37 s before MISSED rises at 0.75 s.
+- **v1 bg:none.** `scrimNone` went from 0 to 0.45: white caps on a pale clip need the smoke, and DESIGN allows a scrim that is part of the graphic. Checked with a transparent WebM over a #D8D4CC background: the smoke fades out by about y 1000, and the alpha is 0 below it.
+- **v1 lower band.**
+  - The stamps went from 30 to 34 px, the rules from 72 to 96 px at 0.7 opacity, and the kicker from 30 to 34 px. The frame keeps three sizes: 34, about 105 and about 144.
+  - **Not taken:** the sunset colour for the rules. MISSED is the one sunset element per frame (DESIGN: one accent), and this round also removed the l1 glow to make that accent singular.
+  - The black below y 1340 stays empty on purpose: it's the platform caption and handle zone.
+- **Kept:**
+  - the v0 entrance wipe and exit mask-out;
+  - the 1.1 / 0.8 s cuts and payoffs;
+  - the grain and vignette re-parenting;
+  - the v1 type measure (740 px);
+  - hero time 2.2 s.
+- **Checked frames:**
+  - 0, 0.034, 0.1, 0.2, 0.3, 0.45 (entrance);
+  - 1.1, 1.15, 1.3 (ignite, punch, chroma);
+  - 1.7, 2.2, 4.0, 5.6 (hold, incl. night);
+  - 6.4, 6.55, 6.75 (exit).
+  - Plus bg:none WebM frames with alpha for both variants.
+
+## v2 round 5
+- Rebuilt from scratch on the v2 kit. The r01–r04 v1 design was rejected as "basic".
+- Self-review fixes within the round (all re-captured as r05):
+  - **Grain fog.** Re-parented the grain and vignette (see Finishing).
+  - **Empty slabs on entry.** The text used to rise after its slab had wiped in, which showed 1–2 frames of empty white or ink. The line now rides inside the wipe.
+  - **Empty slabs on exit.** The text used to lift out first, leaving empty slabs for about 4 frames. The slab now carries the line off.
+  - **Leak tinting the type.** Fixed with `#stage { z-index: 0 }`.
+  - **v1 head crop.** The push origin is now the band's top edge (50% 0%), so the 6% push doesn't crop Lucia's hair at the frame line.
+  - **Dead lower band (v1).** Added the rolling trailer timestamp. It is the same 30 px size as the kicker, so the frame still uses three sizes.
+  - **v0 setup slab.** Gave it its own height factor (1.24) so "GTA 6 details" doesn't fill its slab edge to edge.
+  - **s014 in-point.** Moved from 1.2 to 0.3 s, so the last shot shows the police lights rather than the car's A-pillar.
+- Checked frames:
+  - 0.15, 0.3, 0.5 (entrance);
+  - 0.8 / 1.1 / 1.17 (payoff);
+  - 2.2, 2.9, 4.0 (hold);
+  - 6.45, 6.7, 6.95 (exit, clean by 6.95).
+  - Plus WebM alpha frames for bg:none.
+- Hero time: 2.2 s (v0 on the sunset dock after the ignite and sheen; v1 on Lucia).
+
+## v1 history (rejected look; kept for its content, font and seek-safety lessons)
+### Key design decisions (v1)
+- **Two looks for one job.**
+  - Variant 0 elevates the format that creators really use: the TikTok boxed caption (`refs/tiktok-boxed-caption/LTSbTRP97Js-120`, black sentence case on white boxes, one per line).
+  - Variant 1 uses Rockstar's own type language, which no creator uses (analysis-3 takeaway: "an unclaimed premium look"). It's based on the PS5 feature card (`official-type/8L0CzL2V72c-6.5`: extra-bold geometric caps with no box, and a subline about half the title size, tight underneath, in plain white).
+- **One accent per frame.** The keyword is the only sunset element. In variant 0 it's a highlighter chip behind ink text. In variant 1 it's a gradient fill in the letters. This follows the keyword-highlight hook (`refs/keyword-highlight-hook-text/J-7xIgMVDUE-79`, where "GTA 6" is coloured), without the cheap cyan and pink outline.
+- **Measure with the face that paints (round 4).**
+  - The renderer injects its own Google Inter `@font-face` after our `fonts.css`.
+  - `document.fonts.ready` could resolve before that face loaded. The outline, the auto-fit and the marker were then measured with the narrower local face but drawn with the wider injected one. In the r03 render the boxed padding was 32 px instead of the intended 46 px, and the caps line was wider than its fit.
+  - The build now waits for `document.fonts.load("800 100px Inter" / "700 100px Inter", <the real text>)` and then for `fonts.ready`. Measured widths equal painted widths whichever Inter face wins. I reproduced the injection in headless Chrome with the CLI's own `injectDeterministicFontFaces` to confirm the cause and the fix.
+- **Variant 0 boxes form one outline.**
+  - A single SVG path, rounded-orthogonal with cubic corners, merges the line boxes with concave inner fillets, the way TikTok's native text background does.
+  - Neighbouring widths that differ by less than 2.2 × radius snap to equal, so there are no hairline steps.
+  - The radius is 28 px (a design radius).
+  - The shadow sits on a group around the whole outline and the text: a sharp contact shadow, a 2 px / 8 px edge shadow and a large soft one.
+- **Variant 0 is the only shape, from frame 1 to the last frame (round 3).** There is exactly one box path. It is revealed and hidden through an SVG `clipPath` holding one rect per line band, so the geometry never changes and there is no hand-over between shapes. Each rect overlaps its neighbour by 1 px, so the hold push can't open an anti-aliased seam.
+- **Variant 0 padding (round 4).**
+  - `padX` is 0.33em (about 31 px at the 94 px fit). That's about the caps' vertical clearance in the band, so every box reads evenly padded. It is also the padding the critic actually saw and scored in r03, before the font fix exposed the nominal 0.5em.
+  - `top` is 244, so the three 132 px bands end at y 640.
+- **Variant 0 marker (rounds 3–4).**
+  - The chip is centred in its band with a 16 px inset top and bottom (`chipInset`), radius 28 − 16 = 12 px, so it nests in the box corner.
+  - It overhangs the keyword by 0.08em each side. That's a tight highlighter: about 13 px left and 7 px right of the ink, and 7 px above and below.
+  - The keyword gets a 0.06em margin only on a side that touches another word (`gap-l` / `gap-r`). At line start the marker's rim to the box edge is 23 px against 16 px top and bottom (r03: 26 vs 14), and the marker-to-next-word gap is 23 px, about twice the marker's side padding (r03: 18 px, less than its padding).
+  - The keyword line is optically centred on the keyword's own ink (i/j dots included, since they must stay inside the marker), so the highlighted word sits centred in the chip.
+  - Other lines are centred on their ink: cap or ascender top → baseline, or → descender bottom when they have one, with i/j dots ignored as overshoot. All of this is measured from the real Inter 800 glyphs with canvas `measureText`.
+  - The band grows if the chip couldn't hold the keyword's ink plus 0.06em above and below (`chipPadMin`).
+- **Variant 0 keyword text stays ink.** White on the amber end of the chip failed contrast (2.3:1). Ink on the chip gives 6:1 or better and reads as a real highlighter.
+- **Auto-fit type.** Both variants shrink from `maxSize` until the widest line fits 768 px, centred on x 540. The hold push (1.02 / 1.025) keeps everything inside x 148–932, which is inside the 936 right-rail safe edge, so creators can type any hook. With the face that really paints, the r04 fit is 94 px (boxed) and 82 px (caps).
+- **Motion.**
+  - **Variant 0 (round 4):** no opacity anywhere, so the box is always solid #FFFFFF.
+    - Entrance: one continuous roll-down edge. Each band's clip rect and text window open only after the band above is fully open, linear inside each band, in slices that get longer down the box (0.086 / 0.12 / 0.154 s, 0.18 → 0.54 s). The roll decelerates and the revealed part is always one connected piece. Each line's text rises 14 px inside its band (0.24 s power3.out) as the band opens.
+    - Accent: the chip draws in left to right at 0.6 s with `clip-path: inset(0 100% 0 0 round 12px)` → `inset(0 0% 0 0 round 12px)`, 0.32 s expo.out. Its leading edge stays rounded and its corners never squash.
+    - Hold: a slow 2% push.
+    - Exit (6.45 s): the same edge rolls back up, last line first, each band closing only after the one below. It accelerates (0.118 / 0.093 / 0.069 s) and is gone by 6.73 s, while the text lifts 10 px.
+  - **Variant 1 (round 4):**
+    - Each line fades up while settling from 1.04× (0.3 s fade, 0.6 s expo settle, no blur), the way Rockstar's cards fade. The keyword arrives in plain white with its line.
+    - The subline fades up 8 px at 0.48 s.
+    - At 0.64 s, once the block is opaque, the sunset wipes into the keyword left to right as its own beat (0.42 s expo.out) while the word punches 1 → 1.06 (0.1 s) → 1 (0.5 s expo). That gives the eye a second hit, like v0's marker.
+    - There's a slow 2.5% push during the hold and a clean 0.34 s fade exit.
+- **Plates and content match their source.** I checked the trailer sources against `research/gta6/plates/recut.txt` and the titles in `research/gta6/meta`.
+  - p01 ("The Keys" sign) is cut from the **Launch Trailer** (YouTube `rz1B4B2yBZY` @2.1 s).
+  - p04 (the drive-by past the mural) is cut from **Trailer 2** (`VQRLujxTm3c` @45.4 s), not Trailer 1.
+  - So variant 0 reads "GTA 6 details / nobody noticed / in the Keys". Leonida Keys is a real place (FACTS.md), and the sign in the plate says "The Keys".
+  - Variant 1's subline reads "In Trailer 2".
+  - The source is noted next to each `plate` in CONFIG.
+- **Plates.** Variant 0 uses p01 (sky and sign under the hook band). Variant 1 uses p04, whose dark car roof sits in the hook band for the first 4 s. I passed over the suggested p06: Lucia's face sits at y 240–800, exactly in the hook band, so any hook would cover her face.
+- **Scrim (variant 1).**
+  - Over the sample footage it's 0.55, ending at 66% of its 1100 px height.
+  - As a transparent overlay (`bg: "none"`) it's off (`scrimNone: 0`, round 4), so the export never bakes grey haze into the creator's clip. The type shadow and the keyword's edge shadow carry legibility.
+  - `scrimNone: 0.28` (ending at 58%, y 640) is the documented opt-in for pale footage.
+- **No trademarks.** No logos and no Pricedown. "GTA 6" is set in Inter.
+
+### Round 1
+- First build of both variants.
+- Self-review fixes inside the round:
+  - Enlarged the boxed hook from 84 to 96 px, to reach 73% of the frame width.
+  - Moved its top to 262 px.
+  - Pulled the keyword chip in.
+  - Raised the caps subline from 30 to 34 px.
+
+### Round 2 (critic: v0 7, v1 6)
+- **[defect] v0 descender.** The "y" of *nobody* hung below the chip. The chip was then positioned from measured ink metrics instead of fixed `top/bottom` em offsets, with sides at −0.12em and line height raised from 1.28 to 1.34.
+- **[defect] Mislabelled trailer.**
+  - v1's "In the Launch Trailer" ran over p04, which is Trailer 2 footage (`recut.txt`: `VQRLujxTm3c` = "Grand Theft Auto VI Trailer 2"). The subline became "In Trailer 2".
+  - v0's "in Trailer 2" ran over p01, which is Launch Trailer footage. Line 3 became "in the Keys", which matches the sign in the plate.
+- **v0 entrance.** Replaced the single SVG inset wipe (empty slab, then grey ghost text) with a per-line reveal, and dropped the wrapper's y/scale entrance.
+- **v0 pale sky.** Added the `drop-shadow(0 2px 8px rgba(0,0,0,.18))` contact shadow on a group wrapper.
+- **v1 subline** (biggest gap). 34 px / 600 / 0.34em with a magenta offset became 44 px / 700 / 0.22em in one colour with the DESIGN type shadow, so it reads at 360×640 and the keyword is the only accent.
+- **v1 keyword on the red mural.** Added a 1.5 px dark edge drop-shadow. The resting gradient became `#F84FA4 0% → #FE8E4E 45% → #FEB747 100%`, built as the left half of a mirrored 200% image so the sweep slides in.
+- **v1 entrance.** Replaced the 1.3× blur-slam with a fade plus a 1.04→1 settle.
+- **Both.** maxWidth went from 792 to 768. v1 got a lighter `scrimNone` for transparent exports.
+
+### Round 3 (critic: v0 7, v1 8; both won the blind pick)
+- **[defect] v0 one-frame shape pop at about 0.42 s.**
+  - Cause: each line was its own copy of the outline under a CSS `clip-path: inset()` and its own y offset. Mid-entrance, the bands read as square-stepped slabs. They were then swapped in one frame for the merged outline with fillets.
+  - Fix: the per-line copies and the hand-over are gone. There is one merged, filleted path from the first frame, revealed through animated SVG clip rects (see Key design decisions). Checked frame by frame at 30 fps from 0.15 to 0.75 s: the outline never changes shape.
+- **[defect] v0 chip off-centre** (26 px above vs about 7 px below in its band).
+  - The chip is now exactly band − 28 px, inset 14 px top and bottom, radius 14. Measured in the r03 hero: chip y 398–497 in band 384–512.
+  - The "nobody" ink is centred inside it (y 404–490: about 6 px above, 7 px below).
+  - Every line is now optically centred by its own ink, not just the keyword line. Without that, centring the chip would have pushed the "y" descender out of it.
+  - `chipPad` (an em padding pair) became `chipInset` (px) plus `chipPadMin` (em).
+- **v0 translucent grey boxes.** The critic suggested cutting the 0.18 s opacity fade to 0.05 s. I removed the opacity tweens from v0 completely: the clip reveal carries the entrance, so the white is solid on every frame. The y 14→0 now moves the text inside its band, not the box, because moving the boxes separately is what opened gaps between bands.
+- **v0 squashed chip corners.** `scaleX 0→1` became a `clip-path: inset(0 100% 0 0 round 14px)` → `inset(0 0% 0 0 round 14px)` sweep, 0.32 s expo.out at 0.6 s.
+- **v0 exit.** The 0.34 s group fade (another grey phase) became a reverse wipe: bands retract upward, last line first. This wasn't in the critique. I applied the same "always solid" rule so the exit doesn't reintroduce the defect fixed in the entrance.
+- **v1 muddy keyword.** The gradient slide went from 0.9 s power2.out at 0.28 s to 0.4 s power3.out at 0.18 s (T.in). It runs under the line's fade and has settled pink → amber by about 0.58 s. Checked at 0.33 s and 0.5 s: no amber-brown phase during the read.
+- **v1 bg:none smoke.** `scrimNone` went from 0.38 to 0.28, and the gradient now ends at 58% (y 640) instead of 66% (y 726) when transparent. The stops keep their proportions. Over the sample footage it's unchanged (0.55, ending at 66%), because the critic praised its legibility over the bright prison sky.
+- Kept on purpose: the 28 px merged outline, the auto-fit, the ink-on-chip keyword, p01/p04, every v1 type setting, and the hero time of 2.0 s.
+
+### Polish round 4 (critic r03: v0 8, v1 7)
+- **[defect] v1 subline stuck at the 30 px floor.**
+  - The fit measured the `display:block` `.sub`, which is always 1080 px wide, so the loop always fell to 30 px.
+  - `.sub` is now `display: table; margin: 16px auto 0`, which shrink-wraps the text, so the fit measures the words. The size comes from a new CONFIG field, `subSize` (44).
+  - The round 2 setting is kept: 44 px / 700 / 0.22em. That wasn't a critic taste call, and the PS5 card's subline isn't wide-tracked, so I didn't adopt the suggested 46 / 600 / 0.32em.
+  - Render check (r04 hero): the subline cap height is 32 px against the headline's 60 px (53%; r03 was 22 px), spanning x 350–730.
+- **Hidden defect found while measuring: measure ≠ paint.** See "Measure with the face that paints". It explains the critic's 26 px / 18 px marker numbers. It also explains why the r03 caps line was drawn wider than its own fit (x 155–924 at the hero).
+- **v1 biggest gap: no accent beat.**
+  - The keyword now arrives white with its line. The sunset wipes in at 0.64 s as its own beat, with a 1.06 punch.
+  - The background is a 300% image: sunset, then a soft amber → white edge, then white, slid from 56% to 0%. Every in-between frame is sunset or a sunset/white tint.
+  - The round 3 "muddy keyword" fix still holds: the wipe starts after the line is fully opaque, so there's no amber-over-dark brown.
+  - Checked frame by frame (n 19–27): white at 0.633 s, "NO" lit at 0.667 s, the full word at 0.733 s, settled by 0.8 s. At the peak scale the word's left edge is x 145, inside the safe zone.
+- **v0 marker crowding.** The chip overhang went from 0.12em to 0.08em. The keyword margin went from 0.06em on both sides to 0.06em only where it meets another word.
+  - I didn't use the suggested 0.14em margin. With the chip not yet drawn, it showed a visible double word-space during the entrance.
+  - Render: the gap from the marker to "noticed" is 23 px, about twice the marker's side padding.
+- **v0 marker nesting.** `chipInset` went from 14 to 16, so the radius is now 12 (28 − 16), as suggested.
+  - `padX` went from 0.5 to 0.33em (see Key design decisions). Without that, the corrected font measurement would have widened the side rim to 34 px.
+  - Render: the rim is 23 px at the side and 15–17 px top and bottom (r03: 26 / 14).
+  - `chipPadMin` went from 0.09 to 0.06em, which keeps the bands at 132 px instead of 137. The "nobody" ink still sits 7 px above and 7 px below inside the chip (render y 399–485 in 392–492).
+  - `top` went from 256 to 244, so the hook still ends at y 640.
+- **v0 entrance and exit seams.** These weren't in the critique, but a frame-by-frame check found them.
+  - The r03 stagger (0.06 s apart, 0.24 s each) opened the next band before the band above had finished. From about 0.25 to 0.37 s the plate showed through as a strip between bands, and the exit had the same problem.
+  - Both are now one continuous edge (see Motion). Checked on frames n 5–16 and n 193–204 of the r04 MP4: one connected piece on every frame, solid white, and the outline never changes shape.
+- **v1 caps tracking.** Changed from −0.012em to +0.01em, matching the neutral-to-open tracking on Rockstar's "IMMERSE YOURSELF" / "PLAYSTATION 5 FEATURES" cards. The fit is now 82 px with the real face.
+- **v1 transparent export.** `scrimNone` went from 0.28 to 0, so `bg: "none"` is clean (checked: alpha 0 at the top of the frame). 0.28 is documented as the opt-in for pale footage.
+- **Kept:** the merged 28 px outline, the clip-rect reveal, the ink-on-chip keyword, the 0.6 s v0 marker beat, p01/p04, the caps fade-and-settle, and hero time 2.0 s.

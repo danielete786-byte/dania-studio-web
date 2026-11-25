@@ -118,6 +118,22 @@ Con **SendUserFile** (status `proactive`) envía el `.mp4`, el `.srt` y la **min
 
 No hagas commit de los vídeos ni de `stories/`.
 
+## Efectos estilo GTA (solo vídeos de GTA)
+
+`gta-fx/` contiene los 50 efectos verticales de la librería [echris6/gta-components](https://github.com/echris6/gta-components) (código MIT, fuentes OFL; ver `gta-fx/LICENSE`). **No se incluyen** los 76 componentes de formato largo porque traen fotogramas de GTA V (propiedad de Rockstar), ni los clips de muestra: los efectos se usan como **capas transparentes** encima de nuestras escenas.
+
+```bash
+./gta-fx.sh list                                               # catálogo
+./gta-fx.sh prepare 40-leak-stamp stories/<carpeta>/fx/sello   # copia editable
+#   edita stories/<carpeta>/fx/sello/index.html: los textos están en inglés en el bloque CONFIG -> tradúcelos
+./gta-fx.sh render stories/<carpeta>/fx/sello confirmado '{"variant":"1"}'   # -> remotion/public/fx/confirmado.webm (~40-70 s)
+```
+En `scenes.tsx`: `<GtaFx name="confirmado" from={wordF("bloque", "palabra", startMs)} />` dentro de la escena (de `news.tsx`).
+Vista previa: `cd remotion && npx remotion still FxPreview out/fx.png --frame=60 --props='{"name":"confirmado"}'`.
+
+Los más útiles para noticias: `40-leak-stamp` (RUMOR / CONFIRMADO, variant 0/1), `08-wanted-level`, `09-wasted-stamp`, `10-mission-passed`, `11-news-chyron`, `12-location-card`, `26-stat-counter`, `46-cash-counter`, `07-release-countdown`, `44-minimap`, `45-objective-line`, `29-poll-card`, `24-versus-card`, `34-time-skip`.
+Reglas: traduce siempre los textos al español; usa como mucho 1-2 efectos por vídeo y que no tapen los subtítulos (y ≥ 1290); **no uses** `33-social-frame` ni `38-post-card` (imitan redes sociales). Duración típica de un efecto: 6-7 s (recórtalo con `durationInFrames`).
+
 ## Notas técnicas
 - Voz: Qwen3-TTS 1.7B (Apache-2.0) en CPU, voz diseñada una vez y clonada desde `tts/voice/ref.wav` para que sea siempre la misma. ~40 s de cómputo por frase.
 - Subtítulos: Whisper large-v3 alinea las palabras reales; `assemble.py` convierte cifras y aplica `display`.

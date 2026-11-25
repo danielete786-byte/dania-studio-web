@@ -1,0 +1,476 @@
+<!doctype html>
+<!-- GTA 6 component #22: Evolution timeline. 1080x1920 (9:16), 30 fps, 8 s.
+     Variables: variant "0" Year rail (vertical rail of smoked-glass cards) / "1" Year ticker (ink-navy card, odometer year + to-scale year ruler);
+     bg "plate" (sample GTA VI footage underneath) / "none" (transparent overlay).
+     Safe zones: all text inside x 72–936, y 230–1480. -->
+<html lang="en" data-composition-variables='[
+  {"id":"variant","type":"enum","label":"Variant","default":"0","options":[{"value":"0","label":"Year rail"},{"value":"1","label":"Year ticker"}]},
+  {"id":"bg","type":"enum","label":"Background","default":"plate","options":[{"value":"plate","label":"Sample footage"},{"value":"none","label":"Transparent"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link rel="stylesheet" href="assets/fonts/fonts.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      /* Barlow Condensed declared inline too, so the render's static font guard sees it (same files as assets/fonts/fonts.css) */
+      @font-face { font-family: "Barlow Condensed"; font-style: normal; font-weight: 800; font-display: block; src: url("assets/fonts/BarlowCondensed-ExtraBold.ttf") format("truetype"); }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: transparent; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; font-family: "Inter", sans-serif;
+        -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; font-feature-settings: "tnum" 1, "ss01" 1; }
+      .plate { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      #ov { position: absolute; inset: 0; }
+      #stage { position: absolute; inset: 0; color: #fff; }
+      :root {
+        --ink: #0B0B0E; --paper: #FFFFFF; --navy: #1F202B;
+        --smoke: rgba(14,14,20,.62);
+        --sunset: linear-gradient(100deg, #F84FA4 0%, #FE8E4E 55%, #FEB747 100%);
+        --hair: rgba(255,255,255,.14);
+        --shadow-type: 0 2px 2px rgba(0,0,0,.35), 0 6px 24px rgba(0,0,0,.45);
+        --shadow-card: 0 1px 2px rgba(0,0,0,.28), 0 30px 80px -24px rgba(0,0,0,.65);
+      }
+
+      /* ---------- shared bits ---------- */
+      .lbl { font-weight: 600; text-transform: uppercase; letter-spacing: .35em; margin-right: -.35em; white-space: nowrap; }
+      .ctr { font-family: "JetBrains Mono", monospace; font-weight: 500; display: inline-flex; line-height: 1.2; white-space: nowrap; }
+      .ctr-m { display: inline-block; height: 1.2em; overflow: hidden; vertical-align: top;
+        -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 16%, #000 84%, transparent 100%);
+        mask-image: linear-gradient(180deg, transparent 0, #000 16%, #000 84%, transparent 100%); }
+      .ctr-s { display: block; }
+      .ctr-s b { display: block; height: 1.2em; font-weight: 600; color: #fff; }
+      .ctr-of { color: rgba(255,255,255,.62); }
+      .rail .head .lbl { padding: 13px 22px 13px 24px; margin-right: 0; border-radius: 999px; background: var(--smoke); border: 1px solid var(--hair);
+        backdrop-filter: blur(20px) saturate(1); -webkit-backdrop-filter: blur(20px) saturate(1); text-shadow: none; line-height: 1;
+        box-shadow: 0 1px 2px rgba(0,0,0,.25), 0 10px 30px -10px rgba(0,0,0,.6); }
+      .rail .head .lbl b { font-weight: inherit; margin-right: -.35em; }
+      .rail .head .ctr { padding: 9px 18px 9px 20px; border-radius: 999px; background: var(--smoke); border: 1px solid var(--hair);
+        backdrop-filter: blur(20px) saturate(1); -webkit-backdrop-filter: blur(20px) saturate(1); text-shadow: none;
+        box-shadow: 0 1px 2px rgba(0,0,0,.25), 0 10px 30px -10px rgba(0,0,0,.6); }
+
+      /* ---------- variant 0: YEAR RAIL ---------- */
+      /* header pills share the cards' left/right edges (x 148 / 904): one left edge for all type, the rail sits outside it */
+      .rail .head { position: absolute; left: 148px; width: 756px; top: 252px; height: 40px; display: flex; align-items: center;
+        justify-content: space-between; font-size: 28px; text-shadow: var(--shadow-type); }
+      .rail .track { position: absolute; width: 4px; border-radius: 2px; background: rgba(255,255,255,.24); transform-origin: 50% 0;
+        filter: drop-shadow(0 2px 6px rgba(0,0,0,.45)); }
+      .rail .fill { position: absolute; inset: 0; border-radius: 2px; background: #fff; transform-origin: 50% 0; }
+      .rail .node { position: absolute; width: 0; height: 0; }
+      .rail .node i { position: absolute; border-radius: 50%; left: 0; top: 0; transform: translate(-50%, -50%); }
+      /* future years are previewed only as hollow rail rings; the card itself appears when its year is reached */
+      .rail .node .ring { width: 20px; height: 20px; border: 2px solid rgba(255,255,255,.35); background: rgba(14,14,20,.5); }
+      .rail .node .halo { width: 44px; height: 44px; background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.35); }
+      .rail .node .dot { width: 20px; height: 20px; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.4); }
+      /* 756px wide so the GTA VI row can grow 4% from its left edge and still end inside x 936 */
+      .rail .row { position: absolute; left: 148px; width: 756px; transform-origin: 0% 50%; }
+      /* past rows: neutral smoked glass (no saturation boost, so footage colour doesn't tint them) */
+      .rail .card { position: absolute; inset: 0; border-radius: 28px; background: rgba(14,14,20,.76);
+        backdrop-filter: blur(20px) saturate(1); -webkit-backdrop-filter: blur(20px) saturate(1);
+        box-shadow: var(--shadow-card), inset 0 1px 0 rgba(255,255,255,.10); border: 1px solid var(--hair); transform-origin: 0 50%; }
+      /* the active row is the only full-material card: ink-navy fill plus a brighter top highlight */
+      .rail .act { position: absolute; inset: -1px; border-radius: 28px; background: rgba(31,32,43,.94);
+        border: 1px solid rgba(255,255,255,.12); box-shadow: inset 0 1px 0 rgba(255,255,255,.22); }
+      /* GTA VI landing beat: a 2px sunset hairline swept around the payoff card */
+      .rail .hl { position: absolute; inset: -1px; border-radius: 28px; padding: 2px; background: var(--sunset);
+        -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+        mask-composite: exclude; }
+      .rail .inner { position: absolute; inset: 0; display: flex; align-items: center; padding: 0 32px 0 40px; }
+      /* year and name share one baseline */
+      .rail .line { display: flex; align-items: baseline; flex: 1; min-width: 0; position: relative; top: -4px; } /* optical centre of the numerals */
+      .rail .yr { position: relative; width: 2.45em; flex: none; font-family: "Barlow Condensed", sans-serif; font-weight: 800;
+        font-size: 80px; line-height: 1; letter-spacing: .01em; }
+      /* reveal masks use clip-path (not overflow:hidden) so the flex baseline still comes from the text */
+      .rail .m { display: block; clip-path: inset(0 -24px 0 -24px); }
+      .rail .yr .mi { display: block; position: relative; padding-top: 4px; }
+      /* active year = sunset (.yr-g) over the muted past colour (.yr-w); demotion wipes one into the other with
+         complementary clip-paths on the same box, so no frame mixes the two colours */
+      .rail .yr-w { display: block; color: rgba(255,255,255,.55); }
+      .rail .yr-w.hi { color: #fff; } /* GTA VI: white numeral, the sunset hairline is the frame's one accent */
+      .rail .yr-g { position: absolute; left: 0; right: 0; top: 4px; display: block; background: var(--sunset); -webkit-background-clip: text;
+        background-clip: text; color: transparent; }
+      .rail .nm { flex: 1; min-width: 0; font-weight: 800; font-size: 38px; letter-spacing: -.03em; line-height: 1.2; color: #fff; }
+      .rail .nm .mi { display: block; white-space: nowrap; }
+      .rail .chip { flex: none; font-weight: 700; font-size: 28px; letter-spacing: .04em; line-height: 1; padding: 12px 18px 12px 20px;
+        border-radius: 999px; border: 1px solid rgba(255,255,255,.26); background: rgba(255,255,255,.06); color: rgba(255,255,255,.92); }
+      .rail .chip.hi { background: #fff; color: var(--ink); border-color: #fff; box-shadow: 0 6px 20px -6px rgba(0,0,0,.5); }
+
+      /* ---------- variant 1: YEAR TICKER ---------- */
+      .ticker .card { position: absolute; left: 72px; width: 864px; padding: 40px 48px 42px; border-radius: 36px; background: var(--navy);
+        box-shadow: var(--shadow-card), inset 0 1px 0 rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.06); }
+      .ticker .head { display: flex; align-items: center; justify-content: space-between; font-size: 26px; height: 32px; }
+      .ticker .head .lbl { color: rgba(255,255,255,.78); }
+      /* .yw holds the odometer and its sunset twin (.yg); the payoff punch scales both from the left edge */
+      .ticker .yw { position: relative; margin-top: 8px; margin-left: -8px; transform-origin: 0% 50%; }
+      /* max-content: the odometer's box is exactly its four columns, the same box as .yg, so their complementary
+         clip-path percentages meet on one edge during the payoff sweep */
+      .ticker .year { display: flex; width: max-content; font-family: "Barlow Condensed", sans-serif; font-weight: 800; font-size: 320px;
+        letter-spacing: 0; font-variant-numeric: tabular-nums; }
+      /* each digit column is a 300px slot and the visible window (.win) IS the slot: rolling digits never leave it.
+         The 230px glyph rests with 35px of air above and below, and the 35px fades sit exactly in that air, so a resting
+         digit is fully opaque and a rolling one fades to nothing at the slot edge (no hard slabs, nothing in the header
+         row or on the name line) */
+      .ticker .col { display: block; position: relative; }
+      .ticker .col .sz { display: block; visibility: hidden; font-weight: 800; }
+      .ticker .win { position: absolute; left: 0; right: 0; top: 0; display: block; overflow: hidden;
+        -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 35px, #000 265px, transparent 300px);
+        mask-image: linear-gradient(180deg, transparent 0, #000 35px, #000 265px, transparent 300px); }
+      /* sunset twin of the final year: same font, same column widths (measured), same line box as a resting cell */
+      .ticker .yg { position: absolute; left: 0; display: flex; font-family: "Barlow Condensed", sans-serif; font-weight: 800;
+        font-size: 320px; letter-spacing: 0; font-variant-numeric: tabular-nums; background: var(--sunset);
+        -webkit-background-clip: text; background-clip: text; color: transparent; }
+      .ticker .yg b { display: block; flex: none; text-align: center; font-weight: 800; }
+      .ticker .col-w { display: block; }
+      .ticker .strip { display: block; }
+      .ticker .strip b { display: block; text-align: center; font-weight: 800; }
+      .ticker .names { position: relative; height: 80px; margin-top: -13px; overflow: hidden; } /* cap top 5px below the slot */
+      .ticker .names span { position: absolute; left: 0; top: 0; font-weight: 800; font-size: 64px; letter-spacing: -.035em;
+        line-height: 80px; white-space: nowrap; }
+      .ticker .scale { position: relative; margin-top: 30px; height: 150px; }
+      .ticker .bubble { position: absolute; top: 0; left: 0; width: 156px; height: 48px; border-radius: 999px; background: #fff;
+        color: var(--ink); font-weight: 700; font-size: 26px; letter-spacing: .04em; overflow: hidden; }
+      /* label window: the 25%/75% fade sits outside the 19px cap height, so labels roll through the pill with soft edges */
+      .ticker .bl { position: absolute; inset: 0;
+        -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 25%, #000 75%, transparent 100%);
+        mask-image: linear-gradient(180deg, transparent 0, #000 25%, #000 75%, transparent 100%); }
+      .ticker .bubble span { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; line-height: 1; }
+      .ticker .ptr { position: absolute; top: 46px; left: 0; width: 0; height: 0; margin-left: -9px; border-left: 9px solid transparent;
+        border-right: 9px solid transparent; border-top: 10px solid #fff; }
+      .ticker .track { position: absolute; top: 76px; height: 8px; border-radius: 4px; background: rgba(255,255,255,.14);
+        transform-origin: 0 50%; }
+      .ticker .tfill { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; border-radius: 4px; background: var(--sunset);
+        transform-origin: 0 50%; }
+      /* at the payoff the accent moves from the ruler to the year: this white layer wipes over the fill as 2026 turns sunset */
+      .ticker .tfw { position: absolute; inset: 0; border-radius: 4px; background: #fff; }
+      .ticker .halo { position: absolute; top: 80px; left: 0; width: 24px; height: 24px; margin: -12px 0 0 -12px; border-radius: 50%;
+        background: rgba(255,255,255,.16); box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.9); opacity: 0; }
+      .ticker .marker { position: absolute; top: 80px; left: 0; width: 24px; height: 24px; margin: -12px 0 0 -12px; border-radius: 50%;
+        background: #fff; box-shadow: 0 0 0 5px var(--navy), 0 4px 12px rgba(0,0,0,.4); }
+      .ticker .ticks { position: absolute; left: 0; right: 0; top: 92px; height: 20px; }
+      .ticker .ticks i { position: absolute; top: 0; width: 2px; height: 8px; margin-left: -1px; background: rgba(255,255,255,.28); }
+      .ticker .ticks i.maj { width: 4px; height: 18px; margin-left: -2px; border-radius: 2px; background: rgba(255,255,255,.46); }
+      .ticker .ticks i.lit { background: #fff; opacity: 0; }
+      .ticker .axis { position: absolute; left: 0; right: 0; top: 120px; height: 26px;
+        font-family: "JetBrains Mono", monospace; font-weight: 500; font-size: 26px; line-height: 1; color: rgba(255,255,255,.7); }
+      .ticker .axis span { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="8" data-width="1080" data-height="1920">
+      <!-- sample footage: one framework-owned muted video per plate; the script hides all but the one the variant names -->
+      <video id="plateA" class="clip plate" src="assets/plates/p06-lucia-gate-v.mp4" muted playsinline data-start="0" data-duration="8" data-track-index="0"></video>
+      <video id="plateB" class="clip plate" src="assets/plates/p01-keys-sign-v.mp4" muted playsinline data-start="0" data-duration="8" data-track-index="0"></video>
+
+      <div id="ov" class="clip" data-start="0" data-duration="8" data-track-index="1">
+        <div id="stage"></div>
+      </div>
+    </div>
+
+    <script>
+      const CONFIG = {
+        // the series, in order; years and names from research/gta6/FACTS.md
+        label: "GTA Evolution",
+        items: [
+          { year: 2001, name: "GTA III" },
+          { year: 2002, name: "Vice City" },
+          { year: 2004, name: "San Andreas" },
+          { year: 2008, name: "GTA IV" },
+          { year: 2013, name: "GTA V" },
+          { year: 2026, name: "GTA VI", highlight: true }
+        ],
+        // gap chip / bubble text ("+N YRS" since the previous entry)
+        gap: { one: "+1 YR", many: "+{n} YRS" },
+        variants: {
+          "0": { style: "rail",   plate: "assets/plates/p06-lucia-gate-v.mp4" },
+          "1": { style: "ticker", plate: "assets/plates/p01-keys-sign-v.mp4", top: 250 }
+        },
+        // steps: the second each entry lands (one per item). Leave [] to spread them from first to last.
+        timing: { intro: 0.12, steps: [0.40, 1.30, 2.20, 3.10, 4.00, 5.00], first: 0.40, last: 5.00, out: 7.55, end: 8.0 }
+      };
+
+      (function () {
+        const VARS = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+        const vKey = CONFIG.variants[String(VARS.variant)] ? String(VARS.variant) : "0";
+        const showPlate = VARS.bg !== "none";
+        const V = CONFIG.variants[vKey], T = CONFIG.timing;
+        const items = CONFIG.items, N = items.length;
+        const steps = (T.steps && T.steps.length === N) ? T.steps
+          : items.map((_, i) => T.first + (N > 1 ? i * (T.last - T.first) / (N - 1) : 0));
+        const $ = (s, el) => (el || document).querySelector(s);
+        const $$ = (s, el) => Array.from((el || document).querySelectorAll(s));
+        const pad2 = (n) => String(n).padStart(2, "0");
+        const gapText = (i) => {
+          if (i === 0) return "";
+          const n = items[i].year - items[i - 1].year;
+          return n === 1 ? CONFIG.gap.one : CONFIG.gap.many.replace("{n}", n);
+        };
+        const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+        const ctrHTML = () => `<span class="ctr"><span class="ctr-m" data-layout-allow-overflow data-layout-allow-occlusion><span class="ctr-s" data-layout-allow-overflow data-layout-allow-occlusion>${items.map((_, i) => `<b data-layout-allow-occlusion data-layout-allow-overflow>${pad2(i + 1)}</b>`).join("")}</span></span><span class="ctr-of">&nbsp;/&nbsp;${pad2(N)}</span></span>`;
+        const F = { immediateRender: false };
+
+        document.querySelectorAll("video.plate").forEach((v) => {
+          if (!showPlate || v.getAttribute("src") !== V.plate) v.style.display = "none";
+        });
+
+        const stage = $("#stage");
+        stage.className = V.style;
+
+        /* ================= variant 0: YEAR RAIL ================= */
+        // the stack stays above the caption band: it ends at y 1102 for six entries (112px cards, 18px gaps)
+        const R = { top: 340, maxBottom: 1102, cardH: 112, gap: 18, railX: 100 };
+        // payoff climb: GTA VI's year counts through the gap for 0.6s, accelerating into the landing
+        const RC = { count: .6, ease: "power1.in" };
+        function buildRail() {
+          const h = Math.min(R.cardH, (R.maxBottom - R.top - (N - 1) * R.gap) / N), s = h / R.cardH;
+          R.h = h; R.ys = items.map((_, i) => R.top + i * (h + R.gap));
+          let html = `<div class="head"><span class="lbl"><b>${esc(CONFIG.label)}</b></span>${ctrHTML()}</div>`;
+          const y0 = R.ys[0] + h / 2, y1 = R.ys[N - 1] + h / 2;
+          html += `<div class="track" style="left:${R.railX - 2}px;top:${y0}px;height:${y1 - y0}px"><div class="fill"></div></div>`;
+          items.forEach((it, i) => {
+            const gt = gapText(i);
+            html += `<div class="row" style="top:${R.ys[i]}px;height:${h}px">
+              <div class="card"><div class="act"></div>${it.highlight ? `<div class="hl"></div>` : ""}<div class="inner">
+                <div class="line">
+                  <div class="yr" style="font-size:${(80 * s).toFixed(1)}px"><span class="m" data-layout-allow-overflow><span class="mi" data-layout-allow-overflow data-layout-allow-occlusion>${it.highlight ? `<span class="yr-w hi">${it.year}</span>` : `<span class="yr-w">${it.year}</span><span class="yr-g">${it.year}</span>`}</span></span></div>
+                  <div class="nm" style="font-size:${Math.max(30, 38 * s).toFixed(1)}px"><span class="m" data-layout-allow-overflow><span class="mi" data-layout-allow-overflow>${esc(it.name)}</span></span></div>
+                </div>
+                ${gt ? `<div class="chip${it.highlight ? " hi" : ""}">${esc(gt)}</div>` : ""}
+              </div></div>
+            </div>`;
+          });
+          items.forEach((_, i) => {
+            html += `<div class="node" style="left:${R.railX}px;top:${R.ys[i] + h / 2}px"><i class="halo"></i><i class="ring"></i><i class="dot"></i></div>`;
+          });
+          stage.innerHTML = html;
+          // start states
+          gsap.set(".rail .head", { opacity: 0, y: 14 });
+          gsap.set(".rail .track", { scaleY: 0 });
+          gsap.set(".rail .fill", { scaleY: 0 });
+          gsap.set(".rail .hl", { clipPath: "inset(0% 100% 0% 0%)" });
+          gsap.set(".rail .card", { opacity: 0 });
+          gsap.set(".rail .yr .mi, .rail .nm .mi", { yPercent: 105 });
+          gsap.set(".rail .yr-w:not(.hi)", { clipPath: "inset(0% 100% 0% 0%)" });
+          gsap.set(".rail .yr-g", { clipPath: "inset(0% 0% 0% 0%)" });
+          gsap.set(".rail .chip", { opacity: 0 });
+          gsap.set(".rail .node .ring", { scale: 0 });
+          gsap.set(".rail .node .dot", { scale: 0 });
+          gsap.set(".rail .node .halo", { scale: .4, opacity: 0 });
+        }
+        function animRail(tl) {
+          const rows = $$(".rail .row"), nodes = $$(".rail .node");
+          const frac = (i) => (R.ys[i] - R.ys[0]) / (R.ys[N - 1] - R.ys[0] || 1);
+          const t0 = T.intro;
+          tl.fromTo(".rail .head", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: .4, ease: "power3.out", ...F }, t0);
+          tl.fromTo(".rail .track", { scaleY: 0 }, { scaleY: 1, duration: .7, ease: "expo.out", ...F }, t0);
+          // future years are only hollow rings on the rail; no placeholder rows over the footage
+          nodes.forEach((n, i) => tl.fromTo($(".ring", n), { scale: 0 }, { scale: 1, duration: .3, ease: "back.out(1.6)", ...F }, t0 + .05 * i));
+          steps.forEach((t, i) => {
+            const r = rows[i], n = nodes[i], it = items[i];
+            // GTA VI payoff: its year counts up through the gap (2014 ... 2026) while the rail fill travels to its node,
+            // then everything lands at once. Other steps land at t.
+            const climb = it.highlight && i > 0, land = climb ? t + RC.count : t;
+            // card and type start together (card 0.25s), so no step opens on a blank glass slab
+            tl.fromTo($(".card", r), { opacity: 0, x: -28, scale: .985 }, { opacity: 1, x: 0, scale: 1, duration: .25, ease: "expo.out", ...F }, t);
+            tl.fromTo($(".yr .mi", r), { yPercent: 105 }, { yPercent: 0, duration: .5, ease: "expo.out", ...F }, t);
+            tl.fromTo($(".nm .mi", r), { yPercent: 105 }, { yPercent: 0, duration: .5, ease: "expo.out", ...F }, climb ? land - .033 : t);
+            if (climb) {
+              const el = $(".yr-w", r), from = items[i - 1].year, to = it.year;
+              // seek-safe accessor proxy: the value -> text mapping runs on every render, forward or backward
+              const cnt = { _v: from, get v() { return this._v; },
+                set v(x) { this._v = x; el.textContent = String(x <= from + 1e-6 ? from + 1 : Math.min(to, Math.ceil(x - 1e-6))); } };
+              tl.fromTo(cnt, { v: from }, { v: to, duration: RC.count, ease: RC.ease, ...F }, t);
+            }
+            const chip = $(".chip", r);
+            if (chip) {
+              if (it.highlight) tl.fromTo(chip, { opacity: 0, scale: 1.22 }, { opacity: 1, scale: 1, duration: .24, ease: "power3.out", ...F }, land);
+              else tl.fromTo(chip, { opacity: 0, scale: .86 }, { opacity: 1, scale: 1, duration: .32, ease: "back.out(1.5)", ...F }, t + .2);
+            }
+            if (it.highlight) { // landing: the row steps forward 4% (left edge fixed), a 3-frame impact, then the hairline sweeps round it
+              tl.fromTo(r, { scale: 1 }, { scale: 1.04, duration: .35, ease: "expo.out", ...F }, land);
+              tl.fromTo(r, { x: 0 }, { x: 6, duration: .033, ease: "none", ...F }, land);
+              tl.fromTo(r, { x: 6 }, { x: -4, duration: .033, ease: "none", ...F }, land + .033);
+              tl.fromTo(r, { x: -4 }, { x: 0, duration: .05, ease: "power2.out", ...F }, land + .066);
+              const hl = $(".hl", r);
+              if (hl) tl.fromTo(hl, { clipPath: "inset(0% 100% 0% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: .5, ease: "expo.out", ...F }, land + .02);
+            }
+            if (i > 0) tl.fromTo(".rail .fill", { scaleY: frac(i - 1) }, { scaleY: frac(i), duration: climb ? RC.count : .45, ease: climb ? RC.ease : "power3.out", ...F }, t);
+            tl.fromTo($(".dot", n), { scale: 0 }, { scale: 1, duration: .3, ease: "back.out(1.6)", ...F }, climb ? land : t + .1);
+            tl.fromTo($(".halo", n), { scale: .4, opacity: 0 }, { scale: 1, opacity: 1, duration: .4, ease: "expo.out", ...F }, climb ? land : t + .1);
+            if (i > 0) {
+              tl.fromTo(".rail .head .ctr-s", { yPercent: -100 * (i - 1) / N }, { yPercent: -100 * i / N, duration: .4, ease: "expo.out", ...F }, t);
+              // the previous row drops to the past state: plain smoked glass and explicit muted colours (no opacity dimming)
+              const p = rows[i - 1], pn = nodes[i - 1], pc = items[i - 1].highlight ? null : $(".chip", p);
+              tl.fromTo($(".act", p), { opacity: 1 }, { opacity: 0, duration: .3, ease: "power2.out", ...F }, t);
+              tl.fromTo($(".nm", p), { color: "rgba(255,255,255,1)" }, { color: "rgba(255,255,255,0.72)", duration: .3, ease: "power2.out", ...F }, t);
+              if (pc) tl.fromTo(pc, { color: "rgba(255,255,255,0.92)", borderColor: "rgba(255,255,255,0.26)" },
+                { color: "rgba(255,255,255,0.62)", borderColor: "rgba(255,255,255,0.16)", duration: .3, ease: "power2.out", ...F }, t);
+              // the sunset year wipes off left to right and the muted year is revealed behind the same edge (no colour mix)
+              const pg = $(".yr-g", p), pw = $(".yr-w:not(.hi)", p);
+              if (pg && pw) {
+                tl.fromTo(pg, { clipPath: "inset(0% 0% 0% 0%)" }, { clipPath: "inset(0% 0% 0% 100%)", duration: .22, ease: "power2.in", ...F }, t);
+                tl.fromTo(pw, { clipPath: "inset(0% 100% 0% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: .22, ease: "power2.in", ...F }, t);
+              }
+              tl.fromTo($(".halo", pn), { opacity: 1, scale: 1 }, { opacity: 0, scale: .6, duration: .25, ease: "power2.out", ...F }, t);
+              tl.fromTo($(".dot", pn), { scale: 1 }, { scale: .7, duration: .3, ease: "power2.out", ...F }, t);
+            }
+          });
+        }
+
+        /* ================= variant 1: YEAR TICKER ================= */
+        // scaleW: the card's content width (48px inner padding each side). The ruler is inset 33px at each end so the
+        // bubble's pointer can always sit over the marker while the pill stays inside the padding (24px radius + 9px pointer).
+        // Digits: colH is the slot and winH the visible window (equal: nothing rolls outside the slot), cellH the pitch
+        // between digits on the strip (larger than the window, so a resting digit never shows a neighbour).
+        const K = { scaleW: 768, inset: 33, bubbleW: 156, colH: 300, winH: 300, cellH: 310, blur: 3, blurSpin: 5 };
+        K.trackW = K.scaleW - 2 * K.inset;
+        const minY = Math.min(...items.map((x) => x.year)), maxY = Math.max(...items.map((x) => x.year));
+        const xOf = (y) => K.inset + (y - minY) / ((maxY - minY) || 1) * K.trackW;
+        const fillOf = (x) => (x - K.inset) / K.trackW;
+        const digitCols = [3, 2, 1, 0].map((k) => { // place value 10^k, left to right
+          const p = Math.pow(10, k), lo = Math.floor(minY / p), hi = Math.floor(maxY / p);
+          return { p, lo, cells: Array.from({ length: hi - lo + 1 }, (_, j) => (lo + j) % 10) };
+        });
+        const idxOf = (col, y) => Math.floor(y / col.p) - col.lo;
+        // true odometer: one continuous year value drives every column; a column only carries while
+        // the column to its right passes 9 -> 0, so the display never shows a year outside the range
+        const posOf = (col, v) => {
+          const base = Math.floor(v / col.p), lower = v - base * col.p;
+          return base + Math.max(0, lower - (col.p - 1)) - col.lo;
+        };
+        const odo = { _v: items[0].year, strips: null,
+          get v() { return this._v; },
+          set v(x) { this._v = x; if (this.strips) digitCols.forEach((c, k) => { this.strips[k].style.transform = `translate3d(0, ${(K.off - posOf(c, x) * K.cellH).toFixed(2)}px, 0)`; }); } };
+        K.off = (K.winH - K.cellH) / 2; // strip offset that centres the current cell in the window
+        // the accent moves to the year only when the highlighted entry is the last one (nothing rolls after it)
+        const payoff = items[N - 1].highlight && String(items[N - 1].year).length === digitCols.length ? items[N - 1] : null;
+        function buildTicker() {
+          let html = `<div class="card" style="top:${V.top || 250}px"><div class="head"><span class="lbl">${esc(CONFIG.label)}</span>${ctrHTML()}</div>`;
+          // glyph centred in each cell: line-height = cell - 34 lifts the numeral to the optical centre (digits have no descenders)
+          html += `<div class="yw"><div class="year">${digitCols.map((c) => `<span class="col" style="height:${K.colH}px"><b class="sz" style="height:${K.colH}px;line-height:${K.colH}px">0</b><span class="win" style="top:${-(K.winH - K.colH) / 2}px;height:${K.winH}px" data-layout-allow-overflow data-layout-allow-occlusion><span class="col-w" data-layout-allow-overflow data-layout-allow-occlusion><span class="strip" data-layout-allow-overflow data-layout-allow-occlusion>${c.cells.map((d) => `<b data-layout-allow-occlusion data-layout-allow-overflow style="height:${K.cellH}px;line-height:${K.cellH - 34}px">${d}</b>`).join("")}</span></span></span></span>`).join("")}</div>`;
+          // the payoff's sunset numeral sits exactly on the resting cell's line box (cell top = window top + K.off)
+          if (payoff) html += `<div class="yg" style="top:${K.off}px" data-layout-allow-overflow data-layout-allow-occlusion>${String(payoff.year).split("").map((d) => `<b data-layout-allow-overflow data-layout-allow-occlusion style="height:${K.cellH - 34}px;line-height:${K.cellH - 34}px">${d}</b>`).join("")}</div>`;
+          html += `</div>`;
+          html += `<div class="names" data-layout-allow-overflow data-layout-allow-occlusion>${items.map((it) => `<span>${esc(it.name)}</span>`).join("")}</div>`;
+          let ticks = "";
+          for (let y = minY; y <= maxY; y++) ticks += `<i style="left:${xOf(y)}px"></i>`;
+          items.forEach((it) => { ticks += `<i class="maj" style="left:${xOf(it.year)}px"></i>`; });
+          items.forEach((it) => { ticks += `<i class="maj lit" style="left:${xOf(it.year)}px"></i>`; });
+          html += `<div class="scale">
+            <div class="bubble"><div class="bl" data-layout-allow-overflow data-layout-allow-occlusion>${items.map((_, i) => `<span data-layout-allow-overflow data-layout-allow-occlusion>${esc(gapText(i))}</span>`).join("")}</div></div><i class="ptr"></i>
+            <div class="track" style="left:${K.inset}px;width:${K.trackW}px"><div class="tfill">${payoff ? `<div class="tfw"></div>` : ""}</div></div>
+            <div class="ticks">${ticks}</div>
+            <div class="halo"></div>
+            <div class="marker"></div>
+            <div class="axis"><span style="left:${xOf(minY)}px">${minY}</span><span style="left:${xOf(maxY)}px">${maxY}</span></div>
+          </div></div>`;
+          stage.innerHTML = html;
+          odo.strips = $$(".ticker .strip");
+          odo.v = items[0].year;
+          gsap.set(".ticker .card", { opacity: 0, y: 36 });
+          gsap.set(".ticker .col-w", { y: K.winH });
+          gsap.set(".ticker .win", { filter: "blur(0px)" });
+          gsap.set(".ticker .names span", { opacity: 0, yPercent: 100 });
+          gsap.set(".ticker .bubble, .ticker .ptr", { opacity: 0 });
+          gsap.set(".ticker .bubble span", { yPercent: 100 });
+          if (N > 1) gsap.set($$(".ticker .bubble span")[1], { yPercent: 0 }); // the first label is already in the pill when it appears
+          gsap.set(".ticker .track", { scaleX: 0 });
+          gsap.set(".ticker .tfill", { scaleX: 0 });
+          gsap.set(".ticker .marker", { x: xOf(items[0].year), scale: 0 });
+          gsap.set(".ticker .ticks i:not(.lit)", { opacity: 0 });
+          gsap.set(".ticker .axis", { opacity: 0 });
+          gsap.set(".ticker .yg, .ticker .tfw", { clipPath: "inset(0% 100% 0% 0%)" });
+        }
+        // the pill stays inside the card's 48px padding (0..scaleW); the inset ruler keeps the pointer clear of its radius
+        const bubbleX = (x) => Math.max(0, Math.min(K.scaleW - K.bubbleW, x - K.bubbleW / 2));
+        function animTicker(tl) {
+          const t0 = T.intro, names = $$(".ticker .names span"),
+                gaps = $$(".ticker .bubble span"), lit = $$(".ticker .ticks i.lit"), wins = $$(".ticker .win");
+          tl.fromTo(".ticker .card", { opacity: 0, y: 36 }, { opacity: 1, y: 0, duration: .45, ease: "power3.out", ...F }, t0);
+          $$(".ticker .col-w").forEach((c, k) => tl.fromTo(c, { y: K.winH }, { y: 0, duration: .5, ease: "expo.out", ...F }, t0 + .06 + .03 * k));
+          tl.fromTo(".ticker .track", { scaleX: 0 }, { scaleX: 1, duration: .7, ease: "expo.out", ...F }, t0 + .16);
+          tl.fromTo(".ticker .ticks i:not(.lit)", { opacity: 0 }, { opacity: 1, duration: .3, stagger: .008, ease: "power1.out", ...F }, t0 + .2);
+          tl.fromTo(".ticker .axis", { opacity: 0 }, { opacity: 1, duration: .3, ease: "power1.out", ...F }, t0 + .3);
+          tl.fromTo(".ticker .marker", { scale: 0 }, { scale: 1, duration: .32, ease: "back.out(1.6)", ...F }, t0 + .3);
+          steps.forEach((t, i) => {
+            const it = items[i], dur = it.highlight ? .9 : .45, ease = it.highlight ? "power3.inOut" : "expo.out";
+            // a name is only on screen with its own year: the old name leaves before the roll starts, the new one
+            // arrives in the last 0.12s of the roll (when the digits have settled on the new year)
+            tl.fromTo(names[i], { opacity: 0, yPercent: 100 }, { opacity: 1, yPercent: 0, duration: .45, ease: "expo.out", ...F }, t + (i ? dur - .12 : 0));
+            tl.fromTo(lit[i], { opacity: 0 }, { opacity: 1, duration: .2, ease: "power1.out", ...F }, t + (!i ? .1 : it.highlight ? dur - .05 : .25));
+            if (i === 0) return;
+            const prev = items[i - 1];
+            tl.fromTo(names[i - 1], { opacity: 1, yPercent: 0 }, { opacity: 0, yPercent: -100, duration: .14, ease: "power2.in", ...F }, t - .14);
+            const xa = xOf(prev.year), xb = xOf(it.year);
+            // the year counts up in lockstep with the marker travelling along the to-scale ruler
+            tl.fromTo(odo, { v: prev.year }, { v: it.year, duration: dur, ease, ...F }, t);
+            // soft blur (0 -> 3px -> 0) on the digit columns that actually roll this step, so mid-roll frames read as motion
+            const rolling = wins.filter((_, k) => posOf(digitCols[k], prev.year) !== posOf(digitCols[k], it.year));
+            if (rolling.length) {
+              const cells = Math.max(...rolling.map((w) => Math.abs(posOf(digitCols[wins.indexOf(w)], it.year) - posOf(digitCols[wins.indexOf(w)], prev.year))));
+              const bOn = `blur(${cells > 3 ? K.blurSpin : K.blur}px)`;
+              // blur follows the roll's speed: early for the expo.out steps, mid-travel for the eased-in-out GTA VI spin
+              const [bIn, bHold, bOut] = it.highlight ? [dur * .2, dur * .4, dur * .45] : [.06, .08, .24];
+              tl.fromTo(rolling, { filter: "blur(0px)" }, { filter: bOn, duration: bIn, ease: "power1.out", ...F }, t);
+              tl.fromTo(rolling, { filter: bOn }, { filter: "blur(0px)", duration: bOut, ease: "power2.in", ...F }, t + bHold);
+            }
+            tl.fromTo(".ticker .tfill", { scaleX: fillOf(xa) }, { scaleX: fillOf(xb), duration: dur, ease, ...F }, t);
+            tl.fromTo(".ticker .marker", { x: xa }, { x: xb, duration: dur, ease, ...F }, t);
+            tl.fromTo(".ticker .ptr", { x: xa }, { x: xb, duration: dur, ease, ...F }, t);
+            tl.fromTo(".ticker .bubble", { x: bubbleX(xa) }, { x: bubbleX(xb), duration: dur, ease, ...F }, t);
+            // pill and its first label appear together (no blank pill); later labels roll through the pill's soft-edged
+            // label window (same language as the counter), so there are no clipped half-glyphs and no doubled text
+            if (i === 1) tl.fromTo(".ticker .bubble, .ticker .ptr", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: .3, ease: "power3.out", ...F }, t);
+            if (i > 1) {
+              tl.fromTo(gaps[i - 1], { yPercent: 0 }, { yPercent: -100, duration: .36, ease: "expo.out", ...F }, t + .04);
+              tl.fromTo(gaps[i], { yPercent: 100 }, { yPercent: 0, duration: .36, ease: "expo.out", ...F }, t + .04);
+            }
+            tl.fromTo(".ticker .head .ctr-s", { yPercent: -100 * (i - 1) / N }, { yPercent: -100 * i / N, duration: .4, ease: "expo.out", ...F }, t);
+            if (it.highlight) {
+              // landing beat, all on the frame the year settles. Pops jump up in one instant tween and settle in a second,
+              // so a backward seek always restores scale 1 / opacity 0.
+              const L = t + dur;
+              const pop = (sel, from, d, at) => {
+                tl.fromTo(sel, { scale: 1 }, { scale: from, duration: .001, ease: "none", ...F }, at);
+                tl.fromTo(sel, { scale: from }, { scale: 1, duration: d, ease: "power3.out", ...F }, at + .001);
+              };
+              pop(".ticker .yw", 1.06, .1, L);                 // year punch, 3 frames
+              tl.fromTo(".ticker .card", { x: 0 }, { x: 6, duration: .033, ease: "none", ...F }, L);   // 6px card shake
+              tl.fromTo(".ticker .card", { x: 6 }, { x: -4, duration: .033, ease: "none", ...F }, L + .033);
+              tl.fromTo(".ticker .card", { x: -4 }, { x: 0, duration: .05, ease: "power2.out", ...F }, L + .066);
+              pop(".ticker .bubble", 1.18, .26, L);
+              pop(".ticker .marker", 1.25, .26, L);
+              tl.fromTo(".ticker .halo", { x: xb, scale: 1, opacity: 0 }, { x: xb, scale: 1, opacity: 1, duration: .001, ease: "none", ...F }, L);
+              tl.fromTo(".ticker .halo", { scale: 1 }, { scale: 56 / 24, duration: .4, ease: "expo.out", ...F }, L + .001);
+              tl.fromTo(".ticker .halo", { opacity: 1 }, { opacity: 0, duration: .4, ease: "power2.in", ...F }, L + .001);
+              if (payoff === it) {
+                // the accent moves: 2026 sweeps to sunset left to right (the white odometer is clipped behind the same
+                // edge) while a white layer sweeps over the ruler fill, so the frame still carries exactly one gradient
+                const sw = { duration: .42, ease: "expo.out", ...F };
+                tl.fromTo(".ticker .yg", { clipPath: "inset(0% 100% 0% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", ...sw }, L);
+                tl.fromTo(".ticker .year", { clipPath: "inset(0% 0% 0% 0%)" }, { clipPath: "inset(0% 0% 0% 100%)", ...sw }, L);
+                tl.fromTo(".ticker .tfw", { clipPath: "inset(0% 100% 0% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", ...sw }, L);
+              }
+            }
+          });
+        }
+
+        if (V.style === "rail") buildRail(); else buildTicker();
+
+        document.fonts.ready.then(() => {
+          const tl = gsap.timeline({ paused: true });
+          if (V.style === "rail") animRail(tl);
+          else {
+            // the sunset twin's digit boxes take the odometer columns' exact (fractional) widths
+            const cw = $$(".ticker .col").map((c) => c.getBoundingClientRect().width);
+            $$(".ticker .yg b").forEach((b, k) => { b.style.width = cw[k] + "px"; });
+            animTicker(tl);
+          }
+          tl.fromTo("#stage", { opacity: 1, y: 0 }, { opacity: 0, y: -18, duration: .35, ease: "power2.in", ...F }, T.out);
+          tl.set({}, {}, T.end);
+          window.__timelines = window.__timelines || {};
+          window.__timelines["main"] = tl;
+          tl.seek(0);
+        });
+      })();
+    </script>
+  </body>
+</html>

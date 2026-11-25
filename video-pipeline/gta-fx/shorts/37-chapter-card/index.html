@@ -1,0 +1,507 @@
+<!doctype html>
+<!-- GTA 6 component #37 — Chapter card (Transitions). 1080x1920 (9:16), 30 fps, 5.2 s.
+     An interstitial between two segments of a compilation: the outgoing clip, then "DETAIL 04" + a title,
+     then the incoming clip. Full-frame: it always shows footage, read from the CONFIG clip paths.
+     Variables: variant "0" Sunset card / "1" Blurred footage; bg "plate" (footage) / "none".
+       - v0 + bg "none": the outgoing clip is dropped (transparent until the card lands); the window + landing still play clipIn.
+       - v1 always shows footage (the blur is made from the clip's own pixels).
+     Safe zones: all text inside x 72–936, y 230–1480. -->
+<html lang="en" data-composition-variables='[
+  {"id":"variant","type":"enum","label":"Variant","default":"0","options":[{"value":"0","label":"Sunset card"},{"value":"1","label":"Blurred footage"}]},
+  {"id":"bg","type":"enum","label":"Background","default":"plate","options":[{"value":"plate","label":"Sample footage"},{"value":"none","label":"Transparent"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link rel="stylesheet" href="assets/fonts/fonts.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: transparent; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; font-family: "Inter", sans-serif;
+        -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; font-feature-settings: "tnum" 1, "ss01" 1; }
+      :root {
+        --ink: #0B0B0E; --paper: #FFFFFF; --magenta: #EE08F2;
+      }
+      .hide { display: none !important; }
+
+      /* ---------- footage: outgoing (A) and incoming (B) segments ---------- */
+      #stage { position: absolute; inset: 0; transform-origin: 50% 46%; }
+      .seg { position: absolute; inset: 0; }
+      .plate { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      /* v0 hero window: the incoming clip in a 750x422 r28 window under the lockup (the PS5 card's hero object);
+         on exit the window itself grows to full frame and becomes the next segment.
+         r04: #segB stays full-frame and the window is a clip-path on #winClip; the video is placed by a transform on
+         #winMove. The <video> box never changes size, so the renderer's injected frame can never lag the window. */
+      #segB.win { z-index: 5; }
+      #winClip, #winMove { position: absolute; inset: 0; }
+      #winMove { transform-origin: 0 0; }
+      #winShadow, #winEdge { position: absolute; pointer-events: none; }
+      #winShadow { box-shadow: 0 2px 4px rgba(0,0,0,.25), 0 24px 60px rgba(60,20,70,.35); }
+      #winEdge { box-shadow: inset 0 0 0 1px rgba(255,255,255,.20); }
+
+      /* ============ Variant 0 — Sunset card (PS5 feature-card language on the Leonida sky) ============ */
+      #card { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; overflow: hidden;
+        background: linear-gradient(180deg, #8E76AA 0%, #9C7AA8 22%, #9C7AA8 40%, #AE7DA6 52%, #D689A1 63%, #FAA08D 76%, #FCB680 88%, #FFC88F 100%);
+        box-shadow: 0 0 0 1px rgba(255,255,255,.10) inset, 0 -30px 90px rgba(24,6,34,.50), 0 30px 90px rgba(24,6,34,.50); }
+      #clouds { position: absolute; left: -100px; top: 0; width: 1440px; height: 1920px; opacity: .9; }
+      /* thin cirrus across the upper sky (y 0–1000), like the painterly wisps of the PS5 feature card */
+      #cirrus { position: absolute; left: -80px; top: 0; width: 1240px; height: 1000px; opacity: .30; }
+      /* 2% monochrome grain; the timeline steps its offset at 12 fps (seeded), so it never sits still */
+      #grain { position: absolute; inset: 0; pointer-events: none; opacity: .05; mix-blend-mode: soft-light;
+        background-repeat: repeat; background-size: 256px 256px; }
+      #sun { position: absolute; inset: 0; pointer-events: none;
+        background:
+          radial-gradient(70% 26% at 50% 104%, rgba(255,226,170,.85) 0%, rgba(255,214,160,.35) 45%, rgba(255,214,160,0) 100%),
+          radial-gradient(90% 40% at 50% 0%, rgba(110,80,150,.12) 0%, rgba(110,80,150,0) 100%); }
+      #lock0 { position: absolute; left: 0; width: 1080px; display: flex; flex-direction: column; align-items: center;
+        color: #fff; transform-origin: 50% 50%; }
+      #lock0 .kickTxt { font-weight: 700; font-size: 30px; line-height: 36px; letter-spacing: .42em; padding-left: .42em;
+        text-transform: uppercase; white-space: nowrap;
+        text-shadow: 0 1px 2px rgba(80,30,80,.22), 0 4px 18px rgba(80,30,80,.22); }
+      #lock0 .title { margin-top: 30px; display: flex; flex-direction: column; align-items: center; }
+      #lock0 .mask { overflow: hidden; padding: 6px 24px 10px; margin: -6px 0 -10px; }
+      #lock0 .line { font-weight: 800; line-height: .98; letter-spacing: -0.012em; text-transform: uppercase; white-space: nowrap;
+        text-shadow: 0 2px 3px rgba(84,32,86,.20), 0 4px 14px rgba(84,32,86,.18); }
+      #lock0 .sub { margin-top: 30px; font-weight: 600; font-size: 34px; line-height: 40px; letter-spacing: .03em;
+        text-transform: uppercase; white-space: nowrap; color: rgba(255,255,255,.96);
+        text-shadow: 0 1px 2px rgba(80,30,80,.22), 0 6px 22px rgba(80,30,80,.26); }
+
+      /* ============ Variant 1 — Blurred footage (Rockstar date-card language) ============ */
+      /* r04: a radial scrim only behind the lockup (centre y 44 %); the rest of the club stays untouched footage */
+      #shade1 { position: absolute; inset: 0; pointer-events: none;
+        background: radial-gradient(60% 34% at 50% 44%, rgba(8,6,28,.45) 0%, rgba(8,6,28,0) 100%); }
+      #lock1 { position: absolute; left: 0; width: 1080px; display: flex; flex-direction: column; align-items: center;
+        color: #fff; transform-origin: 50% 50%; }
+      #lock1 .small { font-weight: 600; font-size: 30px; line-height: 36px; letter-spacing: .42em; padding-left: .42em;
+        text-transform: uppercase; white-space: nowrap;
+        text-shadow: 0 2px 2px rgba(0,0,0,.35), 0 6px 24px rgba(0,0,0,.45); }
+      /* Rockstar's date style lives on the small kicker only: 2 px magenta offset + a soft bloom */
+      #lock1 #kick1 { text-shadow: 2px 0 0 var(--magenta), 0 0 14px rgba(238,8,242,.34), 0 2px 2px rgba(0,0,0,.35), 0 6px 24px rgba(0,0,0,.40); }
+      #lock1 .title { margin-top: 26px; display: flex; flex-direction: column; align-items: center; }
+      /* location title: Barlow Condensed 800 caps, tracked 0.06em (DESIGN: location titles) */
+      #lock1 .line { font-family: "Barlow Condensed", "Inter", sans-serif; font-weight: 800; line-height: .94; text-transform: uppercase; white-space: nowrap;
+        text-shadow: 0 2px 3px rgba(0,0,0,.30), 0 10px 36px rgba(0,0,0,.34); }
+      #lock1 .line .ch { display: inline-block; white-space: pre; }
+      #lock1 .sub { margin-top: 28px; color: rgba(255,255,255,.88); }
+
+      /* ---------- shared: segment progress ticks ("04 of 10") ---------- */
+      .ticks { display: flex; gap: 12px; margin-top: 52px; }
+      .tick { width: 52px; height: 8px; border-radius: 4px; background: rgba(255,255,255,.28); transform-origin: 0 50%; }
+      .tick.done { background: rgba(255,255,255,.62); }
+      .tick.now { background: #fff; box-shadow: 0 0 12px rgba(255,255,255,.35); }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="5.2" data-width="1080" data-height="1920">
+      <!-- Footage. Every clip of both variants is listed; the script hides the ones the active variant doesn't name.
+           Keep each <video>'s src / data-media-start in sync with its CONFIG clip. -->
+      <div id="stage" data-layout-allow-overflow>
+        <div class="seg" id="segA" data-layout-allow-overflow>
+          <video id="v0out" class="clip plate" src="assets/plates/p03-jason-door-v.mp4" muted playsinline
+            data-start="0" data-duration="1.5" data-media-start="0" data-track-index="0"></video>
+          <video id="v1out" class="clip plate" src="assets/plates/p02-blue-club-v.mp4" muted playsinline
+            data-start="0" data-duration="1.35" data-media-start="0" data-track-index="0"></video>
+          <!-- v1 hold: p02's clean window played in reverse (assets/custom, = source 1.30 s − t) at 0.4x under the full blur,
+               so it continues from where v1out is and the camera keeps moving (p02 dissolves into the end slate at 1.4 s) -->
+          <div class="seg" id="holdWrap" data-layout-allow-overflow>
+            <video id="v1hold" class="clip plate" src="assets/custom/p02-blue-club-rev-v.mp4" muted playsinline
+              data-start="1.15" data-duration="2.75" data-media-start="0.15" data-playback-rate="0.4" data-track-index="3"></video>
+          </div>
+        </div>
+        <div class="seg" id="segB" data-layout-allow-overflow>
+          <div id="winShadow" class="hide"></div>
+          <div id="winClip" data-layout-allow-overflow>
+            <div id="winMove" data-layout-allow-overflow>
+              <!-- v0in plays in the hero window from 1.45 s; rate 0.62 keeps p06 inside its clean window (3.0–5.45 s, cut at 5.5) -->
+              <video id="v0in" class="clip plate" src="assets/plates/p06-lucia-gate-v.mp4" muted playsinline
+                data-start="1.45" data-duration="3.75" data-media-start="3.0" data-playback-rate="0.62" data-track-index="1"></video>
+              <video id="v1in" class="clip plate" src="assets/plates/p01-keys-sign-v.mp4" muted playsinline
+                data-start="3.45" data-duration="1.75" data-media-start="0" data-track-index="1"></video>
+            </div>
+          </div>
+          <div id="winEdge" class="hide"></div>
+        </div>
+      </div>
+
+      <div id="ov" class="clip" data-start="0" data-duration="5.2" data-track-index="2" style="position:absolute;inset:0;">
+        <!-- Variant 0: the sunset card -->
+        <div id="card" class="hide" data-layout-allow-overflow>
+          <canvas id="clouds" width="450" height="600" data-layout-allow-overflow></canvas>
+          <canvas id="cirrus" width="620" height="500" data-layout-allow-overflow></canvas>
+          <div id="sun"></div>
+          <div id="grain"></div>
+          <div id="lock0">
+            <div class="kickTxt" id="kick0"></div>
+            <div class="title" id="title0"></div>
+            <div class="sub" id="sub0"></div>
+            <div class="ticks" id="ticks0"></div>
+          </div>
+        </div>
+
+        <!-- Variant 1: type over the blurred footage -->
+        <div id="shade1" class="hide"></div>
+        <div id="lock1" class="hide">
+          <div class="small" id="kick1"></div>
+          <div class="title" id="title1"></div>
+          <div class="small sub" id="sub1"></div>
+          <div class="ticks" id="ticks1"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const CONFIG = {
+        variants: {
+          // Sunset card: the outgoing clip is pushed up by a full-frame Leonida-sky card carrying the chapter, with the
+          // incoming clip in a hero window under it; the window then grows to full frame and becomes the next segment.
+          "0": {
+            style: "card",
+            kicker: "Detail", num: 4, of: 10,          // "DETAIL 04" + the 10-segment progress row (of: 0 hides the row)
+            title: "Two\nProtagonists",                // \n = line break
+            sub: "Jason Duval · Lucia Caminos",        // "" hides it
+            clipOut: { src: "assets/plates/p03-jason-door-v.mp4", from: 0 },    // segment that ends (Trailer 1, Jason)
+            clipIn:  { src: "assets/plates/p06-lucia-gate-v.mp4", from: 3.0, rate: 0.62 },  // segment that starts (Trailer 2, Lucia): plays in the hero window, then full frame
+            window: { w: 750, h: 422, top: 1006, radius: 28, focusY: 0 }      // hero window under the lockup, 56 px below the ticks (focusY 0 = top of the clip, 1 = bottom)
+          },
+          // Blurred footage: the outgoing clip defocuses into a dark, coloured blur, the chapter resolves on it in
+          // Rockstar's wide-caps date style, the incoming clip swaps in under the blur and pulls back into focus.
+          "1": {
+            style: "blur",
+            kicker: "Detail", num: 5, of: 10,
+            title: "Leonida\nKeys",
+            sub: "State of Leonida",
+            clipOut: { src: "assets/plates/p02-blue-club-v.mp4", from: 0 },     // night club, blue uplights: a dark, saturated blur
+            // hold: what plays under the full blur. p02 is clean only for 0–1.35 s, so the hold is that window reversed
+            // (assets/custom/p02-blue-club-rev-v.mp4, from 0.15 = source 1.15 s) at 0.4x: it picks up where v1out is and
+            // the camera keeps pushing in. With a long clean clip: { src: <clipOut.src>, from: <clipOut.from + at>, rate: 1, at }.
+            // null = no hold layer (then let v1out run to blur.swap + 0.4).
+            hold:    { src: "assets/custom/p02-blue-club-rev-v.mp4", from: 0.15, rate: 0.4, at: 1.15 },
+            clipIn:  { src: "assets/plates/p01-keys-sign-v.mp4", from: 0 }      // reveals the "Welcome to The Keys" sign
+          }
+        },
+        layout: {
+          centerY: { card: 760, blur: 850 },   // optical centre of the lockup (safe zone is y 230–1480); v0 sits in the violet upper sky
+          titleMaxWidth: 740,    // title lines auto-fit to this width (glyphs stay inside x 170–910)
+          titleSize: { card: [72, 108], blur: [96, 150] },   // min / max title px (v1: Barlow Condensed 800)
+          blurTracking: 0.06     // v1 title tracking (em)
+        },
+        // v1 defocus at full blur: soft enough that the uplights and figures still read; `dip` = brightness at the swap
+        // (r04: .72, a slight dip only). The filter is scaled by the push, so px 9 at zoom 1.38 lands at ~12 px on screen. The push centres on the
+        // lit wall (origin y 30%), so the club's dark floor leaves the frame.
+        blur: { px: 9, brightness: 0.74, saturate: 1.15, dip: 0.72, zoom: 1.38, origin: "50% 30%" },
+        timing: {
+          card: { in: 0.75, move: 0.6, out: 3.2, grow: 0.8 },              // v0: card lands at in+move; the window grows to full frame at out
+          blur: { in: 0.8, ramp: 0.55, textOut: 3.3, swap: 3.45, dipDur: 0.17, focusDur: 0.45 },  // focus pull starts at swap + dipDur
+          end: 5.2
+        }
+      };
+
+      (function () {
+        const VARS = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+        const vKey = CONFIG.variants[String(VARS.variant)] ? String(VARS.variant) : "0";
+        const showPlate = VARS.bg !== "none";
+        const V = CONFIG.variants[vKey], L = CONFIG.layout, T = CONFIG.timing;
+        const $ = (s) => document.querySelector(s);
+        const pad2 = (n) => String(n).padStart(2, "0");
+
+        // footage: keep only this variant's clips. v0 + bg "none": the outgoing clip is dropped (transparent until the
+        // card lands, so it sits on the creator's own clip); the hero window and the landing still play clipIn.
+        document.querySelectorAll("video.plate").forEach((v) => {
+          const src = v.getAttribute("src"), own = v.id.startsWith("v" + vKey);
+          const named = src === V.clipOut.src || src === V.clipIn.src || (v.id === "v1hold" && V.hold && src === V.hold.src);
+          const dropOut = !showPlate && v.id === "v0out";
+          if (!own || !named || dropOut) v.style.display = "none";
+          if (v.id === "v1hold" && !V.hold) v.style.display = "none";
+        });
+
+        const buildTicks = (el) => {
+          el.innerHTML = "";
+          if (!V.of) { el.classList.add("hide"); return []; }
+          const out = [];
+          for (let i = 1; i <= V.of; i++) {
+            const t = document.createElement("div");
+            t.className = "tick" + (i < V.num ? " done" : i === V.num ? " now" : "");
+            el.appendChild(t); out.push(t);
+          }
+          return out;
+        };
+        const fitLines = (lines, range) => {
+          // each line auto-fits to the max width; the lockup uses the smallest result so lines share one size
+          let size = range[1];
+          lines.forEach((ln) => {
+            ln.style.fontSize = "100px";
+            const w = ln.getBoundingClientRect().width;
+            size = Math.min(size, Math.floor(100 * L.titleMaxWidth / w));
+          });
+          size = Math.max(range[0], size);
+          lines.forEach((ln) => { ln.style.fontSize = size + "px"; });
+          return size;
+        };
+
+        // ---- v0 sky texture: soft cloud streaks from seeded value noise (deterministic, drawn once) ----
+        function paintClouds(cv, seed) {
+          const ctx = cv.getContext("2d"), W = cv.width, H = cv.height;
+          const hash = (x, y) => {
+            let h = (Math.imul(x, 374761393) + Math.imul(y, 668265263) + Math.imul(seed, 982451653)) | 0;
+            h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16;
+            return (h >>> 0) / 4294967296;
+          };
+          const sm = (t) => t * t * (3 - 2 * t);
+          const noise = (x, y) => {
+            const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
+            const a = hash(xi, yi), b = hash(xi + 1, yi), c = hash(xi, yi + 1), d = hash(xi + 1, yi + 1);
+            const u = sm(xf), v = sm(yf);
+            return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+          };
+          const fbm = (x, y) => { let s = 0, a = 0.5, f = 1; for (let o = 0; o < 5; o++) { s += a * noise(x * f, y * f); f *= 2.03; a *= 0.5; } return s; };
+          const img = ctx.createImageData(W, H), D = img.data;
+          for (let y = 0; y < H; y++) {
+            const yn = y / H;
+            for (let x = 0; x < W; x++) {
+              const nx = x / W * 2.2, ny = yn * 11;                       // wide, thin streaks
+              const w = fbm(nx * 0.7 + 7.3, ny * 0.5 + 1.1);
+              const n = fbm(nx + w * 1.4, ny + w * 0.6);
+              let dns = Math.max(0, Math.min(1, (n - 0.47) / 0.27)); dns = dns * dns * (3 - 2 * dns);
+              const k = Math.max(0, Math.min(1, (yn - 0.50) / 0.20)), band = 0.16 + 0.84 * k * k * (3 - 2 * k);   // streaks gather toward the horizon; the type's sky stays clean
+              const i = (y * W + x) * 4;
+              D[i] = 255; D[i + 1] = 238 - yn * 18; D[i + 2] = 236 - yn * 40; D[i + 3] = Math.round(dns * band * 150);
+            }
+          }
+          ctx.putImageData(img, 0, 0);
+        }
+
+        // seeded hash + value-noise fbm shared by the cirrus and grain painters
+        const mkNoise = (seed) => {
+          const hash = (x, y) => {
+            let h = (Math.imul(x, 374761393) + Math.imul(y, 668265263) + Math.imul(seed, 982451653)) | 0;
+            h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16;
+            return (h >>> 0) / 4294967296;
+          };
+          const sm = (t) => t * t * (3 - 2 * t);
+          const noise = (x, y) => {
+            const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
+            const a = hash(xi, yi), b = hash(xi + 1, yi), c = hash(xi, yi + 1), d = hash(xi + 1, yi + 1);
+            const u = sm(xf), v = sm(yf);
+            return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+          };
+          const fbm = (x, y, oct) => { let s = 0, a = 0.5, f = 1; for (let o = 0; o < oct; o++) { s += a * noise(x * f, y * f); f *= 2.07; a *= 0.5; } return s; };
+          return { hash, fbm };
+        };
+
+        // ---- v0 upper sky: thin, slightly tilted cirrus wisps (domain-warped, stretched fbm), drawn once ----
+        function paintCirrus(cv, seed) {
+          const ctx = cv.getContext("2d"), W = cv.width, H = cv.height, N = mkNoise(seed);
+          const img = ctx.createImageData(W, H), D = img.data;
+          for (let y = 0; y < H; y++) {
+            const yn = y / H;
+            for (let x = 0; x < W; x++) {
+              const xn = x / W;
+              const nx = xn * 1.8, ny = yn * 13 + xn * 2.2;                       // long thin streaks, rising to the right
+              const w = N.fbm(nx * 0.8 + 3.1, ny * 0.35 + 8.7, 4);
+              const n = N.fbm(nx + w * 1.6, ny + w * 2.4, 6);
+              let dns = Math.max(0, Math.min(1, (n - 0.50) / 0.22)); dns = dns * dns * (3 - 2 * dns);
+              const fade = Math.max(0, Math.min(1, (1 - yn) / 0.22));             // dissolves out by y ≈ 1000
+              const dx = (xn - 0.5) / 0.42, dy = (yn * 1000 - 760) / 260;          // lighter behind the lockup (kept legible)
+              const hole = 1 - 0.45 * Math.exp(-(dx * dx + dy * dy));
+              const i = (y * W + x) * 4;
+              D[i] = 255; D[i + 1] = 226 + yn * 8; D[i + 2] = 246 - yn * 22;     // lavender-white, warming toward the bottom
+              D[i + 3] = Math.round(dns * fade * hole * 255);
+            }
+          }
+          ctx.putImageData(img, 0, 0);
+        }
+
+        // ---- 256 px monochrome grain tile (seeded) ----
+        function grainTile(seed) {
+          const cv = document.createElement("canvas"); cv.width = cv.height = 256;
+          const ctx = cv.getContext("2d"), img = ctx.createImageData(256, 256), D = img.data, N = mkNoise(seed);
+          for (let y = 0; y < 256; y++) for (let x = 0; x < 256; x++) {
+            const g = Math.round(N.hash(x, y) * 255), i = (y * 256 + x) * 4;
+            D[i] = D[i + 1] = D[i + 2] = g; D[i + 3] = 255;
+          }
+          ctx.putImageData(img, 0, 0);
+          return cv.toDataURL("image/png");
+        }
+
+        document.fonts.ready.then(() => {
+          const tl = gsap.timeline({ paused: true });
+          const set = (el, vars) => gsap.set(el, vars);
+          const ft = (el, from, to, at) => tl.fromTo(el, from, Object.assign({ immediateRender: false }, to), at);
+          const kickText = V.kicker + " " + pad2(V.num);
+
+          if (V.style === "card") {
+            /* ---------------- Variant 0: Sunset card ---------------- */
+            const C = T.card, W = V.window, card = $("#card"), lock = $("#lock0"), win = $("#segB");
+            const clip = $("#winClip"), mover = $("#winMove"), edge = $("#winEdge"), shadow = $("#winShadow");
+            card.classList.remove("hide");
+            win.classList.add("win"); edge.classList.remove("hide"); shadow.classList.remove("hide");
+            paintClouds($("#clouds"), 6);
+            paintCirrus($("#cirrus"), 11);
+            const grain = $("#grain"); grain.style.backgroundImage = "url(" + grainTile(23) + ")";
+            $("#kick0").textContent = kickText;
+            const tbox = $("#title0"); tbox.innerHTML = "";
+            const lines = V.title.split("\n").map((s) => {
+              const m = document.createElement("div"); m.className = "mask";
+              const l = document.createElement("div"); l.className = "line"; l.textContent = s;
+              m.appendChild(l); tbox.appendChild(m); return l;
+            });
+            fitLines(lines, L.titleSize.card);
+            const sub = $("#sub0"); sub.textContent = V.sub || ""; if (!V.sub) sub.classList.add("hide");
+            const ticks = buildTicks($("#ticks0"));
+            lock.style.top = Math.round(L.centerY.card - lock.getBoundingClientRect().height / 2) + "px";
+
+            const landed = C.in + C.move, t0 = landed - 0.30;   // type arrives with the card, no empty-sky beat
+            const tW = t0 + 0.42;                                // the hero window follows the title
+            // window geometry. The window is a clip-path on the full-frame #winClip; #winMove scales the full-frame clip
+            // down so it covers the window (top-anchored at focusY 0), overhanging it by PAD px so no sub-pixel sliver of
+            // sky shows at the edges. On exit the clip-path and the transform tween together (same ease, linear in
+            // progress), so the clip covers the growing window on every frame and lands at identity (1:1, full frame).
+            const wl = (1080 - W.w) / 2, PAD = 4, s0 = (W.w + 2 * PAD) / 1080, vh = 1920 * s0;
+            const y0 = W.top - PAD - (W.focusY || 0) * Math.max(0, vh - W.h - 2 * PAD);
+            const winBox = { left: wl, top: W.top, width: W.w, height: W.h, borderRadius: W.radius };
+            const fullBox = { left: 0, top: 0, width: 1080, height: 1920, borderRadius: 0 };
+            const clipWin = "inset(" + W.top + "px " + (1080 - wl - W.w) + "px " + (1920 - W.top - W.h) + "px " + wl + "px round " + W.radius + "px)";
+            const clipFull = "inset(0px 0px 0px 0px round 0px)";
+            const moveWin = { x: wl - PAD, y: y0, scale: s0 }, moveFull = { x: 0, y: 0, scale: 1 };
+            const winOrigin = "540px " + (W.top + W.h / 2) + "px";   // the window's float-in and drift scale about its own centre
+            // ---- start states
+            set(card, { y: 1920, scale: 1 });
+            set("#segA", { y: 0, filter: "brightness(1)" });
+            set(win, { opacity: 0, y: 50, scale: 0.94, transformOrigin: winOrigin });
+            set(clip, { clipPath: clipWin });
+            set(mover, moveWin);
+            set(shadow, Object.assign({ opacity: 1 }, winBox));
+            set(edge, Object.assign({ opacity: 1 }, winBox));
+            set("#clouds", { x: 0 });
+            set("#cirrus", { x: 0 });
+            set("#kick0", { opacity: 0, letterSpacing: "0.70em", paddingLeft: "0.70em" });
+            set(lines, { yPercent: 108 });
+            set(sub, { opacity: 0, y: 18 });
+            set(ticks, { scaleX: 0, opacity: 0 });
+            set(lock, { scale: 1, y: 0, opacity: 1 });
+
+            // ---- card in: a square-edged full-frame sky (a film wipe, not a sheet) pushes the outgoing clip up (parallax 30%)
+            ft(card, { y: 1920 }, { y: 0, duration: C.move, ease: "expo.inOut" }, C.in);
+            ft("#segA", { y: 0, filter: "brightness(1)" }, { y: -560, filter: "brightness(0.62)", duration: C.move, ease: "expo.inOut" }, C.in);
+
+            // ---- chapter lockup: kicker settles its tracking, title lines rise, sub + ticks follow
+            ft("#kick0", { opacity: 0, letterSpacing: "0.70em", paddingLeft: "0.70em" },
+                         { opacity: 1, letterSpacing: "0.42em", paddingLeft: "0.42em", duration: 0.6, ease: "expo.out" }, t0);
+            lines.forEach((l, i) => ft(l, { yPercent: 108 }, { yPercent: 0, duration: 0.6, ease: "expo.out" }, t0 + 0.06 + i * 0.08));
+            ft(sub, { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.45, ease: "power3.out" }, t0 + 0.28);
+            ticks.forEach((tk, i) => ft(tk, { scaleX: 0, opacity: 0 }, { scaleX: 1, opacity: 1, duration: 0.32, ease: "power3.out" }, t0 + 0.36 + i * 0.03));
+            const now = ticks[V.num - 1];
+            if (now) ft(now, { scaleY: 1 }, { scaleY: 1.6, duration: 0.16, ease: "power2.out", yoyo: true, repeat: 1 }, t0 + 0.75);
+
+            // ---- hero window: the incoming clip floats up under the lockup, then drifts in slowly
+            ft(win, { opacity: 0, y: 50, scale: 0.94 }, { opacity: 1, y: 0, scale: 1, duration: 0.8, ease: "expo.out" }, tW);
+            ft(win, { scale: 1 }, { scale: 1.025, duration: C.out - (tW + 0.8), ease: "none" }, tW + 0.8);
+
+            // ---- hold: the sky drifts, the lockup pushes in slowly (never a still frame)
+            ft("#clouds", { x: 0 }, { x: -220, duration: T.end - C.in, ease: "none" }, C.in);
+            ft("#cirrus", { x: 0 }, { x: -70, duration: T.end - C.in, ease: "none" }, C.in);
+            // grain: seeded offsets stepped at 12 fps
+            const gh = mkNoise(31).hash;
+            for (let k = 0, n = Math.ceil(T.end * 12); k <= n; k++)
+              tl.set(grain, { backgroundPosition: Math.floor(gh(k, 1) * 256) + "px " + Math.floor(gh(k, 2) * 256) + "px" }, k / 12);
+            ft(lock, { scale: 1 }, { scale: 1.035, duration: C.out - landed, ease: "none" }, landed);
+
+            // ---- out: the lockup lifts off first (gone by C.out + 0.09, before the window starts to climb), then the window
+            // grows to full frame and becomes the next segment while the sky pushes in
+            ft(lock, { y: 0, opacity: 1 }, { y: -60, opacity: 0, duration: 0.24, ease: "power2.in" }, C.out - 0.15);
+            const G = { duration: C.grow, ease: "expo.inOut" };
+            ft(win, { scale: 1.025 }, Object.assign({ scale: 1 }, G), C.out);
+            ft(clip, { clipPath: clipWin }, Object.assign({ clipPath: clipFull }, G), C.out);
+            ft(mover, moveWin, Object.assign({}, moveFull, G), C.out);
+            ft(shadow, Object.assign({ opacity: 1 }, winBox), Object.assign({ opacity: 0 }, fullBox, G), C.out);
+            ft(edge, winBox, Object.assign({}, fullBox, G), C.out);
+            ft(edge, { opacity: 1 }, { opacity: 0, duration: C.grow * 0.6, ease: "power2.in" }, C.out);
+            ft(card, { scale: 1 }, { scale: 1.08, duration: C.grow, ease: "expo.inOut" }, C.out);
+          } else {
+            /* ---------------- Variant 1: Blurred footage ---------------- */
+            const B = T.blur, F = CONFIG.blur, lock = $("#lock1"), shade = $("#shade1");
+            lock.classList.remove("hide"); shade.classList.remove("hide");
+            $("#kick1").textContent = kickText;
+            const sub = $("#sub1"); sub.textContent = V.sub || ""; if (!V.sub) sub.classList.add("hide");
+            const tbox = $("#title1"); tbox.innerHTML = "";
+            const tr = L.blurTracking + "em";
+            const lines = V.title.split("\n").map((s) => {
+              const l = document.createElement("div"); l.className = "line"; l.style.letterSpacing = tr; l.style.paddingLeft = tr;
+              Array.from(s.toUpperCase()).forEach((c) => { const sp = document.createElement("span"); sp.className = "ch"; sp.textContent = c; l.appendChild(sp); });
+              tbox.appendChild(l); return l;
+            });
+            fitLines(lines, L.titleSize.blur);
+            const chars = lines.flatMap((l) => Array.from(l.children));
+            const ticks = buildTicks($("#ticks1"));
+            lock.style.top = Math.round(L.centerY.blur - lock.getBoundingClientRect().height / 2) + "px";
+
+            const sharp = "blur(0px) brightness(1) saturate(1)";
+            const soft = "blur(" + F.px + "px) brightness(" + F.brightness + ") saturate(" + F.saturate + ")";
+            const dip = "blur(" + F.px + "px) brightness(" + F.dip + ") saturate(" + F.saturate + ")";
+            const tIn = B.in + B.ramp - 0.12, focus = B.swap + B.dipDur;
+            // ---- start states (the push centres on the lit wall, so the dark floor leaves the frame)
+            set("#stage", { filter: sharp, scale: 1, transformOrigin: F.origin });
+            set("#segB", { opacity: 0 });
+            set(shade, { opacity: 0 });
+            set("#holdWrap", { opacity: 0 });
+            set("#kick1", { opacity: 0, letterSpacing: "0.70em", paddingLeft: "0.70em" });
+            set(chars, { opacity: 0, filter: "blur(14px)" });
+            set(lines, { letterSpacing: (L.blurTracking + 0.14) + "em", paddingLeft: (L.blurTracking + 0.14) + "em" });
+            set(sub, { opacity: 0, y: 12 });
+            set(ticks, { scaleX: 0, opacity: 0 });
+            set(lock, { scale: 1 });
+
+            // ---- defocus: the outgoing clip melts into a dark, coloured blur with a slow push
+            ft("#stage", { filter: sharp }, { filter: soft, duration: B.ramp, ease: "power2.inOut" }, B.in);
+            ft("#stage", { scale: 1 }, { scale: F.zoom, duration: B.ramp + 0.3, ease: "expo.out" }, B.in);
+            ft(shade, { opacity: 0 }, { opacity: 1, duration: B.ramp, ease: "power2.inOut" }, B.in);
+            // the hold layer (the same clean window reversed, at 0.4x) crossfades in once the blur has swallowed the detail
+            // (tweened on a wrapper so it doesn't fight the clip lifecycle on the <video> itself)
+            if (V.hold) ft("#holdWrap", { opacity: 0 }, { opacity: 1, duration: 0.18, ease: "none" }, V.hold.at);
+            ft("#stage", { scale: F.zoom }, { scale: F.zoom * 1.035, duration: focus - (B.in + B.ramp + 0.3), ease: "none" }, B.in + B.ramp + 0.3);
+
+            // ---- chapter resolves through a bloom (Rockstar's date reveal), centre-out
+            ft("#kick1", { opacity: 0, letterSpacing: "0.70em", paddingLeft: "0.70em" },
+                         { opacity: 1, letterSpacing: "0.42em", paddingLeft: "0.42em", duration: 0.6, ease: "expo.out" }, tIn);
+            lines.forEach((l, li) => {
+              const cs = Array.from(l.children), mid = (cs.length - 1) / 2;
+              cs.forEach((c, i) => {
+                const d = Math.abs(i - mid) / Math.max(mid, 1);
+                ft(c, { opacity: 0, filter: "blur(14px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.30, ease: "power3.out" }, tIn + 0.08 + li * 0.07 + d * 0.05);
+              });
+              ft(l, { letterSpacing: (L.blurTracking + 0.14) + "em", paddingLeft: (L.blurTracking + 0.14) + "em" },
+                    { letterSpacing: tr, paddingLeft: tr, duration: 0.85, ease: "expo.out" }, tIn + 0.08 + li * 0.07);
+            });
+            ft(sub, { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.42, ease: "power3.out" }, tIn + 0.38);
+            ticks.forEach((tk, i) => ft(tk, { scaleX: 0, opacity: 0 }, { scaleX: 1, opacity: 1, duration: 0.3, ease: "power3.out" }, tIn + 0.46 + i * 0.03));
+            const now = ticks[V.num - 1];
+            if (now) ft(now, { scaleY: 1 }, { scaleY: 1.6, duration: 0.16, ease: "power2.out", yoyo: true, repeat: 1 }, tIn + 0.85);
+            ft(lock, { scale: 1 }, { scale: 1.03, duration: B.textOut - (tIn + 0.6), ease: "none" }, tIn + 0.6);
+
+            // ---- after the chapter has gone, the incoming clip swaps in under the same soft blur (soft-to-soft); brightness
+            // dips only slightly (.74 -> .72) so the crossfade never turns to grey-brown mud
+            ft("#segB", { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power1.inOut" }, B.swap);
+            ft("#stage", { filter: soft }, { filter: dip, duration: B.dipDur, ease: "power1.in" }, B.swap);
+
+            // ---- chapter blooms out, then the new segment pulls into focus
+            ft(chars, { opacity: 1, filter: "blur(0px)" }, { opacity: 0, filter: "blur(10px)", duration: 0.3, ease: "power2.in" }, B.textOut);
+            lines.forEach((l) => ft(l, { letterSpacing: tr, paddingLeft: tr },
+              { letterSpacing: (L.blurTracking + 0.08) + "em", paddingLeft: (L.blurTracking + 0.08) + "em", duration: 0.35, ease: "power2.in" }, B.textOut));
+            ft(["#kick1", sub], { opacity: 1 }, { opacity: 0, duration: 0.25, ease: "power2.in" }, B.textOut);
+            ft(ticks, { opacity: 1 }, { opacity: 0, duration: 0.22, ease: "power2.in" }, B.textOut + 0.04);
+            // focus pull (slow start: the blur holds until the crossfade is done, then the sign snaps sharp)
+            ft("#stage", { filter: dip }, { filter: sharp, duration: B.focusDur, ease: "power2.inOut" }, focus);
+            ft("#stage", { scale: F.zoom * 1.035 }, { scale: 1, duration: B.focusDur, ease: "expo.inOut" }, focus);
+            ft(shade, { opacity: 1 }, { opacity: 0, duration: B.focusDur * 0.8, ease: "power2.out" }, focus);
+          }
+
+          tl.set({}, {}, T.end);
+          window.__timelines = window.__timelines || {};
+          window.__timelines["main"] = tl;
+          tl.seek(0);
+        });
+      })();
+    </script>
+  </body>
+</html>

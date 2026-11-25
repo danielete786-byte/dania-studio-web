@@ -1,0 +1,399 @@
+<!doctype html>
+<!-- GTA 6 component #47, Race HUD. 1080x1920 (9:16), 30 fps, 6.5 s.
+     Variables: variant "0" Race stack (LAP / position / ticking timer) or "1" Speedometer (thin sunset arc, MPH + speed row, gear chip);
+     bg "plate" (sample GTA VI footage underneath) or "none" (transparent overlay).
+     Safe zone: all of the HUD sits inside x 72–936, y 230–1480. The race stack sits bottom-right, where Rockstar puts the race HUD;
+     the speedometer sits low and left of centre (x 206–714) so its ring clears the p09 plate's own aim reticle (x 705, y 963). -->
+<html lang="en" data-composition-variables='[
+  {"id":"variant","type":"enum","label":"Variant","default":"0","options":[{"value":"0","label":"Race stack"},{"value":"1","label":"Speedometer"}]},
+  {"id":"bg","type":"enum","label":"Background","default":"plate","options":[{"value":"plate","label":"Sample footage"},{"value":"none","label":"Transparent"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link rel="stylesheet" href="assets/fonts/fonts.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="assets/kit/motion/motion.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: transparent; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; font-family: "Inter", sans-serif;
+        -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; font-feature-settings: "tnum" 1; }
+      .plate { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      #ov { position: absolute; inset: 0; }
+      :root {
+        --pink: #F84FA4; --orange: #FE8E4E; --amber: #FEB747;
+        --dim: #C3C5CF;
+        --edge: rgba(10,10,16,.55);                 /* Rockstar's thin dark edge around HUD type and boxes */
+        --type-shadow: 0 1px 1.5px rgba(0,0,0,.45), 0 3px 12px rgba(0,0,0,.30);
+      }
+
+      /* soft corner scrim behind the HUD over the sample footage only (0 on the transparent export) */
+      .scrim { position: absolute; inset: 0; opacity: 0; }
+
+      /* the HUD block: anchored bottom-right of the safe zone, scaled as one unit from CONFIG.layout.scale */
+      .hud { position: absolute; display: none; color: #fff; font-family: "Barlow Condensed", "Inter", sans-serif;
+        text-shadow: var(--type-shadow); }
+      .hud.on { display: block; }
+      .hud-inner { display: flex; flex-direction: column; align-items: flex-end; }
+
+      /* type that sits straight on the footage gets the official HUD's dark edge (stroke painted under the fill) */
+      .edge { -webkit-text-stroke: 4px var(--edge); paint-order: stroke fill; }
+
+      /* ---------- shared kit pieces (both variants) ---------- */
+      /* slanted ink-navy chip (the official LAP chip has a raked left edge).
+         The chip itself is the 1.5 px dark outer edge; ::before is the fill inset by 1.5 px; ::after a 1 px light hairline on the rake */
+      .chip { position: relative; display: flex; align-items: center; justify-content: center; color: #fff;
+        background: var(--edge); clip-path: polygon(28px 0, 100% 0, 100% 100%, 0 100%); }
+      .chip::before { content: ""; position: absolute; inset: 1.5px;
+        clip-path: polygon(27.6px 0, 100% 0, 100% 100%, .5px 100%);
+        background: linear-gradient(180deg, rgba(54,56,72,.88), rgba(31,32,43,.88));
+        -webkit-backdrop-filter: blur(14px) saturate(1.3); backdrop-filter: blur(14px) saturate(1.3); }
+      .chip::after { content: ""; position: absolute; inset: 1.5px; background: rgba(255,255,255,.14);
+        clip-path: polygon(evenodd, 27.6px 0, 100% 0, 100% 100%, .5px 100%, 27.6px 0,
+          28.35px 1px, calc(100% - 1px) 1px, calc(100% - 1px) calc(100% - 1px), 1.85px calc(100% - 1px), 28.35px 1px); }
+      .chip > * { position: relative; }
+      .sl { color: rgba(255,255,255,.55); font-weight: 600; margin: 0 .16em; display: inline-block; }
+      .tot { color: var(--dim); }
+      .lap-chip .tot { color: #fff; }   /* the official LAP chip's total is white; only the position box dims its field size */
+
+      /* square box with a pink keyline on the right (the official position box), with the same 1.5 px dark outer edge */
+      .box { position: relative; display: flex; align-items: center; justify-content: flex-end; overflow: hidden;
+        outline: 1.5px solid var(--edge); }
+      .box-bg { position: absolute; inset: 0; background: rgba(20, 21, 30, .52);
+        -webkit-backdrop-filter: blur(16px) saturate(1.3); backdrop-filter: blur(16px) saturate(1.3);
+        box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.16), inset 0 1px 0 rgba(255,255,255,.12); }
+      /* event flash: a crisp full pink fill that wipes in left to right, holds 2-3 frames, then wipes out into the keyline (no fade) */
+      .box-wipe { position: absolute; inset: 0; background: var(--pink); transform: scaleX(0); transform-origin: 0 50%; }
+      .chip > .box-wipe { position: absolute; inset: 1.5px; clip-path: polygon(27.6px 0, 100% 0, 100% 100%, .5px 100%); }
+      .box-bar { position: absolute; top: 0; right: 0; bottom: 0; width: 10px; background: var(--pink); transform-origin: 100% 50%; }
+      .box-num { position: relative; display: flex; align-items: center; }
+
+      /* rolling numeral slot: every value sits in the same grid cell; the old one rolls up and out, the new one rolls in */
+      .slot { display: inline-grid; overflow: hidden; vertical-align: top; }
+      .slot > span { grid-area: 1 / 1; text-align: right; display: block; }
+
+      /* ---------- variant 0: race stack ---------- */
+      .lap-row { width: 400px; height: 100px; display: flex; align-items: center; justify-content: space-between; }
+      .lap-lbl { font-weight: 700; font-size: 78px; line-height: 1; letter-spacing: .03em; padding-left: 4px; }
+      .lap-chip { width: 222px; height: 100px; font-weight: 600; font-size: 78px; line-height: 1; padding-left: 18px; }
+      .lap-chip .slot > span, .gear-chip .slot > span { text-align: center; }
+
+      /* the box hugs its numerals: 36 px air on the left, 36 px + the 10 px keyline on the right */
+      .pos { height: 168px; margin-top: 22px; padding: 0 46px 0 36px; font-weight: 600; font-size: 128px; line-height: 1.04; }
+      /* chequered-flag texture: 56 px squares = exactly 3 rows in the 168 px box, a faint frost, fading in from the left */
+      .pos-chk { position: absolute; inset: 0;
+        background: repeating-conic-gradient(rgba(255,255,255,.022) 0 25%, rgba(255,255,255,0) 0 50%) 100% 0 / 112px 112px;
+        -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 45%);
+        mask-image: linear-gradient(90deg, transparent 0%, #000 45%); }
+      .pos .box-num .sl { font-weight: 600; margin: 0 .14em; }
+
+      /* the timer shares the position's 128 px cap height (as in the official HUD), so the boxed position leads */
+      .timer { margin-top: 18px; margin-right: 6px; font-weight: 600; font-size: 128px; line-height: .98; letter-spacing: 0;
+        display: flex; white-space: nowrap; }
+      .timer .d { display: inline-block; width: .47em; text-align: center; }
+      .timer .p { display: inline-block; width: .2em; text-align: center; }
+
+      /* ---------- variant 1: speedometer (thin flat ring + the MPH / speed row, no box) ---------- */
+      .gauge { position: relative; width: 508px; height: 508px; }
+      .gauge svg { position: absolute; left: 0; top: 0; overflow: visible; filter: drop-shadow(0 0 1px rgba(10,10,16,.7)) drop-shadow(0 2px 8px rgba(0,0,0,.28)); }
+      /* the sunset fill: a conic gradient masked to an 8 px ring (r 212-220) laid exactly over the 8 px track; flat ends, like the chips */
+      .arc-wrap { position: absolute; left: 0; top: 0; width: 508px; height: 508px; filter: drop-shadow(0 0 1px rgba(10,10,16,.7)) drop-shadow(0 2px 8px rgba(0,0,0,.28)); }
+      .arc-fill { position: absolute; inset: 0;
+        -webkit-mask-image: radial-gradient(circle at 50% 50%, transparent 211.5px, #000 212px, #000 220px, transparent 220.5px);
+        mask-image: radial-gradient(circle at 50% 50%, transparent 211.5px, #000 212px, #000 220px, transparent 220.5px); }
+      /* the kit's label + value row (like LAP 1/2): a 66 px MPH label left of the 180 px numeral (DESIGN floor 180), the pair
+         centred in the ring with both cap heights centred on the ring centre (y 254). Three fixed digit cells; a leading zero is ghosted */
+      .spd-row { position: absolute; left: 0; right: 0; top: 155px; display: flex; align-items: flex-start; justify-content: center; gap: 14px; }
+      .unit { font-weight: 700; font-size: 66px; line-height: 1; letter-spacing: .03em; margin-top: 63px; }
+      .spd { display: flex; white-space: nowrap; font-weight: 700; font-size: 180px; line-height: 1; }
+      .spd .d { display: inline-block; width: .46em; text-align: center; }
+      .spd .d.z { color: rgba(255,255,255,.22); -webkit-text-stroke-color: rgba(10,10,16,.18); text-shadow: none; }
+      .gear-wrap { position: absolute; left: 0; right: 0; top: 418px; display: flex; justify-content: center; }
+      .gear-row { display: flex; align-items: center; gap: 10px; }
+      .gear-lbl { font-weight: 700; font-size: 66px; line-height: 1; letter-spacing: .03em; }
+      .gear-chip { width: 112px; height: 88px; font-weight: 600; font-size: 66px; line-height: 1; padding-left: 14px; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6.5" data-width="1080" data-height="1920">
+      <!-- Sample footage, cut on the plates' own scene changes so every frame is a vehicle in motion.
+           Race stack: the p07 convertible cruising (0–1.2 s, cut on the plate's 1.23 s change), then one unbroken p10 run
+           (1.2–6.5 s, media 0.45–4.16 s at 0.7x): the green sports car, the police car drifting, then the dirt-bike jump and landing.
+           It starts after the pedestrian (media 0.3–0.4) and stops before the plate's 4.25 s cut to a man on foot.
+           Speedometer: the p04 in-car POV pull-away (0–2.5 s, the 3 -> 4 shift lands on the cut), then the p09 getaway chase
+           (2.5–6.5 s, media 0.1–2.98 s at 0.72x): the road streaks past as the police truck charges and flips, so 100+ mph reads true.
+           It stops before the plate's next shot (the shooter on his feet). -->
+      <video id="plA0" class="clip plate" src="assets/plates/p07-convertible-v.mp4" muted playsinline data-start="0" data-duration="1.2" data-media-start="0" data-track-index="0"></video>
+      <video id="plA1" class="clip plate" src="assets/plates/p10-police-car-v.mp4" muted playsinline data-start="1.2" data-duration="5.3" data-media-start="0.45" data-playback-rate="0.7" data-track-index="0"></video>
+      <video id="plB0" class="clip plate" src="assets/plates/p04-driveby-mural-v.mp4" muted playsinline data-start="0" data-duration="2.5" data-media-start="0" data-track-index="0"></video>
+      <video id="plB1" class="clip plate" src="assets/plates/p09-police-chase-v.mp4" muted playsinline data-start="2.5" data-duration="4.0" data-media-start="0.1" data-playback-rate="0.72" data-track-index="0"></video>
+
+      <div id="ov" class="clip" data-start="0" data-duration="6.5" data-track-index="1">
+        <div class="scrim" id="scrim"></div>
+        <!-- variant 0: race stack -->
+        <div class="hud" id="hudRace">
+          <div class="hud-inner">
+            <div class="lap-row" id="lapRow">
+              <span class="lap-lbl edge" id="lapLbl">LAP</span>
+              <div class="chip lap-chip"><div class="box-wipe" id="lapWipe"></div><span class="slot" id="lapSlot" data-layout-allow-overflow></span><span class="sl" id="lapSl">/</span><span class="tot" id="lapTot"></span></div>
+            </div>
+            <div class="box pos" id="pos">
+              <div class="box-bg"></div>
+              <div class="pos-chk"></div>
+              <div class="box-wipe" id="posWipe"></div>
+              <div class="box-bar" id="posBar"></div>
+              <div class="box-num"><span class="slot" id="posSlot" data-layout-allow-overflow></span><span class="sl" id="posSl">/</span><span class="tot" id="posTot"></span></div>
+            </div>
+            <div class="timer edge" id="timer"></div>
+          </div>
+        </div>
+        <!-- variant 1: speedometer (same kit: a thin sunset arc on a full 270 degree track with 8 ticks, the MPH / speed row at its centre, the GEAR chip) -->
+        <div class="hud" id="hudSpeed">
+          <div class="gauge" id="gauge">
+            <svg id="gsvg" width="508" height="508" viewBox="0 0 508 508">
+              <g id="ticks"></g>
+              <path id="track" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="8" stroke-linecap="butt" pathLength="1" />
+            </svg>
+            <div class="arc-wrap" id="arcWrap"><div class="arc-fill" id="arcFill"></div></div>
+            <div class="spd-row" id="spdRow"><span class="unit edge" id="unit"></span><div class="spd edge" id="spd"></div></div>
+            <div class="gear-wrap">
+              <div class="gear-row" id="gearRow">
+                <span class="gear-lbl edge" id="gearLbl"></span>
+                <div class="chip gear-chip"><div class="box-wipe" id="gearWipe"></div><span class="slot" id="gearSlot" data-layout-allow-overflow></span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const CONFIG = {
+        variants: {
+          "0": {
+            name: "Race stack",
+            plates: ["plA0", "plA1"],              // sample-footage clip ids shown under this variant
+            lap: { label: "LAP", steps: [1, 2], at: [4.2], total: 2 },     // LAP 1/2 -> 2/2 at 4.2 s (the final-lap beat)
+            position: { total: 8, steps: [5, 4, 3], at: [1.75, 3.05] },   // 5/8 -> 4/8 -> 3/8, one overtake at each time
+            timer: { startSec: 46.20, from: 0.32 }  // reads 00:46.20 when it appears, then ticks in real time
+          },
+          "1": {
+            name: "Speedometer",
+            plates: ["plB0", "plB1"],
+            layout: { right: 366, bottom: 450 },   // gauge centre x 460, y 1216: the ring clears the p09 plate's aim reticle (x 705, y 963)
+            unit: "MPH", max: 140, tickEvery: 20, gearLabel: "GEAR",   // 8 ticks: 0, 20 ... 140
+            // speed keyframes [time s, mph]; each short dip is a gear change. Matches the footage: a rolling 24 mph
+            // in-car pull-away, then the getaway chase pins the dial at 138 (arc ~99% of the sweep) after the 5 -> 6 shift.
+            speed: [[0.3, 24], [1.19, 41], [1.31, 37], [2.44, 66], [2.56, 61], [3.89, 99], [4.01, 94], [5.54, 129], [5.66, 124], [6.20, 138]],
+            gears: [[0, 2], [1.25, 3], [2.5, 4], [3.95, 5], [5.6, 6]]   // [time s, gear]; the chip rolls and flashes pink at each
+          }
+        },
+        flashHold: 2, finalHold: 3,                // frames the pink event fill holds before it wipes out; the last event (final lap / 5 -> 6 shift) holds 3
+        flash: { in: 0.16, out: 0.16 },            // pink wipe-in / wipe-out (s) for the overtake and lap flash
+        gearFlash: { in: 0.07, out: 0.09 },        // the gear-shift flash is quicker (about 0.25 s in all), so the pink chip and the sunset arc barely overlap
+        accent: "#F84FA4",                         // Leonida pink: the keylines, the event wipe, the start of the speed arc
+        layout: { right: 144, bottom: 480, scale: 1.0 },   // right/bottom edge in px (x 936, y 1440), whole HUD scale; a variant's own layout overrides it
+        scrim: 0.45,                               // corner shade behind the HUD over the sample footage, 0 = off
+        scrimNone: 0,                              // transparent (bg "none") export: no shade, the dark type edge carries legibility
+        timing: { in: 0.08, out: 6.0, outDur: 0.32, end: 6.5 }
+      };
+
+      (function () {
+        const VARS = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+        const vKey = CONFIG.variants[String(VARS.variant)] ? String(VARS.variant) : "0";
+        const showPlate = VARS.bg !== "none";
+        const V = CONFIG.variants[vKey], T = CONFIG.timing, L = Object.assign({}, CONFIG.layout, V.layout || {});
+        const $ = (s) => document.querySelector(s);
+
+        document.querySelectorAll("video.plate").forEach((v) => {
+          if (!showPlate || V.plates.indexOf(v.id) < 0) v.style.display = "none";
+        });
+        document.documentElement.style.setProperty("--pink", CONFIG.accent);
+        const hud = vKey === "0" ? $("#hudRace") : $("#hudSpeed");
+        hud.classList.add("on");
+        hud.style.right = L.right + "px";
+        hud.style.bottom = L.bottom + "px";
+        hud.style.transformOrigin = "100% 100%";
+        hud.style.transform = "scale(" + L.scale + ")";
+
+        // corner scrim centred on the HUD block (off on the transparent export by default)
+        const sA = showPlate ? CONFIG.scrim : CONFIG.scrimNone;
+        const half = vKey === "0" ? [230, 240] : [254, 254];   // half the HUD block's width / height
+        const cx = 1080 - L.right - half[0] * L.scale, cy = 1920 - L.bottom - half[1] * L.scale;
+        $("#scrim").style.background = sA > 0 ? "radial-gradient(ellipse " + Math.round(560 * L.scale) + "px " + Math.round(520 * L.scale) + "px at " +
+          cx + "px " + cy + "px, rgba(6,6,10," + sA + ") 0%, rgba(6,6,10," + (sA * 0.45).toFixed(3) + ") 52%, rgba(6,6,10,0) 100%)" : "none";
+
+        function cells(el, str) {   // fixed-width digit cells so ticking numbers never jitter
+          el.innerHTML = "";
+          const out = [];
+          for (const ch of str) {
+            const s = document.createElement("span");
+            s.className = /\d/.test(ch) ? "d" : "p";
+            s.textContent = ch;
+            el.appendChild(s); out.push(s);
+          }
+          return out;
+        }
+        function fillSlot(el, values) {
+          return values.map((v) => { const s = document.createElement("span"); s.textContent = String(v); el.appendChild(s); return s; });
+        }
+        const pad2 = (n) => (n < 10 ? "0" : "") + n;
+
+        let render = () => {};
+        const rolls = [];   // [time, outEl, inEl, kind]
+        if (vKey === "0") {
+          $("#lapLbl").textContent = V.lap.label;
+          $("#lapTot").textContent = V.lap.total;
+          const lapSpans = fillSlot($("#lapSlot"), V.lap.steps);
+          V.lap.at.forEach((t, i) => rolls.push([t, lapSpans[i], lapSpans[i + 1], "lap"]));
+          $("#posTot").textContent = V.position.total;
+          const posSpans = fillSlot($("#posSlot"), V.position.steps);
+          V.position.at.forEach((t, i) => rolls.push([t, posSpans[i], posSpans[i + 1], "pos"]));
+          const tDigits = cells($("#timer"), "00:00.00").filter((s) => s.className === "d");
+          const fmt = (sec) => { const cs = Math.floor(sec * 100 + 1e-6); const m = Math.floor(cs / 6000), s = Math.floor(cs / 100) % 60, c = cs % 100;
+            return pad2(m) + pad2(s) + pad2(c); };
+          render = (t) => {
+            const d = fmt(V.timer.startSec + Math.max(0, t - V.timer.from));
+            for (let i = 0; i < 6; i++) if (tDigits[i].textContent !== d[i]) tDigits[i].textContent = d[i];
+          };
+        } else {
+          // gauge geometry: 270 degree arc open at the bottom, centre (254,254); angles clockwise from +x (screen space)
+          const C = 254, R_F = 216, R_T0 = 229, R_T1 = 251, A0 = 135, SWEEP = 270;
+          const pt = (a, r) => [C + r * Math.cos(a * Math.PI / 180), C + r * Math.sin(a * Math.PI / 180)];
+          const p0 = pt(A0, R_F), p1 = pt(A0 + SWEEP, R_F);
+          $("#track").setAttribute("d", "M" + p0[0].toFixed(2) + " " + p0[1].toFixed(2) + " A" + R_F + " " + R_F + " 0 1 1 " + p1[0].toFixed(2) + " " + p1[1].toFixed(2));
+          // only the major ticks: 3 x 22 px white (.72) just outside the arc; a tick goes full white once the speed passes it
+          const NS = "http://www.w3.org/2000/svg", ticks = [];
+          for (let v = 0; v <= V.max + 1e-6; v += V.tickEvery) {
+            const a = A0 + SWEEP * v / V.max, q0 = pt(a, R_T0), q1 = pt(a, R_T1);
+            const ln = document.createElementNS(NS, "line");
+            Object.entries({ x1: q0[0], y1: q0[1], x2: q1[0], y2: q1[1] }).forEach(([k, n]) => ln.setAttribute(k, n.toFixed(2)));
+            ln.setAttribute("stroke", "#fff"); ln.setAttribute("stroke-width", 3); ln.setAttribute("opacity", 0);
+            $("#ticks").appendChild(ln); ticks.push({ el: ln, v: v, o: -1 });
+          }
+          $("#unit").textContent = V.unit; $("#gearLbl").textContent = V.gearLabel;
+          const gearSpans = fillSlot($("#gearSlot"), V.gears.map((g) => g[1]));
+          V.gears.slice(1).forEach((g, i) => rolls.push([g[0], gearSpans[i], gearSpans[i + 1], "gear"]));
+          // three fixed digit cells, so the MPH label never shifts when the speed passes 100; a leading zero is ghosted
+          const sd = [0, 1, 2].map(() => { const s = document.createElement("span"); s.className = "d"; $("#spd").appendChild(s); return s; });
+          const easeSeg = (x) => 1 - Math.pow(1 - x, 1.6);
+          const speedAt = (t) => {
+            const K = V.speed;
+            if (t <= K[0][0]) return K[0][1];
+            for (let i = 1; i < K.length; i++)
+              if (t <= K[i][0]) { const x = (t - K[i - 1][0]) / (K[i][0] - K[i - 1][0]); return K[i - 1][1] + (K[i][1] - K[i - 1][1]) * easeSeg(x); }
+            const last = K[K.length - 1];
+            return last[1] + 0.9 * Math.sin((t - last[0]) * 7.3);   // holding speed: a 1 mph flutter, deterministic
+          };
+          // sunset colour along the arc: pink at 0, orange at 55 %, amber at the run's top speed, so the tip warms as it climbs
+          const peak = Math.max.apply(null, V.speed.map((k) => k[1]));
+          const A_PK = Math.max(30, SWEEP * Math.min(1, peak / V.max));
+          const hex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+          const STOPS = [[0, hex(CONFIG.accent)], [0.55, hex("#FE8E4E")], [1, hex("#FEB747")]];
+          const colAt = (a) => {
+            const u = Math.max(0, Math.min(1, a / A_PK));
+            let i = 1; while (i < STOPS.length - 1 && u > STOPS[i][0]) i++;
+            const k = (u - STOPS[i - 1][0]) / (STOPS[i][0] - STOPS[i - 1][0]);
+            return "rgb(" + STOPS[i - 1][1].map((x, j) => Math.round(x + (STOPS[i][1][j] - x) * k)).join(",") + ")";
+          };
+          const arcFill = $("#arcFill"), arcWrap = $("#arcWrap");
+          let lastTxt = null, lastA = -1;
+          const drawIn = T.in + 0.02, drawDur = 0.36;
+          render = (t) => {
+            const s = Math.max(0, speedAt(t)), p = Math.min(1, s / V.max);
+            const txt = String(Math.min(999, Math.round(s))).padStart(3, "0");
+            if (txt !== lastTxt) { lastTxt = txt; let lead = true;   // ghost the unlit leading zero (white .22, like the track)
+              sd.forEach((el, i) => { const z = lead && i < 2 && txt[i] === "0"; if (!z) lead = false; el.textContent = txt[i]; el.classList.toggle("z", z); }); }
+            // the track draws on once, clockwise; the ticks appear as it passes them
+            const rev = Math.max(0, Math.min(1, (t - drawIn) / drawDur));
+            const revE = 1 - Math.pow(1 - rev, 3);
+            $("#track").setAttribute("stroke-dasharray", revE.toFixed(4) + " 1");
+            $("#track").setAttribute("opacity", revE > 0.004 ? 1 : 0);
+            // speed fill: conic sunset up to the tip angle, flat ends (no round caps)
+            const A = Math.round(SWEEP * Math.min(p, revE) * 100) / 100;
+            if (A !== lastA) {
+              lastA = A;
+              arcWrap.style.visibility = A > 0.3 ? "visible" : "hidden";
+              const st = ["from 225deg at 50% 50%", colAt(0) + " 0deg"];
+              if (A_PK * 0.55 < A) st.push(colAt(A_PK * 0.55) + " " + (A_PK * 0.55).toFixed(2) + "deg");
+              st.push(colAt(A) + " " + A.toFixed(2) + "deg", "rgba(0,0,0,0) " + A.toFixed(2) + "deg");
+              arcFill.style.background = "conic-gradient(" + st.join(", ") + ")";
+            }
+            for (const k of ticks) {
+              const shown = (k.v / V.max) <= revE + 1e-6 ? 1 : 0;
+              const lit = k.v > 0 && k.v <= s + 0.01;
+              const o = shown * (lit ? 1 : 0.72);
+              if (o !== k.o) { k.el.setAttribute("opacity", o); k.o = o; }
+            }
+          };
+        }
+
+        document.fonts.ready.then(() => {
+          const K = window.KitMotion;
+          render(0);   // first frame's state, so the entrance measures the rows at their real size
+          const tl = gsap.timeline({ paused: true });
+          const zero = { immediateRender: false };
+          // scrim
+          gsap.set("#scrim", { opacity: 0 });
+          tl.fromTo("#scrim", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out", ...zero }, T.in - 0.05);
+
+          // entrance: each row slides in from the screen edge (x +36 -> 0) while a clip reveals it right-to-left,
+          // 0.30 s expo.out, 70 ms apart. The clip is dropped once the row is in, so the boxes keep their backdrop blur.
+          const OPEN = "inset(-40px -40px -40px -40px)";
+          const reveal = (sel, at) => {
+            const el = $(sel), shut = "inset(-40px -40px -40px " + (el.offsetWidth + 40) + "px)";
+            gsap.set(el, { x: 36, clipPath: shut });
+            tl.fromTo(el, { x: 36, clipPath: shut }, { x: 0, clipPath: OPEN, duration: 0.30, ease: "expo.out", ...zero }, at);
+            tl.fromTo(el, { clipPath: OPEN }, { clipPath: "none", duration: 0.001, ease: "none", ...zero }, at + 0.31);
+          };
+          let rows;
+          if (vKey === "0") {
+            rows = ["#lapRow", "#pos", "#timer"];
+            rows.forEach((r, i) => reveal(r, T.in + i * 0.07));
+            gsap.set("#posBar", { scaleY: 0 });
+            tl.fromTo("#posBar", { scaleY: 0 }, { scaleY: 1, duration: 0.3, ease: "power3.out", ...zero }, T.in + 0.12);
+          } else {
+            rows = ["#gsvg", "#arcWrap", "#spdRow", "#gearRow"];
+            reveal("#spdRow", T.in + 0.07);
+            reveal("#gearRow", T.in + 0.14);
+          }
+
+          // rolling numeral swaps (overtakes, the lap change, gear changes), each with the kit's event flash:
+          // a crisp 100% pink fill wipes in left to right (0.16 s expo.out), holds 2 frames (the last event 3),
+          // then wipes out into the right edge / keyline (scaleX 1 -> 0, 0.16 s power2.in). No opacity fade, so no plum half-state.
+          // A gear shift runs the same flash faster (0.07 s in, 0.09 s out: about 0.25 s of pink in all).
+          const WIPE = { pos: "#posWipe", lap: "#lapWipe", gear: "#gearWipe" };
+          const DIM = { pos: ["#posSl", "#posTot"], lap: ["#lapSl"], gear: [] };
+          const restCol = {}; Object.values(DIM).flat().forEach((s) => { restCol[s] = getComputedStyle($(s)).color; });
+          rolls.sort((a, b) => a[0] - b[0]);
+          rolls.forEach((r) => gsap.set(r[2], { yPercent: 75, opacity: 0 }));
+          rolls.forEach(([at, outEl, inEl, kind], n) => {
+            const F = kind === "gear" ? CONFIG.gearFlash : CONFIG.flash;
+            const hold = (n === rolls.length - 1 ? CONFIG.finalHold : CONFIG.flashHold) / 30, outAt = at + F.in + hold;
+            tl.fromTo(outEl, { yPercent: 0, opacity: 1 }, { yPercent: -75, opacity: 0, duration: 0.16, ease: "power2.in", ...zero }, at);
+            tl.fromTo(inEl, { yPercent: 75, opacity: 0 }, { yPercent: 0, opacity: 1, duration: 0.3, ease: "power3.out", ...zero }, at + 0.1);
+            tl.fromTo(WIPE[kind], { scaleX: 0, transformOrigin: "0% 50%" }, { scaleX: 1, transformOrigin: "0% 50%", duration: F.in, ease: "expo.out", ...zero }, at);
+            tl.fromTo(WIPE[kind], { scaleX: 1, transformOrigin: "100% 50%" }, { scaleX: 0, transformOrigin: "100% 50%", duration: F.out, ease: "power2.in", ...zero }, outAt);
+            DIM[kind].forEach((s) => {
+              // the dimmed slash / grey total go white while they sit on the pink, and settle back as the wipe-out edge passes them
+              tl.fromTo(s, { color: restCol[s] }, { color: "#ffffff", duration: 0.001, ease: "none", ...zero }, at);
+              tl.fromTo(s, { color: "#ffffff" }, { color: restCol[s], duration: 0.06, ease: "none", ...zero }, outAt + 0.1);
+            });
+          });
+
+          // per-frame state (timer digits, speed, gauge) as a pure function of time
+          K.drive(tl, 0, T.end, (p) => render(p * T.end));
+
+          // exit: everything clears together, gone ~0.18 s before the loop point
+          const all = ["#scrim"].concat(rows);
+          tl.fromTo(all, { opacity: 1 }, { opacity: 0, duration: T.outDur, ease: "power2.in", ...zero }, T.out);
+          tl.set({}, {}, T.end);
+          window.__timelines = window.__timelines || {};
+          window.__timelines["main"] = tl;
+          tl.seek(0);
+        });
+      })();
+    </script>
+  </body>
+</html>

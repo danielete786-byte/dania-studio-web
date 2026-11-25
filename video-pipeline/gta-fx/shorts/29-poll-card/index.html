@@ -1,0 +1,422 @@
+<!doctype html>
+<!-- GTA 6 component #29 "This or that" (poll), craft v2 — 1080x1920 (9:16), 30 fps, 5 s.
+     Variables: variant "0" = Bars (full-bleed cut sequence; two type rows whose result bars are beams that run in from the frame edge),
+                variant "1" = Split tap (would-you-rather split of two live shots; the seam IS the chart and slides to the vote share);
+                bg "plate" (sample GTA VI shots + Look finishing) / "none" (transparent overlay: no footage, grain, vignette or exposure hits).
+     Safe zones: all text inside x 72–936, y 230–1480. -->
+<html lang="en" data-composition-variables='[
+  {"id":"variant","type":"enum","label":"Variant","default":"0","options":[{"value":"0","label":"Bars"},{"value":"1","label":"Split tap"}]},
+  {"id":"bg","type":"enum","label":"Background","default":"plate","options":[{"value":"plate","label":"Sample footage"},{"value":"none","label":"Transparent"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link rel="stylesheet" href="assets/fonts/fonts.css" />
+    <link rel="stylesheet" href="assets/kit/look/look.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="assets/kit/look/look.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: transparent; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; font-family: "Inter", sans-serif; color: #fff;
+        -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; }
+      #shake, .push, .pane, .xp { position: absolute; inset: 0; }
+      .shot { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; object-fit: cover; transform-origin: 0 0; }
+      .shot.h { width: 1920px; height: 1080px; }
+      #ov { position: absolute; inset: 0; z-index: 10; }
+      .hide { display: none !important; }
+      :root { --ink: #0B0B0E; --plum: #160123;
+        --sunset: linear-gradient(90deg, #F84FA4 0%, #FE78A6 26%, #FE8E4E 66%, #FEB747 100%);
+        --lift: 0 1px 1px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.42); }
+
+      /* ---------- shared: option key (A / B). Outline before the vote; the tapped one fills white with an ink letter ---------- */
+      .key { position: relative; flex: 0 0 auto; width: 64px; height: 64px; border-radius: 15px; box-shadow: inset 0 0 0 2.5px #fff, 0 2px 10px rgba(0,0,0,.28);
+        display: flex; align-items: center; justify-content: center; }
+      .key .on { position: absolute; inset: 0; border-radius: 15px; background: #fff; transform: scale(0);
+        box-shadow: inset 0 -3px 0 rgba(0,0,0,.16), 0 2px 8px rgba(0,0,0,.25); }
+      .key .lt { position: relative; font-weight: 800; font-size: 31px; line-height: 1; letter-spacing: 0; color: #fff; }
+      .key .rip { position: absolute; left: 0; top: 0; width: 64px; height: 64px; border-radius: 15px;
+        box-shadow: inset 0 0 0 3px #fff, 0 0 18px rgba(255,255,255,.45); opacity: 0; }
+
+      /* numerals: Inter display, tabular, with a raised small % */
+      .num { font-family: "Inter", sans-serif; font-weight: 800; letter-spacing: -0.045em; line-height: .86; white-space: nowrap;
+        font-variant-numeric: tabular-nums lining-nums; font-feature-settings: "tnum" 1, "lnum" 1, "ss01" 1, "cv11" 1; }
+      .num .pc { display: inline-block; vertical-align: top; font-size: .46em; font-weight: 700; letter-spacing: -0.02em; margin: .06em 0 0 .06em; }
+
+      /* ---------- shared: the ask ---------- */
+      .cta { position: absolute; left: 72px; display: flex; align-items: center; gap: 18px; white-space: nowrap;
+        font-weight: 700; font-size: 52px; letter-spacing: -0.024em; line-height: 1; }
+      .cta .ic { width: 54px; height: 54px; flex: 0 0 54px; filter: drop-shadow(0 2px 6px rgba(0,0,0,.4)); }
+      .cta .ic path { fill: none; stroke: #fff; stroke-width: 2.1; stroke-linejoin: round; stroke-linecap: round; }
+      .cta .w { text-shadow: var(--lift); }
+      .cta .ck { width: 70px; height: 70px; border-radius: 16px; background: #fff; color: var(--ink); display: inline-flex; align-items: center; justify-content: center;
+        font-weight: 800; font-size: 34px; letter-spacing: 0; box-shadow: inset 0 -3px 0 rgba(0,0,0,.16), 0 2px 4px rgba(0,0,0,.3), 0 12px 28px rgba(0,0,0,.4); }
+
+      /* ---------- v0: Bars ---------- */
+      #bars { position: absolute; inset: 0; }
+      #scrim0 { position: absolute; left: 0; right: 0; bottom: 0; height: 1080px;
+        background: linear-gradient(0deg, rgba(5,5,9,.62) 0%, rgba(5,5,9,.58) 30%, rgba(5,5,9,.44) 52%, rgba(5,5,9,.14) 78%, rgba(5,5,9,0) 100%); }
+      #kick0 { position: absolute; left: 72px; color: #fff; text-shadow: 0 1px 1px rgba(0,0,0,.3), 0 3px 12px rgba(0,0,0,.45); }
+      .bar { position: absolute; left: 0; width: 0; height: 128px; }
+      .bar .fillb { position: absolute; inset: 0; overflow: hidden; }
+      .bar.win .fillb { background-image: var(--sunset); background-repeat: no-repeat;
+        box-shadow: 0 0 34px rgba(248,79,164,.38), 0 0 90px rgba(254,142,78,.22); }
+      .bar.lose .fillb { background: linear-gradient(180deg, rgba(255,255,255,.3), rgba(255,255,255,.19));
+        -webkit-backdrop-filter: blur(18px) saturate(1.3); backdrop-filter: blur(18px) saturate(1.3);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.3), inset 0 -1px 0 rgba(255,255,255,.08); }
+      .bar .sh { position: absolute; top: 0; bottom: 0; left: 0; width: 180px; transform: skewX(-22deg);
+        background: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,.55), rgba(255,255,255,0)); }
+      .bar .tip { position: absolute; top: -6px; bottom: -6px; width: 4px; margin-left: -3px; border-radius: 2px; background: #fff;
+        box-shadow: 0 0 10px #fff, 0 0 28px rgba(254,183,71,.95), 0 0 70px rgba(248,79,164,.65); }
+      .row { position: absolute; left: 72px; width: 864px; height: 128px; display: flex; align-items: center; transform-origin: 0 50%; }
+      .row .namew { position: relative; margin-left: 30px; }
+      .row .name { font-size: 104px; white-space: nowrap; }
+      .row .name.base { text-shadow: var(--lift); }
+      .row .name.ink { position: absolute; left: 0; top: 0; color: var(--plum); }
+      .row .num { margin-left: auto; font-size: 112px; text-shadow: var(--lift); }
+      .row.lose .num { color: rgba(255,255,255,.86); }
+
+      /* ---------- v1: Split tap ---------- */
+      #split { position: absolute; inset: 0; }
+      #scrimQ { position: absolute; left: 0; right: 0; top: 0; height: 600px;
+        background: linear-gradient(180deg, rgba(5,5,9,.66) 0%, rgba(5,5,9,.42) 40%, rgba(5,5,9,.12) 76%, rgba(5,5,9,0) 100%); }
+      #band { position: absolute; left: 0; right: 0; height: 940px; margin-top: -470px;
+        background: linear-gradient(180deg, rgba(5,5,9,0) 0%, rgba(5,5,9,.3) 22%, rgba(5,5,9,.56) 50%, rgba(5,5,9,.3) 78%, rgba(5,5,9,0) 100%); }
+      .qline { position: absolute; left: 72px; width: 864px; font-weight: 700; font-size: 52px; letter-spacing: -0.024em; line-height: 1.08; text-shadow: var(--lift); }
+      .grp { position: absolute; left: 72px; width: 864px; }
+      .grp .rowS { display: flex; align-items: center; transform-origin: 0 50%; }
+      .grp .name { margin-left: 28px; font-size: 96px; white-space: nowrap; text-shadow: var(--lift); }
+      #gA .num { margin: 0 0 30px -6px; display: inline-block; }
+      #gB .num { margin: 30px 0 0 0; display: inline-block; }
+      .seamL { position: absolute; height: 4px; margin-top: -2px; background: #fff; transform-origin: 0 50%;
+        box-shadow: 0 0 8px rgba(255,255,255,.85), 0 0 26px rgba(255,255,255,.4); }
+      #or { position: absolute; left: 72px; margin-top: -13px; width: 64px; text-align: center; color: #fff; text-shadow: 0 1px 6px rgba(0,0,0,.5); }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="5" data-width="1080" data-height="1920">
+      <div id="shake">
+        <!-- v0 (Bars): one full-bleed cut sequence. Row A lands on Jason, row B on the cut to Lucia; the result hits on the cut to
+             Lucia at the gate, and the ask lands on the cut to both of them. -->
+        <div class="push v0only" id="push0">
+          <video id="a1" class="clip shot" src="assets/shots/s078-jason-phone-v.mp4" muted playsinline data-start="0" data-duration="1.05" data-media-start="0.6" data-track-index="0"></video>
+          <video id="a2" class="clip shot" src="assets/shots/s083-duo-convertible-v.mp4" muted playsinline data-start="1.05" data-duration="0.9" data-media-start="0.43" data-track-index="0"></video>
+          <video id="a3" class="clip shot" src="assets/shots/s018-lucia-gate-v.mp4" muted playsinline data-start="1.95" data-duration="2.2" data-media-start="0.75" data-track-index="0"></video>
+          <video id="a4" class="clip shot" src="assets/shots/s092-duo-car-v.mp4" muted playsinline data-start="4.15" data-duration="0.85" data-media-start="0.1" data-track-index="0"></video>
+        </div>
+        <!-- v1 (Split tap): two panes. Top = A (Vice City), bottom = B (The Keys). The winner's pane cuts on the hit. -->
+        <div class="pane v1only" id="paneA"><div class="xp" id="xpA"><div class="push" id="pushA">
+          <video id="b1" class="clip shot" src="assets/shots/s012-muscle-beach-v.mp4" muted playsinline data-start="0" data-duration="1.7" data-media-start="0.1" data-track-index="1"></video>
+          <video id="b2" class="clip shot h" src="assets/shots/s135-skydive-city-h.mp4" muted playsinline data-start="1.7" data-duration="1.6333" data-media-start="0" data-track-index="1"></video>
+          <video id="b3" class="clip shot" src="assets/shots/s011-vice-highway-v.mp4" muted playsinline data-start="3.3333" data-duration="1.6667" data-media-start="0" data-track-index="1"></video>
+        </div></div></div>
+        <div class="pane v1only" id="paneB"><div class="xp" id="xpB"><div class="push" id="pushB">
+          <video id="c1" class="clip shot" src="assets/shots/s074-keys-sign-v.mp4" muted playsinline data-start="0" data-duration="2.2333" data-media-start="0" data-track-index="2"></video>
+          <video id="c2" class="clip shot" src="assets/shots/s026-sunset-pier-v.mp4" muted playsinline data-start="2.2333" data-duration="1.1" data-media-start="0.2" data-track-index="2"></video>
+          <video id="c3" class="clip shot" src="assets/shots/s064-jetski-v.mp4" muted playsinline data-start="3.3333" data-duration="1.6667" data-media-start="0" data-track-index="2"></video>
+        </div></div></div>
+        <!-- the seam lives with the footage so the hit's shake moves the cut line and the panes together -->
+        <div class="v1only" id="seamWrap">
+          <div class="seamL" id="seamL"></div>
+          <div class="seamL" id="seamR"></div>
+        </div>
+      </div>
+
+      <div id="ov" class="clip" data-start="0" data-duration="5" data-track-index="3">
+        <!-- v0: Bars -->
+        <div id="bars" class="hide">
+          <div id="scrim0"></div>
+          <div id="kick0" class="t-label"></div>
+          <div class="bar" id="bar0"><div class="fillb"></div></div>
+          <div class="bar" id="bar1"><div class="fillb"></div></div>
+          <div class="row" id="row0"><div class="key"><div class="rip"></div><div class="on"></div><span class="lt"></span></div><div class="namew" data-layout-allow-occlusion data-layout-allow-overflow><div class="name base t-wide" data-layout-allow-overflow></div><div class="name ink t-wide" aria-hidden="true" data-layout-allow-overflow data-layout-allow-occlusion></div></div><div class="num"><span class="n">0</span><span class="pc">%</span></div></div>
+          <div class="row" id="row1"><div class="key"><div class="rip"></div><div class="on"></div><span class="lt"></span></div><div class="namew" data-layout-allow-occlusion data-layout-allow-overflow><div class="name base t-wide" data-layout-allow-overflow></div><div class="name ink t-wide" aria-hidden="true" data-layout-allow-overflow data-layout-allow-occlusion></div></div><div class="num"><span class="n">0</span><span class="pc">%</span></div></div>
+        </div>
+        <!-- v1: Split tap -->
+        <div id="split" class="hide">
+          <div id="scrimQ"></div>
+          <div id="band"></div>
+          <div id="q1" class="qline"></div>
+          <div id="or" class="t-label-wide">or</div>
+          <div class="grp" id="gA">
+            <div class="num" id="numA"><span class="n">0</span><span class="pc">%</span></div>
+            <div class="rowS" id="rowA"><div class="key"><div class="rip"></div><div class="on"></div><span class="lt"></span></div><div class="name t-wide" data-layout-allow-overflow></div></div>
+          </div>
+          <div class="grp" id="gB">
+            <div class="rowS" id="rowB"><div class="key"><div class="rip"></div><div class="on"></div><span class="lt"></span></div><div class="name t-wide" data-layout-allow-overflow></div></div>
+            <div class="num" id="numB"><span class="n">0</span><span class="pc">%</span></div>
+          </div>
+        </div>
+        <!-- the ask (both variants) -->
+        <div class="cta" id="cta">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M6.6 4h10.8A2.6 2.6 0 0 1 20 6.6v7.3a2.6 2.6 0 0 1-2.6 2.6H11l-4.6 3.6v-3.6A2.4 2.4 0 0 1 4 14.1V6.6A2.6 2.6 0 0 1 6.6 4z"/></svg>
+          <span class="w" id="ctaPre"></span><span class="ck" id="ckA"></span><span class="w" id="ctaOr"></span><span class="ck" id="ckB"></span>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const CONFIG = {
+        variants: {
+          // Bars: full-bleed cut sequence, type rows in the lower third, result beams that run in from the frame edge.
+          // pct values are the creator's own poll result (e.g. a YouTube community poll); the two should add up to 100.
+          "0": {
+            style: "bars",
+            kicker: "Pick one · GTA 6 fan poll",
+            options: [ { key: "A", label: "Jason", pct: 43 }, { key: "B", label: "Lucia", pct: 57 } ],
+            pick: 1,                       // the option the tap lands on (it gets the sunset beam and the hit)
+            layout: { kicker: 990, rows: [1036, 1186], cta: 1366 },   // y of the kicker, the two 128 px rows (beam = row), the ask
+            // framing of the sample shots (the <video> tags above): x / y offset in px and scale, from the top-left corner
+            frame: { a1: { x: 0, y: 0, s: 1 }, a2: { x: 0, y: 0, s: 1 }, a3: { x: 0, y: 0, s: 1 }, a4: { x: 0, y: 0, s: 1 } },
+            timing: { kicker: 0.1, rows: [0.2, 1.07], press: 1.6, fill: 1.63, hit: 1.95, sheen: 2.55, cta: 3.3, keys: 0.85, out: 4.58, end: 5.0 }
+          },
+          // Split tap: a would-you-rather split of two live shots. The seam is the chart: it starts mid safe zone and slides to the vote share.
+          "1": {
+            style: "split",
+            question: "Where do you go first?",
+            options: [ { key: "A", label: "Vice City", pct: 58 }, { key: "B", label: "The Keys", pct: 42 } ],
+            pick: 0,
+            seam: { top: 230, bottom: 1480, gap: 42 },   // seam y = top + (bottom - top) * share of A; the type sits gap px off the seam
+            layout: { question: 254 },                   // the ask replaces the question in the same slot
+            frame: { b1: { x: 0, y: 0, s: 1 }, b2: { x: -150, y: -70, s: 1.0 }, b3: { x: -40, y: -520, s: 1.05 },
+                     c1: { x: 0, y: 700, s: 1 }, c2: { x: 0, y: 330, s: 1 }, c3: { x: 0, y: 850, s: 1 } },
+            timing: { seam: 0.02, question: 0.1, rows: [0.18, 0.3], press: 1.25, fill: 1.28, hit: 1.7, sheen: 2.45, cta: 3.3333, keys: 0.85, out: 4.58, end: 5.0 }
+          }
+        },
+        cta: { pre: "Comment", or: "or" },          // reads "Comment [A] or [B]"
+        look: { grain: 0.14, vignette: 0.45, expose: [1.72, 1.5] }   // exposure peak of the payoff hit, per variant
+      };
+
+      (function () {
+        const VARS = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+        const vKey = CONFIG.variants[String(VARS.variant)] ? String(VARS.variant) : "0";
+        const plate = VARS.bg !== "none";
+        const V = CONFIG.variants[vKey], T = V.timing, D = T.end;
+        const isBars = V.style === "bars";
+        const $ = (s) => document.querySelector(s);
+        const F = { immediateRender: false };
+        const SUNSET = "linear-gradient(100deg, #F84FA4 0%, #FE78A6 24%, #FE8E4E 64%, #FEB747 100%)";
+
+        // only this variant's footage plays; bg:"none" hides all footage
+        document.querySelectorAll(".v0only").forEach((e) => { if (!isBars) e.style.display = "none"; });
+        document.querySelectorAll(".v1only").forEach((e) => { if (isBars) e.style.display = "none"; });
+        if (!plate) document.querySelectorAll("video.shot").forEach((v) => (v.style.display = "none"));
+        Object.keys(V.frame).forEach((id) => { const f = V.frame[id], e = document.getElementById(id); if (e) gsap.set(e, { x: f.x, y: f.y, scale: f.s }); });
+
+        // the ask
+        $("#ctaPre").textContent = CONFIG.cta.pre;
+        $("#ctaOr").textContent = CONFIG.cta.or;
+        $("#ckA").textContent = V.options[0].key;
+        $("#ckB").textContent = V.options[1].key;
+
+        const faces = ["expanded 800 100px Archivo", "expanded 600 24px Archivo", "800 100px Inter", "700 52px Inter", "600 26px Inter"];
+        Promise.all(faces.map((f) => document.fonts.load(f, "ABJASONLUCIAVICETHEKYS0123456789%"))).catch(() => {}).then(() => document.fonts.ready).then(() => {
+          const tl = gsap.timeline({ paused: true });
+          if (isBars) buildBars(tl); else buildSplit(tl);
+
+          // ---- the ask: on its cut, word by word, keys pop; then A and B press once like keys ----
+          ["#cta .ic", "#ctaPre", "#ckA", "#ctaOr", "#ckB"].forEach((s, i) => {
+            const isKey = s.indexOf("#ck") === 0;
+            Look.enter(tl, s, T.cta + i * 0.06, isKey ? { from: "scale", scale: 0.6, dur: 0.42, ease: "back.out(2)" } : { from: "up", dist: 34, dur: 0.5, blur: 8 });
+          });
+          [["#ckA", T.cta + T.keys], ["#ckB", T.cta + T.keys + 0.25]].forEach(([s, t]) => {
+            tl.fromTo(s, { scale: 1 }, { scale: 0.88, duration: 0.07, ease: "power2.in", ...F }, t);
+            tl.fromTo(s, { scale: 0.88 }, { scale: 1, duration: 0.32, ease: "back.out(2.2)", ...F }, t + 0.07);
+          });
+          Look.exit(tl, "#cta", T.out, { to: "blur", dur: 0.36 });
+
+          if (plate) Look.push(tl, isBars ? "#push0" : "#pushA", 0, D, { from: 1.0, to: 1.06 });
+          if (plate && !isBars) Look.push(tl, "#pushB", 0, D, { from: 1.0, to: 1.05 });
+          Look.install(tl, { duration: D, grain: CONFIG.look.grain, vignette: CONFIG.look.vignette, enabled: plate });
+          tl.set({}, {}, D);
+          window.__timelines = window.__timelines || {};
+          window.__timelines["main"] = tl;
+          tl.seek(0);
+        });
+
+        // ---------- shared: the tap. The option itself presses, its key fills white with an ink letter, one ring leaves the key ----------
+        function tap(tl, at, rowEl) {
+          const on = rowEl.querySelector(".on"), lt = rowEl.querySelector(".lt"), rip = rowEl.querySelector(".rip");
+          gsap.set(rip, { scale: 1, opacity: 0 });
+          tl.fromTo(rowEl, { scale: 1 }, { scale: 0.965, duration: 0.08, ease: "power2.in", ...F }, at - 0.08);
+          tl.fromTo(rowEl, { scale: 0.965 }, { scale: 1, duration: 0.36, ease: "back.out(1.8)", ...F }, at);
+          tl.fromTo(on, { scale: 0 }, { scale: 1, duration: 0.24, ease: "back.out(1.6)", ...F }, at - 0.02);
+          tl.fromTo(lt, { color: "#FFFFFF" }, { color: "#0B0B0E", duration: 0.08, ease: "none", ...F }, at);
+          tl.fromTo(rip, { scale: 1, opacity: 0.95 }, { scale: 2.1, opacity: 0, duration: 0.5, ease: "expo.out", ...F }, at);
+        }
+        function fillRow(row, o) {
+          row.querySelector(".lt").textContent = o.key;
+          row.querySelectorAll(".name").forEach((n) => (n.textContent = o.label));
+        }
+
+        // =====================================================================================
+        // v0 Bars
+        // =====================================================================================
+        function buildBars(tl) {
+          $("#bars").classList.remove("hide");
+          const L = V.layout, pk = V.pick, lo = 1 - pk;
+          $("#kick0").textContent = V.kicker;
+          $("#kick0").style.top = L.kicker + "px";
+          $("#cta").style.top = L.cta + "px";
+          const rows = [$("#row0"), $("#row1")], bars = [$("#bar0"), $("#bar1")];
+          V.options.forEach((o, i) => {
+            fillRow(rows[i], o);
+            rows[i].style.top = bars[i].style.top = L.rows[i] + "px";
+            rows[i].classList.add(i === pk ? "win" : "lose");
+            bars[i].classList.add(i === pk ? "win" : "lose");
+            if (i !== pk) rows[i].querySelector(".name.ink").remove();
+          });
+          // beam geometry: each beam runs from the frame edge to its share of the full frame width (honest proportions)
+          const len = V.options.map((o) => Math.round(1080 * o.pct / 100));
+          const winFill = bars[pk].querySelector(".fillb");
+          winFill.style.backgroundSize = len[pk] + "px 100%";
+          const sh = document.createElement("div"); sh.className = "sh"; sh.setAttribute("data-layout-allow-overflow", ""); winFill.appendChild(sh);
+          const tip = document.createElement("div"); tip.className = "tip"; bars[pk].appendChild(tip);
+          gsap.set(sh, { x: -260 }); gsap.set(tip, { opacity: 0 });
+          // the winner's name is two layers: white over footage, plum over the sunset beam, split exactly at the beam's edge
+          const nw = rows[pk].querySelector(".namew"), base = nw.querySelector(".base"), ink = nw.querySelector(".ink");
+          const nameX = 72 + nw.offsetLeft, nameW = nw.offsetWidth;
+          function split(w) {
+            const c = w - nameX;
+            if (c <= 0) { base.style.clipPath = "none"; ink.style.clipPath = "inset(0 100% 0 0)"; }
+            else if (c >= nameW) { base.style.clipPath = "inset(0 0 0 100%)"; ink.style.clipPath = "none"; }
+            else { base.style.clipPath = "inset(-30px -30px -30px " + c.toFixed(1) + "px)"; ink.style.clipPath = "inset(-30px " + (nameW - c).toFixed(1) + "px -30px -30px)"; }
+          }
+          split(0);
+
+          // ---- entrance: kicker, then each row arrives on its own shot (A on Jason, B on the cut to Lucia) ----
+          Look.enter(tl, "#kick0", T.kicker, { from: "blur", dur: 0.55, blur: 10 });
+          rows.forEach((r, i) => {
+            const t = T.rows[i];
+            Look.enter(tl, r.querySelector(".key"), t, { from: "scale", scale: 0.5, dur: 0.45, ease: "back.out(1.9)" });
+            r.querySelectorAll(".name").forEach((n) => Look.reveal(tl, n, t + 0.04, { by: "chars", stagger: 0.03, dur: 0.6 }));
+            // the name does not exist on screen until its reveal starts (masked glyphs waiting below their line are not "occluded" text)
+            const nw = r.querySelector(".namew"); gsap.set(nw, { visibility: "hidden" }); tl.set(nw, { visibility: "visible" }, t + 0.04);
+            gsap.set(r.querySelector(".num"), { opacity: 0 });
+          });
+
+          // ---- the tap on the picked row ----
+          tap(tl, T.press, rows[pk]);
+
+          // ---- the result: beams run in from the frame edge, numerals count (winner first) ----
+          V.options.forEach((o, i) => {
+            const at = T.fill + (i === pk ? 0 : 0.05), num = rows[i].querySelector(".num");
+            tl.fromTo(num, { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.2, ease: "power2.out", ...F }, at);
+            Look.count(tl, num.querySelector(".n"), at, 0.3, 0, o.pct, { ease: "expo.out", format: (v) => String(Math.round(v)) });
+            Look.drive(tl, at, 0.62, (p) => {
+              const w = len[i] * gsap.parseEase("expo.out")(p);
+              bars[i].style.width = w.toFixed(1) + "px";
+              if (i === pk) { tip.style.left = w.toFixed(1) + "px"; split(w); }
+            });
+          });
+          tl.fromTo(tip, { opacity: 0 }, { opacity: 1, duration: 0.08, ...F }, T.fill);
+
+          // ---- payoff hit on the cut to the winner: shake + punch, exposure light, the beam's head flares, a touch of RGB on the numeral ----
+          if (plate) {
+            Look.impact(tl, T.hit, { shake: "#shake", amp: 8, flash: 0, zoom: 1.035 });
+            Look.expose(tl, T.hit, { target: "#shake", peak: CONFIG.look.expose[0] });
+          }
+          tl.fromTo(tip, { scaleX: 1 }, { scaleX: 2.2, duration: 0.07, ease: "power2.out", ...F }, T.hit);
+          tl.fromTo(tip, { scaleX: 2.2 }, { scaleX: 1, duration: 0.5, ease: "power3.out", ...F }, T.hit + 0.1);
+          const wn = rows[pk].querySelector(".num");
+          tl.fromTo(wn, { scale: 1.1 }, { scale: 1, duration: 0.45, ease: "expo.out", transformOrigin: "100% 60%", ...F }, T.hit);
+          Look.chroma(tl, wn, T.hit, 0.16, { px: 4 });
+
+          // ---- hold: one specular pass along the winning beam ----
+          tl.fromTo(sh, { x: -260 }, { x: len[pk] + 80, duration: 0.9, ease: "power2.inOut", ...F }, T.sheen);
+
+          // ---- exit: type blurs out, beams retract into the frame edge ----
+          Look.exit(tl, [rows[0], rows[1], "#kick0"], T.out + 0.04, { to: "blur", dur: 0.36, stagger: 0.04 });
+          tl.fromTo(tip, { opacity: 1 }, { opacity: 0, duration: 0.2, ...F }, T.out);
+          bars.forEach((b, i) => {
+            Look.drive(tl, T.out, 0.4, (p) => { if (p > 0) b.style.width = (len[i] * (1 - gsap.parseEase("power3.in")(p))).toFixed(1) + "px"; });
+          });
+          tl.fromTo("#scrim0", { opacity: 1 }, { opacity: 0, duration: 0.42, ease: "power2.in", ...F }, T.out);
+        }
+
+        // =====================================================================================
+        // v1 Split tap
+        // =====================================================================================
+        function buildSplit(tl) {
+          $("#split").classList.remove("hide");
+          const S = V.seam, L = V.layout, pk = V.pick;
+          const pA = V.options[0].pct / 100;
+          const y0 = S.top + (S.bottom - S.top) * 0.5, y1 = S.top + (S.bottom - S.top) * pA;
+          $("#q1").textContent = V.question;
+          $("#q1").style.top = L.question + "px";
+          $("#cta").style.top = (L.question - 6) + "px";
+          fillRow($("#rowA"), V.options[0]);
+          fillRow($("#rowB"), V.options[1]);
+          $("#numA .n").textContent = String(V.options[0].pct);
+          $("#numB .n").textContent = String(V.options[1].pct);
+          // the winner's numeral is the hero and carries the one accent (sunset fill + sheen); the loser's sits at name size
+          const winNum = pk === 0 ? "#numA" : "#numB", loseNum = pk === 0 ? "#numB" : "#numA";
+          $(winNum).style.fontSize = "214px"; $(loseNum).style.fontSize = "96px";
+          $(loseNum).style.color = "rgba(255,255,255,.86)"; $(loseNum).style.textShadow = "var(--lift)";
+          Look.fill(winNum, SUNSET, { sheen: true });
+          $(winNum).style.filter = "drop-shadow(0 4px 18px rgba(0,0,0,.45))";
+          const seamL = $("#seamL"), seamR = $("#seamR"), orEl = $("#or");
+          const orL = 72 + 32 - 46, orR = 72 + 32 + 46;   // the seam breaks around the OR label (centred on the keys' column)
+          seamL.style.left = "0px"; seamL.style.width = orL + "px";
+          seamR.style.left = orR + "px"; seamR.style.width = (1080 - orR) + "px";
+          let wipe = 0, cur = y0;
+          function setSeam(y) {
+            cur = y;
+            $("#paneB").style.clipPath = "inset(" + y.toFixed(1) + "px " + (1080 * (1 - wipe)).toFixed(1) + "px 0px 0px)";
+            seamL.style.top = seamR.style.top = orEl.style.top = $("#band").style.top = y.toFixed(1) + "px";
+            $("#gA").style.bottom = (1920 - y + S.gap).toFixed(1) + "px";
+            $("#gB").style.top = (y + S.gap).toFixed(1) + "px";
+          }
+          setSeam(y0);
+
+          // ---- entrance: B wipes in behind the seam's head (A fills the frame until then), question, names ----
+          Look.drive(tl, T.seam, 0.5, (p) => { wipe = p <= 0 ? 0 : gsap.parseEase("expo.out")(p); setSeam(cur); });
+          gsap.set([seamL, seamR], { scaleX: 0 });
+          tl.fromTo(seamL, { scaleX: 0 }, { scaleX: 1, duration: 0.1, ease: "none", ...F }, T.seam);
+          tl.fromTo(seamR, { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease: "expo.out", ...F }, T.seam + 0.03);
+          Look.enter(tl, orEl, T.seam + 0.22, { from: "blur", dur: 0.5, blur: 8 });
+          Look.reveal(tl, "#q1", T.question, { by: "words", stagger: 0.06, dur: 0.6 });
+          [["#rowA", T.rows[0]], ["#rowB", T.rows[1]]].forEach(([r, t]) => {
+            Look.enter(tl, r + " .key", t, { from: "scale", scale: 0.5, dur: 0.45, ease: "back.out(1.9)" });
+            Look.reveal(tl, r + " .name", t + 0.04, { by: "chars", stagger: 0.028, dur: 0.6 });
+            gsap.set(r + " .name", { visibility: "hidden" }); tl.set(r + " .name", { visibility: "visible" }, t + 0.04);
+          });
+          gsap.set(["#numA", "#numB"], { opacity: 0 });
+
+          // ---- the tap on the picked pane's key ----
+          tap(tl, T.press, pk === 0 ? $("#rowA") : $("#rowB"));
+
+          // ---- the result: the seam slides to the vote share, numerals rise out of the seam and count ----
+          Look.drive(tl, T.fill, 0.62, (p) => setSeam(y0 + (y1 - y0) * gsap.parseEase("expo.out")(p)));
+          [["#numA", 0, 0], ["#numB", 1, 0.05]].forEach(([s, i, d]) => {
+            const at = T.fill + d;
+            tl.fromTo(s, { opacity: 0, y: i === 0 ? 40 : -30 }, { opacity: 1, y: 0, duration: 0.34, ease: "expo.out", ...F }, at);
+            Look.count(tl, $(s + " .n"), at, 0.36, 0, V.options[i].pct, { ease: "expo.out", format: (v) => String(Math.round(v)) });
+          });
+
+          // ---- payoff hit on the winner's cut: exposure light on the winning pane only, shake + punch, numeral settles ----
+          if (plate) {
+            Look.impact(tl, T.hit, { shake: "#shake", amp: 8, flash: 0, zoom: 1.03 });
+            Look.expose(tl, T.hit, { target: pk === 0 ? "#xpA" : "#xpB", peak: CONFIG.look.expose[1] });
+          }
+          tl.fromTo(winNum, { scale: 1.12 }, { scale: 1, duration: 0.5, ease: "expo.out", transformOrigin: "0% 80%", ...F }, T.hit);
+          Look.chroma(tl, winNum + " .n", T.hit, 0.16, { px: 4 });
+          [seamL, seamR].forEach((s) => {
+            tl.fromTo(s, { scaleY: 1 }, { scaleY: 2, duration: 0.06, ...F }, T.hit);
+            tl.fromTo(s, { scaleY: 2 }, { scaleY: 1, duration: 0.45, ease: "power3.out", ...F }, T.hit + 0.1);
+          });
+          Look.sheen(tl, winNum, T.sheen, { dur: 0.9 });
+
+          // ---- the question hands its slot to the ask ----
+          Look.exit(tl, "#q1", T.cta - 0.2, { to: "up", dist: 30, dur: 0.22 });
+
+          // ---- exit: type blurs out, the seam retracts into the left edge ----
+          Look.exit(tl, ["#gB", "#gA", "#or"], T.out + 0.04, { to: "blur", dur: 0.36, stagger: 0.04 });
+          tl.fromTo(seamR, { scaleX: 1 }, { scaleX: 0, duration: 0.36, ease: "power3.in", ...F }, T.out);
+          tl.fromTo(seamL, { scaleX: 1 }, { scaleX: 0, duration: 0.2, ease: "power3.in", ...F }, T.out + 0.2);
+          tl.fromTo(["#band", "#scrimQ"], { opacity: 1 }, { opacity: 0, duration: 0.42, ease: "power2.in", ...F }, T.out);
+        }
+      })();
+    </script>
+  </body>
+</html>

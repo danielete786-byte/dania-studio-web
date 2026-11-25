@@ -1,0 +1,387 @@
+<!doctype html>
+<!-- #30 Facecam split (craft v2): a reaction layout. GTA 6 footage cut on rhythm + a held facecam, joined by a seam of light,
+     labelled with a title lockup (who is reacting, to what). The payoff is the reaction punch-in: on the big cut the facecam
+     jumps in, the footage takes an exposure hit (Look.expose) and the seam / bubble rim flares.
+     Variables: variant "0" Top/bottom, "1" Corner bubble. bg "plate" / "none".
+       v0 always shows both halves (the split IS the frame); with bg "none" it drops the finishing (grain, vignette, exposure hit).
+       v1 with bg "none" drops the gameplay and renders only the facecam bubble + lockup (+ its top scrim) on transparent.
+     Every <video> carries data-slot; the script shows only the active variant's slots. CONFIG mirrors the static
+     src / data-start / data-duration / data-media-start below: edit both together.
+     The sample facecam lives in assets/cam/ (re-encoded with a keyframe every 1 s so seeks never freeze). -->
+<html lang="en" data-composition-variables='[
+  {"id":"variant","type":"enum","label":"Variant","default":"0","options":[{"value":"0","label":"Top/bottom"},{"value":"1","label":"Corner bubble"}]},
+  {"id":"bg","type":"enum","label":"Background","default":"plate","options":[{"value":"plate","label":"Sample footage"},{"value":"none","label":"Transparent"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link rel="stylesheet" href="assets/fonts/fonts.css" />
+    <link rel="stylesheet" href="assets/kit/look/look.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="assets/kit/look/look.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: transparent; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; font-family: "Inter", sans-serif; color: #fff;
+        -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; }
+      .layout { position: absolute; inset: 0; display: none; }
+      .layout.on { display: block; }
+      .wrap { position: absolute; inset: 0; }
+      .shot { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      .cam { position: absolute; left: 0; top: 0; object-fit: fill; filter: contrast(1.07) saturate(1.08); }
+
+      /* ---------- v0: top/bottom ---------- */
+      #L0 { background: #050509; }
+      #gamePanel { position: absolute; left: 0; top: 0; width: 1080px; height: 980px; overflow: hidden; background: #050509; }
+      /* the valley of shadow above the seam: the title lockup sits in it */
+      #gScrim { position: absolute; left: 0; right: 0; bottom: 0; height: 520px;
+        background: linear-gradient(0deg, rgba(5,5,9,.78) 0%, rgba(5,5,9,.56) 24%, rgba(5,5,9,.22) 58%, rgba(5,5,9,0) 100%); }
+      #facePanel { position: absolute; left: 0; top: 980px; width: 1080px; height: 940px; overflow: hidden; background: #050509; }
+      /* the seam throws a short shadow onto the facecam, and the room falls off at the edges */
+      #fShade { position: absolute; left: 0; right: 0; top: 0; height: 110px;
+        background: linear-gradient(180deg, rgba(5,5,9,.62) 0%, rgba(5,5,9,.22) 45%, rgba(5,5,9,0) 100%); }
+      #fVig { position: absolute; inset: 0; background: radial-gradient(ellipse 78% 74% at 54% 30%, rgba(5,5,9,0) 52%, rgba(5,5,9,.42) 100%); }
+      /* the seam: a 2 px line of warm light with bloom, not a rule */
+      #seam { position: absolute; left: 0; top: 979px; width: 1080px; height: 2px; background: #FFF6EC;
+        box-shadow: 0 0 3px rgba(255,244,230,.95), 0 0 14px rgba(255,214,176,.6), 0 0 44px rgba(254,170,120,.32); }
+      #seamGlow { position: absolute; left: -120px; top: 900px; width: 1320px; height: 160px; opacity: 0; mix-blend-mode: screen; pointer-events: none;
+        background: radial-gradient(ellipse 50% 50% at 50% 50%, rgba(255,232,206,.7) 0%, rgba(255,190,140,.26) 38%, rgba(255,160,110,0) 72%); }
+      .glint { position: absolute; left: 0; top: 944px; width: 460px; height: 72px; margin-left: -230px; opacity: 0; mix-blend-mode: screen; pointer-events: none;
+        background: radial-gradient(ellipse 50% 50% at 50% 50%, #FFFFFF 0%, rgba(255,240,222,.75) 18%, rgba(255,200,160,.18) 48%, rgba(255,190,150,0) 72%); }
+      #lock0 { position: absolute; left: 72px; }
+      #kick0 { color: rgba(255,255,255,.88); font-size: 26px; white-space: nowrap;
+        text-shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.45); }
+      #hero0 { font-size: 200px; margin-top: 22px; white-space: nowrap; letter-spacing: .01em; }
+      #h0a { text-shadow: 0 2px 2px rgba(0,0,0,.22), 0 8px 28px rgba(0,0,0,.36), 0 0 46px rgba(255,236,214,.16); }
+      #h0b { filter: drop-shadow(0 6px 20px rgba(0,0,0,.38)); }
+
+      /* ---------- v1: corner bubble ---------- */
+      #scrim1 { position: absolute; left: 0; right: 0; top: 0; height: 1020px;
+        background: linear-gradient(180deg, rgba(5,5,9,.64) 0%, rgba(5,5,9,.5) 30%, rgba(5,5,9,.2) 64%, rgba(5,5,9,0) 100%); }
+      #bubble { position: absolute; left: 72px; top: 256px; width: 380px; height: 380px; }
+      #bShadow { position: absolute; inset: 0; border-radius: 50%;
+        box-shadow: 0 2px 4px rgba(0,0,0,.4), 0 18px 40px -8px rgba(0,0,0,.5), 0 50px 110px -30px rgba(0,0,0,.6); }
+      #bPhoto { position: absolute; inset: 0; border-radius: 50%; overflow: hidden; background: #0b0b10; }
+      #bPunch { position: absolute; inset: 0; }
+      #bInner { position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
+        box-shadow: inset 0 0 0 1px rgba(0,0,0,.35), inset 0 -70px 90px -50px rgba(5,5,9,.55), inset 0 30px 60px -40px rgba(255,236,214,.12); }
+      /* rim light: breathes with the voice (speaking indicator), flares on the payoff */
+      #bGlow, #bFlare { position: absolute; inset: 0; border-radius: 50%; pointer-events: none; }
+      #bGlow { box-shadow: 0 0 8px 1px rgba(255,240,224,.8), 0 0 30px 3px rgba(255,200,150,.42), 0 0 70px 6px rgba(254,160,110,.18); opacity: .35; }
+      #bFlare { box-shadow: 0 0 12px 3px rgba(255,248,240,.95), 0 0 46px 10px rgba(255,214,170,.6), 0 0 120px 20px rgba(254,170,120,.3); opacity: 0; }
+      #rim { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+      #lock1 { position: absolute; left: 488px; }
+      #kick1 { color: rgba(255,255,255,.88); font-size: 26px; white-space: nowrap; text-shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.45); }
+      #hero1 { font-size: 190px; margin-top: 18px; }
+      #hero1 > span { display: block; white-space: nowrap; }
+      #h1a { text-shadow: 0 2px 2px rgba(0,0,0,.22), 0 8px 28px rgba(0,0,0,.36), 0 0 46px rgba(255,236,214,.14); }
+      #h1b { filter: drop-shadow(0 6px 20px rgba(0,0,0,.36)); }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1080" data-height="1920">
+
+      <!-- v0: GTA 6 on top (16:9 shots, cut on rhythm), facecam below, one seam of light -->
+      <div id="L0" class="layout">
+        <div id="gamePanel">
+          <div id="g0shake" class="wrap"><div id="g0push" class="wrap">
+            <video id="a0" data-slot="0g" class="clip shot" src="assets/shots/s083-duo-convertible-h.mp4" muted playsinline data-start="0" data-duration="1.3" data-media-start="0" data-track-index="0"></video>
+            <video id="a1" data-slot="0g" class="clip shot" src="assets/shots/s098-jason-fireworks-h.mp4" muted playsinline data-start="1.3" data-duration="0.88" data-media-start="0.22" data-track-index="0"></video>
+            <video id="a2" data-slot="0g" class="clip shot" src="assets/shots/s096-police-street-h.mp4" muted playsinline data-start="2.18" data-duration="1.62" data-media-start="0.1" data-track-index="0"></video>
+            <video id="a3" data-slot="0g" class="clip shot" src="assets/shots/s113-lucia-firing-h.mp4" muted playsinline data-start="3.8" data-duration="0.83" data-media-start="0" data-track-index="0"></video>
+            <video id="a4" data-slot="0g" class="clip shot" src="assets/shots/s065-biker-plane-h.mp4" muted playsinline data-start="4.63" data-duration="1.37" data-media-start="0.3" data-track-index="0"></video>
+          </div></div>
+          <div id="gScrim"></div>
+        </div>
+        <div id="facePanel">
+          <div id="faceShake" class="wrap"><div id="facePush" class="wrap"><div id="facePunch" class="wrap">
+            <video id="cam0" data-slot="0f" class="clip cam" data-layout-allow-overflow src="assets/cam/facecam-sample.mp4" muted playsinline data-start="0" data-duration="6" data-media-start="0" data-track-index="2"></video>
+          </div></div></div>
+          <div id="fVig"></div>
+          <div id="fShade"></div>
+        </div>
+        <div id="seamGlow" data-layout-allow-overflow></div>
+        <div id="seam"></div>
+        <div id="glintA" class="glint"></div>
+        <div id="glintB" class="glint"></div>
+        <div id="lock0" data-layout-allow-overflow>
+          <div id="kick0" class="t-label-wide"></div>
+          <div id="hero0" class="t-wide" data-layout-allow-overflow><span id="h0a"></span> <span id="h0b"></span></div>
+        </div>
+      </div>
+
+      <!-- v1: full-bleed vertical GTA 6 shots, facecam bubble in the top-left corner with the title lockup beside it -->
+      <div id="L1" class="layout">
+        <div id="shake" class="wrap"><div id="push" class="wrap">
+          <video id="b0" data-slot="1g" class="clip shot" src="assets/shots/s011-vice-highway-v.mp4" muted playsinline data-start="0" data-duration="1.35" data-media-start="0.15" data-track-index="1"></video>
+          <video id="b1" data-slot="1g" class="clip shot" src="assets/shots/s135-skydive-city-v.mp4" muted playsinline data-start="1.35" data-duration="1.6" data-media-start="0" data-track-index="1"></video>
+          <video id="b2" data-slot="1g" class="clip shot" src="assets/shots/s012-muscle-beach-v.mp4" muted playsinline data-start="2.95" data-duration="2.15" data-media-start="0.3" data-track-index="1"></video>
+          <video id="b3" data-slot="1g" class="clip shot" src="assets/shots/s064-jetski-v.mp4" muted playsinline data-start="5.1" data-duration="0.9" data-media-start="0" data-track-index="1"></video>
+        </div></div>
+        <div id="scrim1"></div>
+        <div id="bubble">
+          <div id="bShadow"></div>
+          <div id="bPhoto"><div id="bPunch" class="wrap">
+            <video id="cam1" data-slot="1f" class="clip cam" data-layout-allow-overflow src="assets/cam/facecam-sample.mp4" muted playsinline data-start="0" data-duration="6" data-media-start="1" data-track-index="3"></video>
+          </div></div>
+          <div id="bInner"></div>
+          <div id="bGlow"></div>
+          <div id="bFlare"></div>
+          <svg id="rim" viewBox="0 0 380 380">
+            <circle id="rimArc" cx="190" cy="190" r="188.5" fill="none" stroke="#FFFFFF" stroke-opacity="0.96" stroke-width="3" pathLength="1" stroke-dasharray="1 1" transform="rotate(-90 190 190)" />
+          </svg>
+        </div>
+        <div id="lock1" data-layout-allow-overflow>
+          <div id="kick1" class="t-label-wide"></div>
+          <div id="hero1" class="t-display" data-layout-allow-overflow><span id="h1a"></span><span id="h1b"></span></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const CONFIG = {
+        duration: 6,
+        handle: "@everestchris6",
+        sunset: "linear-gradient(100deg, #F84FA4 0%, #FE78A6 24%, #FE8E4E 62%, #FEB747 100%)",
+        facecam: {
+          clip: "assets/cam/facecam-sample.mp4",   // re-encoded sample (keyframe every 1 s); export yours with -g 30 too
+          srcW: 1920, srcH: 1080,                    // facecam source size (any 16:9 webcam export)
+          eyes: { x: 0.49, y: 0.237 }                // where the eyes sit in the source (0..1): the framing and punch-in anchor
+        },
+        // speaking light (v1 rim): updates per second and seed for the deterministic voice envelope
+        voice: { rate: 6, seed: 30 },
+        variants: {
+          "0": {
+            layout: "split",
+            seamY: 980,                              // gameplay above (1080x980), facecam below (1080x940)
+            kicker: "@everestchris6 reacts",
+            hero: ["GTA", "6"],                      // the second part carries the sunset fill (the frame's one accent)
+            heroWidth: 720,                          // hero ink width in px (min 180 px type)
+            // shots: 16:9 trailer shots, cover-cropped into the panel; pos = object-position (pick the subject)
+            shots: [
+              { src: "assets/shots/s083-duo-convertible-h.mp4", at: 0,   dur: 1.3, in: 0,   pos: "46% 50%" },
+              { src: "assets/shots/s098-jason-fireworks-h.mp4", at: 1.3, dur: 0.88, in: 0.22, pos: "100% 50%" }, // the explosion is blooming on the cut (hidden cut at 1.13 s in the source: never pass it)
+              { src: "assets/shots/s096-police-street-h.mp4",   at: 2.18, dur: 1.62, in: 0.1, pos: "50% 50%" },
+              { src: "assets/shots/s113-lucia-firing-h.mp4",    at: 3.8, dur: 0.83, in: 0,   pos: "30% 50%" },
+              { src: "assets/shots/s065-biker-plane-h.mp4",     at: 4.63, dur: 1.37, in: 0.3, pos: "58% 50%" }
+            ],
+            hit: 1.3,                                // the payoff: cut to the explosion + reaction punch-in
+            punchOut: 2.18,                          // the face jumps back out on this cut
+            // facecam framing: scale of the 1920x1080 source; the eyes land at (bx, by) of the 1080x940 panel
+            face: { scale: 0.92, bx: 0.53, by: 0.25 },
+            punch: 1.2,
+            expose: 1.85,
+            camIn: 0,                                // facecam in-point (s)
+            out: 4.95                                // the lockup blurs out here; the clean split holds to the end
+          },
+          "1": {
+            layout: "bubble",
+            kicker: "@everestchris6",
+            hero: ["Vice", "City"],
+            shots: [
+              { src: "assets/shots/s011-vice-highway-v.mp4",  at: 0,    dur: 1.35, in: 0.15 },
+              { src: "assets/shots/s135-skydive-city-v.mp4",  at: 1.35, dur: 1.6,  in: 0 },
+              { src: "assets/shots/s012-muscle-beach-v.mp4",  at: 2.95, dur: 2.15, in: 0.3 },
+              { src: "assets/shots/s064-jetski-v.mp4",        at: 5.1,  dur: 0.9,  in: 0 }      // stop at 0.9 s: after that the riders swing left under the bubble (and spray whites out at 1.3 s)
+            ],
+            hit: 1.35,
+            punchOut: 2.95,
+            bubble: { size: 380, left: 72, top: 256 },
+            gap: 36,                                 // bubble edge to lockup
+            face: { scale: 0.64, bx: 0.5, by: 0.43 },
+            punch: 1.18,
+            expose: 1.5,                             // the skydive sky is already bright: a lower peak keeps the white title readable through the hit
+            camIn: 1,                                // facecam in-point (s)
+            out: 4.55                                // the lockup blurs out here, before the jetski riders rise into its space
+          }
+        }
+      };
+
+      (function () {
+        const VARS = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+        const vKey = CONFIG.variants[String(VARS.variant)] ? String(VARS.variant) : "0";
+        const plate = VARS.bg !== "none";
+        const V = CONFIG.variants[vKey], D = CONFIG.duration, F = CONFIG.facecam;
+        const $ = (s) => document.querySelector(s);
+        const split = V.layout === "split";
+        const sfx = split ? "0" : "1";
+        $(split ? "#L0" : "#L1").classList.add("on");
+
+        // ---------- footage: only the active variant's slots; src / timing from CONFIG ----------
+        const setAttr = (el, k, val) => { val = String(val); if (el.getAttribute(k) !== val) el.setAttribute(k, val); };
+        let gi = 0;
+        document.querySelectorAll("video[data-slot]").forEach((v) => {
+          const slot = v.getAttribute("data-slot");
+          if (slot[0] !== sfx) { v.style.display = "none"; return; }
+          if (slot[1] === "g") {
+            const s = V.shots[gi++];
+            if (!s || (!split && !plate)) { v.style.display = "none"; return; }
+            setAttr(v, "src", s.src); setAttr(v, "data-start", s.at); setAttr(v, "data-duration", s.dur); setAttr(v, "data-media-start", s.in);
+            if (s.pos) v.style.objectPosition = s.pos;
+          } else { setAttr(v, "src", F.clip); setAttr(v, "data-duration", D); setAttr(v, "data-media-start", V.camIn || 0); }
+        });
+
+        // place the 16:9 facecam in a box: the eyes land at (bx, by); always covers the box
+        function frameCam(video, W, H, f) {
+          const s = Math.max(f.scale, W / F.srcW, H / F.srcH), w = F.srcW * s, h = F.srcH * s;
+          let left = f.bx * W - F.eyes.x * w, top = f.by * H - F.eyes.y * h;
+          left = Math.min(0, Math.max(W - w, left)); top = Math.min(0, Math.max(H - h, top));
+          Object.assign(video.style, { width: w + "px", height: h + "px", left: left + "px", top: top + "px" });
+          return { x: left + F.eyes.x * w, y: top + F.eyes.y * h };
+        }
+        // left side bearing of a string's first glyph, so the ink (not the box) sits on the column
+        function inkLeft(el) {
+          const cs = getComputedStyle(el), c = document.createElement("canvas").getContext("2d");
+          c.font = cs.fontWeight + " " + cs.fontSize + " " + cs.fontFamily;
+          if ("fontStretch" in c) c.fontStretch = parseFloat(cs.fontStretch) >= 120 ? "expanded" : "normal";
+          const t = (cs.textTransform === "uppercase" ? el.textContent.toUpperCase() : el.textContent).trim();
+          return -c.measureText(t[0] || "").actualBoundingBoxLeft;
+        }
+        // after a masked reveal, open the masks so glow and lift aren't clipped at the line box
+        const openMasks = (tl, el, at) => tl.set(el.querySelectorAll(".lk-mask"), { overflow: "visible" }, at);
+
+        document.fonts.ready.then(() => {
+          const tl = gsap.timeline({ paused: true });
+          const HIT = V.hit;
+
+          if (split) {
+            // ================= v0: top/bottom =================
+            const seam = V.seamY;
+            $("#gamePanel").style.height = seam + "px";
+            Object.assign($("#facePanel").style, { top: seam + "px", height: (1920 - seam) + "px" });
+            $("#seam").style.top = (seam - 1) + "px";
+            $("#seamGlow").style.top = (seam - 80) + "px";
+            document.querySelectorAll(".glint").forEach((g) => (g.style.top = (seam - 36) + "px"));
+            const eye = frameCam($("#cam0"), 1080, 1920 - seam, V.face);
+            const eyeOrigin = eye.x + "px " + eye.y + "px";
+
+            // lockup: kicker + hero, fitted to heroWidth, hugging the seam
+            $("#kick0").textContent = V.kicker;
+            $("#h0a").textContent = V.hero[0]; $("#h0b").textContent = V.hero[1];
+            const hero = $("#hero0");
+            const fs = Math.max(180, Math.min(230, 200 * V.heroWidth / hero.offsetWidth));
+            hero.style.fontSize = fs.toFixed(1) + "px";
+            // optical alignment: the hero's first ink edge and the kicker's first ink edge share x = 72
+            const hb = inkLeft($("#h0a")), kb = inkLeft($("#kick0"));
+            hero.style.marginLeft = (-hb) + "px"; $("#kick0").style.marginLeft = (-kb) + "px";
+            const lock = $("#lock0");
+            lock.style.top = (seam - 46 - lock.offsetHeight + fs * 0.16) + "px";   // cap baseline ~46 px above the seam (line box carries ~.16em of descender room)
+
+            // footage life
+            if (plate) Look.push(tl, "#g0push", 0, D, { from: 1.0, to: 1.06, origin: "50% 60%" });
+            Look.push(tl, "#facePush", 0, D, { from: 1.0, to: 1.04, origin: eyeOrigin });
+            gsap.set("#facePunch", { transformOrigin: eyeOrigin, scale: 1 });
+
+            // the seam draws in from the left, a glint riding its head
+            gsap.set("#seam", { scaleX: 0, transformOrigin: "0% 50%" });
+            tl.fromTo("#seam", { scaleX: 0 }, { scaleX: 1, duration: 0.85, ease: "expo.out", immediateRender: false }, 0.04);
+            tl.fromTo("#glintA", { x: 0, opacity: 1 }, { x: 1080, duration: 0.85, ease: "expo.out", immediateRender: false }, 0.04);
+            tl.to("#glintA", { opacity: 0, duration: 0.3, ease: "power2.in" }, 0.5);
+
+            // title
+            Look.enter(tl, "#kick0", 0.2, { from: "blur", dur: 0.6, blur: 10 });
+            const ra = Look.reveal(tl, "#h0a", 0.3, { by: "chars", stagger: 0.035, dur: 0.72 });
+            const rb = Look.reveal(tl, "#h0b", 0.44, { by: "chars", dur: 0.72 });
+            Look.fill("#h0b", CONFIG.sunset, { sheen: true });
+            openMasks(tl, $("#h0a"), ra); openMasks(tl, $("#h0b"), rb);
+
+            // PAYOFF on the cut to the explosion: reaction punch-in + exposure hit + seam flare + sheen
+            if (plate) {
+              Look.impact(tl, HIT, { shake: "#g0shake", amp: 9, flash: 0, zoom: 1.035 });
+              Look.expose(tl, HIT, { target: "#g0shake", peak: V.expose });
+            }
+            Look.impact(tl, HIT, { shake: "#faceShake", amp: 4, flash: 0, zoom: 1 });
+            tl.fromTo("#facePunch", { scale: 1 }, { scale: V.punch, duration: 0.1, ease: "power3.out", immediateRender: false }, HIT);
+            tl.fromTo("#facePunch", { scale: V.punch }, { scale: V.punch + 0.03, duration: V.punchOut - HIT - 0.1, ease: "none", immediateRender: false }, HIT + 0.1);
+            tl.set("#facePunch", { scale: 1 }, V.punchOut);
+            tl.fromTo("#seamGlow", { opacity: 0 }, { opacity: 1, duration: 1 / 30, ease: "none", immediateRender: false }, HIT);
+            tl.to("#seamGlow", { opacity: 0, duration: 0.9, ease: "power2.out" }, HIT + 3 / 30);
+            tl.fromTo("#glintB", { x: 0, opacity: 1 }, { x: 1080, duration: 0.6, ease: "expo.out", immediateRender: false }, HIT);
+            tl.to("#glintB", { opacity: 0, duration: 0.25, ease: "power2.in" }, HIT + 0.35);
+            Look.sheen(tl, "#h0b", HIT + 0.04, { dur: 0.6 });
+
+            // every later cut is a beat: a softer glint runs the seam, alternating direction
+            V.shots.slice(1).forEach((s, i) => {
+              if (Math.abs(s.at - HIT) < 0.01) return;
+              const ltr = i % 2 === 0, from = ltr ? 0 : 1080, to = ltr ? 1080 : 0;
+              tl.fromTo("#glintA", { x: from, opacity: 0.6 }, { x: to, duration: 0.55, ease: "expo.out", immediateRender: false }, s.at);
+              tl.to("#glintA", { opacity: 0, duration: 0.22, ease: "power2.in" }, s.at + 0.3);
+            });
+
+            // exit: the lockup blurs away; the clean split holds to the last frame
+            Look.exit(tl, ["#hero0", "#kick0"], V.out, { to: "blur", dur: 0.45, stagger: 0.06, blur: 14 });
+          } else {
+            // ================= v1: corner bubble =================
+            if (!plate) $("#shake").style.display = "none";
+            const B = V.bubble, S = B.size;
+            Object.assign($("#bubble").style, { left: B.left + "px", top: B.top + "px", width: S + "px", height: S + "px" });
+            $("#rim").setAttribute("viewBox", "0 0 " + S + " " + S);
+            const arc = $("#rimArc"), c = S / 2;
+            arc.setAttribute("cx", c); arc.setAttribute("cy", c); arc.setAttribute("r", c - 1.5);
+            arc.setAttribute("transform", "rotate(-90 " + c + " " + c + ")");
+            const eye = frameCam($("#cam1"), S, S, V.face);
+            gsap.set("#bPunch", { transformOrigin: eye.x + "px " + eye.y + "px", scale: 1 });
+
+            // lockup beside the bubble, centred on it
+            $("#kick1").textContent = V.kicker;
+            $("#h1a").textContent = V.hero[0]; $("#h1b").textContent = V.hero[1];
+            const lock = $("#lock1");
+            lock.style.left = (B.left + S + V.gap) + "px";
+            const hb = inkLeft($("#h1a")), kb = inkLeft($("#kick1"));
+            $("#hero1").style.marginLeft = (-hb) + "px"; $("#kick1").style.marginLeft = (-kb) + "px";
+            lock.style.top = (B.top + S / 2 - lock.offsetHeight / 2 + 8) + "px";
+
+            if (plate) Look.push(tl, "#push", 0, D, { from: 1.0, to: 1.06 });
+
+            // bubble: the face opens as a circular mask, the white rim draws from 12 o'clock
+            gsap.set("#bubble", { scale: 0.9, opacity: 0, transformOrigin: "50% 50%" });
+            tl.fromTo("#bubble", { scale: 0.9 }, { scale: 1, duration: 0.6, ease: "expo.out", immediateRender: false }, 0.06);
+            tl.fromTo("#bubble", { opacity: 0 }, { opacity: 1, duration: 0.1, ease: "none", immediateRender: false }, 0.06);   // the circular mask does the reveal; no ghosted face
+            gsap.set("#bPhoto", { clipPath: "circle(0% at 50% 50%)" });
+            tl.fromTo("#bPhoto", { clipPath: "circle(0% at 50% 50%)" }, { clipPath: "circle(50% at 50% 50%)", duration: 0.55, ease: "expo.out", immediateRender: false }, 0.06);
+            gsap.set("#rimArc", { attr: { "stroke-dashoffset": 1 } });
+            tl.fromTo("#rimArc", { attr: { "stroke-dashoffset": 1 } }, { attr: { "stroke-dashoffset": 0 }, duration: 0.7, ease: "expo.out", immediateRender: false }, 0.14);
+
+            // title
+            Look.enter(tl, "#kick1", 0.26, { from: "blur", dur: 0.6, blur: 10 });
+            const ra = Look.reveal(tl, "#h1a", 0.34, { by: "chars", stagger: 0.035, dur: 0.72 });
+            const rb = Look.reveal(tl, "#h1b", 0.46, { by: "chars", stagger: 0.035, dur: 0.72 });
+            Look.fill("#h1b", CONFIG.sunset, { sheen: true });
+            openMasks(tl, $("#h1a"), ra); openMasks(tl, $("#h1b"), rb);
+
+            // speaking light: the rim glow breathes with a deterministic voice envelope (syllable rate)
+            const VO = CONFIG.voice, lv = (n) => (n < 0 ? 0 : 0.25 + 0.75 * Look.hash(VO.seed * 977 + n));
+            Look.drive(tl, 0, D, (p) => {
+              const t = p * D, k = t * VO.rate, n = Math.floor(k), f = k - n, e = f * f * (3 - 2 * f);
+              const level = lv(n - 1) + (lv(n) - lv(n - 1)) * e;
+              $("#bGlow").style.opacity = (t < 0.6 ? 0 : 0.18 + 0.5 * level).toFixed(3);
+            });
+
+            // PAYOFF on the cut to the skydive: exposure hit, reaction punch-in inside the bubble, rim flare, sheen
+            if (plate) {
+              Look.impact(tl, HIT, { shake: "#shake", amp: 9, flash: 0, zoom: 1.035 });
+              Look.expose(tl, HIT, { target: "#shake", peak: V.expose });
+            }
+            tl.fromTo("#bPunch", { scale: 1 }, { scale: V.punch, duration: 0.1, ease: "power3.out", immediateRender: false }, HIT);
+            tl.fromTo("#bPunch", { scale: V.punch }, { scale: V.punch + 0.03, duration: V.punchOut - HIT - 0.1, ease: "none", immediateRender: false }, HIT + 0.1);
+            tl.set("#bPunch", { scale: 1 }, V.punchOut);
+            tl.fromTo("#bubble", { scale: 1 }, { scale: 1.045, duration: 0.08, ease: "power2.out", immediateRender: false }, HIT);
+            tl.to("#bubble", { scale: 1, duration: 0.55, ease: "expo.out" }, HIT + 0.08);
+            tl.fromTo("#bFlare", { opacity: 0 }, { opacity: 1, duration: 1 / 30, ease: "none", immediateRender: false }, HIT);
+            tl.to("#bFlare", { opacity: 0, duration: 0.8, ease: "power2.out" }, HIT + 3 / 30);
+            Look.sheen(tl, "#h1b", HIT + 0.04, { dur: 0.6 });
+
+            // exit: the lockup blurs away before the last cut; the bubble stays docked in its corner
+            Look.exit(tl, ["#h1b", "#h1a", "#kick1"], V.out, { to: "blur", dur: 0.42, stagger: 0.05, blur: 14 });
+          }
+
+          Look.install(tl, { duration: D, grain: 0.14, vignette: 0.42, enabled: plate });
+          tl.set({}, {}, D);
+          window.__timelines = window.__timelines || {};
+          window.__timelines["main"] = tl;
+          tl.seek(0);
+        });
+      })();
+    </script>
+  </body>
+</html>

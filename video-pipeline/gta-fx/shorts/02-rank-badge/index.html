@@ -1,0 +1,684 @@
+<!doctype html>
+<!-- GTA 6 component #2: Rank badge (craft v2). 1080x1920 (9:16), 30 fps, 7.0 s.
+     Variant 0 "Hero numeral → dock": full-bleed night montage cut on beats. A giant sunset "#3" in Archivo wide slams in on the cut
+       to Jason in front of the fireworks blast (flash + shake + RGB split + light leak + pink bloom). It is set like a film poster:
+       face above, the numeral on the dark of his jacket, the title under it, held 1.3 s. The pre-roll is one 0.33 s beat. Then it flies into the top-left corner on
+       the next cut (directional motion blur), lands with a sheen and a bloom flare, and lives on as a type-only corner bug with a
+       5-segment progress rule.
+     Variant 1 "Corner badge": full-bleed police-chase edit, all Inter. A 700 px Inter-display "#2" climbs like a slot reel
+       ("#5" blurs in on frame 0, then 4, 3 rush through) and locks on "2" ON the cut to the charging SUV (flash + shake + RGB
+       split + leak); the item title, set on the numeral's measure, rises under it and holds 1.2 s. It docks across a punch-in
+       cut into a real top-left badge (numeral, hairline, series label, title, progress ticks) that holds over the gameplay clip
+       and hits again, with a sheen and bloom, on the SUV's real rollover.
+     bg "plate" = sample footage + finishing (grain, vignette, flashes, leak); bg "none" = transparent overlay (no footage, no finishing;
+       the soft legibility scrims stay, they are part of the graphic). Safe zone: all text inside x 72–936, y 230–1480. -->
+<html lang="en" data-composition-variables='[
+  {"id":"variant","type":"enum","label":"Variant","default":"0","options":[{"value":"0","label":"Hero numeral → dock"},{"value":"1","label":"Corner badge"}]},
+  {"id":"bg","type":"enum","label":"Background","default":"plate","options":[{"value":"plate","label":"Sample footage"},{"value":"none","label":"Transparent"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link rel="stylesheet" href="assets/fonts/fonts.css" />
+    <link rel="stylesheet" href="assets/kit/look/look.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="assets/kit/look/look.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: transparent; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; color: #fff;
+        font-family: "Archivo", "Inter", sans-serif; -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; }
+
+      /* ---------- footage: full frame, both variants ---------- */
+      #stage { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; overflow: hidden; }
+      #shake, #push { position: absolute; inset: 0; }
+      .shot { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      /* v1: the 2.27 s punch-in cut. The rollover take is framed 1.13x tighter around the SUV (same media, continuous) */
+      #punch { position: absolute; inset: 0; transform: scale(1.13); transform-origin: 50% 46%; }
+
+      #ov { position: absolute; inset: 0; z-index: 10; }
+      .wide { font-family: "Archivo", "Inter", sans-serif; font-stretch: 125%; text-transform: uppercase; white-space: nowrap; }
+      /* Rockstar date style: white wide-tracked caps, a 2 px #EE08F2 offset and a soft magenta bloom */
+      .r-date { font-weight: 600; font-size: 26px; line-height: 1; letter-spacing: .34em;
+        text-shadow: 2px 1px 0 rgba(238,8,242,.85), 0 0 18px rgba(238,8,242,.32), 0 2px 10px rgba(0,0,0,.55); }
+      #v0, #v1 { position: absolute; inset: 0; display: none; }
+      #root.v0 #v0, #root.v1 #v1 { display: block; }
+
+      /* ---------- variant 0: hero ---------- */
+      /* poster scrim: deepens the lower half (jacket, pavement) under the numeral and title; the face above stays untouched */
+      #scrimHero { position: absolute; left: 0; right: 0; top: 760px; height: 1100px; opacity: 0;
+        background: linear-gradient(180deg, rgba(5,5,9,0) 0%, rgba(5,5,9,.22) 16%, rgba(5,5,9,.36) 48%, rgba(5,5,9,.40) 62%, rgba(5,5,9,.18) 84%, rgba(5,5,9,0) 100%); }
+      /* bug shade (both variants): a soft top-left corner shade plus a light top grade. It darkens the sky behind the corner
+         badge (bright sunset or daylight sky behind it, too), leaves the rest of the frame bright */
+      .bugShade { position: absolute; left: 0; top: 0; width: 1080px; height: 900px; opacity: 0;
+        background: radial-gradient(ellipse 1100px 640px at 6% 8%, rgba(5,5,9,.66) 0%, rgba(5,5,9,.52) 38%, rgba(5,5,9,.22) 70%, rgba(5,5,9,0) 100%),
+                    linear-gradient(180deg, rgba(5,5,9,.62) 0%, rgba(5,5,9,.38) 30%, rgba(5,5,9,.12) 56%, rgba(5,5,9,0) 82%); }
+      #kicker { position: absolute; left: 72px; width: 864px; top: 0; text-align: center; padding-left: .34em; }
+      #bug0 { position: absolute; inset: 0; }
+      #numFly { position: absolute; left: 0; top: 0; }
+      #numSlam { will-change: transform, opacity; }
+      .num { display: flex; align-items: flex-start; font-family: "Archivo", "Inter", sans-serif; font-stretch: 125%; font-weight: 900;
+        line-height: 1; white-space: nowrap; font-variant-numeric: lining-nums; }
+      .num .hash { font-size: .42em; line-height: .84; margin-right: .035em; }
+      .num .fig { line-height: .84; }
+      #titleWrap { position: absolute; left: 72px; width: 864px; top: 0; text-align: center;
+        filter: drop-shadow(0px 3px 6px rgba(0,0,0,0.45)) drop-shadow(0px 12px 34px rgba(0,0,0,0.4)); }
+      #title { display: inline-block; font-weight: 800; font-size: 72px; line-height: 1; letter-spacing: .02em; color: #fff; }
+
+      /* ---------- variant 0: corner bug (type only, no card) ---------- */
+      #bugText { position: absolute; inset: 0; filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.5)) drop-shadow(0px 8px 24px rgba(0,0,0,0.42)); }
+      #bLabel { position: absolute; left: 0; top: 0; font-weight: 600; font-size: 24px; line-height: 1; letter-spacing: .28em; color: rgba(255,255,255,.86); }
+      #bTitle { position: absolute; left: 0; top: 0; font-weight: 800; font-size: 46px; line-height: 1; letter-spacing: .015em; }
+      .segs { position: absolute; left: 0; top: 0; display: flex; gap: 8px; }
+      .seg { position: relative; flex: 1; height: 6px; border-radius: 3px; overflow: hidden; }
+      .seg b { position: absolute; inset: 0; border-radius: 3px; background: rgba(255,255,255,.28); transform-origin: 0 50%; }
+      .seg i { position: absolute; inset: 0; border-radius: 3px; background: #fff; transform-origin: 0 50%; }
+
+      /* ---------- variant 1: corner badge (all Inter) ---------- */
+      /* hero scrim: a soft top-down shade that gives the bright daylight street a sky to set the numeral in */
+      /* r09: the hero is 700 px now (ink y 250–760, title y ≈ 800–860), so the shade runs deeper: building band, then the title */
+      #v1ScrimHero { position: absolute; left: 0; right: 0; top: 0; height: 1260px; opacity: 0;
+        background: linear-gradient(180deg, rgba(5,5,9,.6) 0%, rgba(5,5,9,.55) 20%, rgba(5,5,9,.42) 42%, rgba(5,5,9,.32) 60%, rgba(5,5,9,.22) 70%, rgba(5,5,9,.07) 86%, rgba(5,5,9,0) 100%); }
+      .lbl { font-family: "Inter", sans-serif; font-weight: 600; text-transform: uppercase; white-space: nowrap; line-height: 1;
+        color: rgba(255,255,255,.86); text-shadow: 0 1px 1px rgba(0,0,0,.3), 0 3px 12px rgba(0,0,0,.42); }
+      /* v1 hero title: the item name, set under the numeral's ink (Inter 800, tight) */
+      #v1HeroTitleWrap { position: absolute; left: 72px; width: 864px; top: 0; text-align: center;
+        filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.5)) drop-shadow(0px 10px 30px rgba(0,0,0,0.45)); }
+      #v1HeroTitle { display: inline-block; font-family: "Inter", sans-serif; font-weight: 800; font-size: 68px; line-height: 1;
+        letter-spacing: -.012em; text-transform: uppercase; white-space: nowrap; color: #fff; }
+      #v1Badge { position: absolute; inset: 0; }
+      /* r09: an extra top shade over the bright highway sky (clouds, the airliner) from the 4.43 s cut */
+      #v1ScrimTail { position: absolute; left: 0; right: 0; top: 0; height: 720px; opacity: 0; }
+      #v1Text { position: absolute; inset: 0; filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.45)) drop-shadow(0px 8px 24px rgba(0,0,0,0.38)); }
+      #v1Rule { position: absolute; left: 0; top: 0; width: 2px; transform-origin: 50% 0;
+        background: linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.8) 18%, rgba(255,255,255,.8) 82%, rgba(255,255,255,0) 100%); }
+      #v1Label { position: absolute; left: 0; top: 0; font-size: 22px; letter-spacing: .3em; text-shadow: none; }
+      #v1Title { position: absolute; left: 0; top: 0; font-family: "Inter", sans-serif; font-weight: 800; font-size: 50px; line-height: 1;
+        letter-spacing: -.012em; text-transform: uppercase; white-space: nowrap; color: #fff; }
+      #v1Segs { gap: 7px; }
+      #v1Segs .seg { height: 5px; }
+      #v1Fly { position: absolute; left: 0; top: 0; }
+      #v1Slam { will-change: transform; }
+      /* Inter display: 800, tracking -0.045em, optical size auto; tabular figures so every reel row has the same advance */
+      .numi { display: flex; align-items: flex-start; font-family: "Inter", sans-serif; font-weight: 800; letter-spacing: -0.045em; line-height: 1;
+        white-space: nowrap; font-optical-sizing: auto; font-feature-settings: "tnum" 1, "lnum" 1; }
+      .numi .hash { font-size: .46em; line-height: .84; margin-right: .045em; }
+      #v1Win { position: relative; overflow: hidden; }
+      #v1Reel { position: absolute; left: 0; top: 0; }
+      #v1Reel .row { display: block; height: .84em; line-height: .84; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="7" data-width="1080" data-height="1920">
+      <!-- footage. v0 (track 0) and v1 (track 2) are both declared; the script shows only the active variant's shots.
+           v0: in- and out-points avoid the hidden cuts inside s039 (1.07 s) and s055 (2.1 s). s098 is a PRE-RENDERED SPEED RAMP (assets/clips/
+             s098-ramp.mp4: source frames 3–33, i.e. before its hidden cut at 1.13 s; the blast erupts at 1.0× (source 0.10–0.57,
+             which also carries the blast's camera-shake blur), then ramps to 0.39× for the hold (source 0.57–1.10, sharp), built with
+             motion-compensated interpolation), so every frame of the hero hold is new: no playback-rate judder. s014 stops before the
+             A-pillar wedge (≈ 2.33 s). s027 ends 0.05 s before its last frame.
+             The pre-roll is 0.33 s (s055 media 1.0–1.33): the slam lands on the 0.33 s cut, and the ramp enters at its frame 2 (media
+             0.07), the frame the blast erupts at the right edge, so the cut frame carries the explosion's light (frames 0–1 are a dark
+             pre-blast Jason that the flash only washed grey). s039 runs 2.02–3.06 (media 0–1.04: its last frames before the hidden cut
+             repeat a frame). s014 runs 3.06–5.2 (media 0.06–2.2), s027 5.2–7.0 (media 0.04–1.84).
+             v0 is LOCKED at 8 (r08) and must render exactly as r08: do not touch its shots, timing or layout without a v0 defect.
+           v1: the renderer shows source frame floor(media × 30). s096 has a foreground pole on frame 12 (0.40) and frame 35 (1.167),
+             so it plays media 0.46–1.18 = frames 13–34 only (the green car whips past, then the cruiser drifts in), and cuts at 0.72 s,
+             before frame 35 can show. A slow-motion version was tried and rejected: every interpolator (mci/obmc/blend) smears the
+             drifting cruiser. The reel locks ON the 0.72 s cut to s119, which enters at media 0.35 (past the smeared opening pan:
+             the slam frame is source frame 10 and the 0.9 s hero frame is 15, both sharp); the hero holds over the SUV charging under
+             fire to 2.08 s. The dock flies across a 2.26 s punch-in cut on the same take (media continuous at 1.89, framed 1.13×
+             tighter), so the SUV's hard flip (media 2.43) lands at 2.8 s; s119 ends at media 4.06 (shot length 4.10). s011 enters at media 0 and the badge exits at 6.15 s, so the airliner (in at the top right
+             at ≈ 6.1 s) only reaches the badge's band once the type has left. -->
+      <div id="stage"><div id="shake"><div id="push">
+        <video id="a0" data-v="0" class="clip shot" src="assets/shots/s055-night-truck-v.mp4" muted playsinline data-start="0" data-duration="0.33" data-media-start="1.0" data-track-index="0"></video>
+        <video id="a1" data-v="0" class="clip shot" src="assets/clips/s098-ramp.mp4" muted playsinline data-start="0.33" data-duration="1.69" data-media-start="0.07" data-track-index="0"></video>
+        <video id="a2" data-v="0" class="clip shot" src="assets/shots/s039-blue-club-v.mp4" muted playsinline data-start="2.02" data-duration="1.04" data-media-start="0" data-track-index="0"></video>
+        <video id="a3" data-v="0" class="clip shot" src="assets/shots/s014-driveby-police-v.mp4" muted playsinline data-start="3.06" data-duration="2.14" data-media-start="0.06" data-track-index="0"></video>
+        <video id="a4" data-v="0" class="clip shot" src="assets/shots/s027-sunset-dock-v.mp4" muted playsinline data-start="5.2" data-duration="1.8" data-media-start="0.04" data-track-index="0"></video>
+        <video id="b0" data-v="1" class="clip shot" src="assets/shots/s096-police-street-v.mp4" muted playsinline data-start="0" data-duration="0.72" data-media-start="0.46" data-track-index="2"></video>
+        <video id="b1" data-v="1" class="clip shot" src="assets/shots/s119-gameplay-shootout-v.mp4" muted playsinline data-start="0.72" data-duration="1.54" data-media-start="0.35" data-track-index="2"></video>
+        <!-- the 2.26 s cut is a punch-in on the same take (continuous media, 1.0 → 1.13 framing), so the dock still flies across a cut -->
+        <div id="punch"><video id="b3" data-v="1" class="clip shot" src="assets/shots/s119-gameplay-shootout-v.mp4" muted playsinline data-start="2.26" data-duration="2.17" data-media-start="1.89" data-track-index="2"></video></div>
+        <video id="b2" data-v="1" class="clip shot" src="assets/shots/s011-vice-highway-v.mp4" muted playsinline data-start="4.43" data-duration="2.57" data-media-start="0" data-track-index="2"></video>
+      </div></div></div>
+
+      <div id="ov" class="clip" data-start="0" data-duration="7" data-track-index="1">
+        <!-- variant 0 -->
+        <div id="v0">
+          <div id="scrimHero"></div>
+          <div id="scrimTop" class="bugShade"></div>
+          <div id="kicker" class="wide r-date"></div>
+          <div id="titleWrap"><div id="title" class="wide" data-layout-allow-overflow></div></div>
+          <div id="bug0">
+            <div id="bugText">
+              <div id="bLabel" class="wide" data-layout-allow-overflow></div>
+              <div id="bTitle" class="wide" data-layout-allow-overflow></div>
+              <div id="bSegs" class="segs"></div>
+            </div>
+            <div id="numFly"><div id="numLift"><div id="numSlam"><div id="num" class="num"></div></div></div></div>
+          </div>
+        </div>
+        <!-- variant 1 -->
+        <div id="v1">
+          <div id="v1ScrimHero"></div>
+          <div id="v1ScrimTop" class="bugShade"></div>
+          <div id="v1ScrimTail" class="lk-scrim-top"></div>
+          <div id="v1HeroTitleWrap"><div id="v1HeroTitle" data-layout-allow-overflow></div></div>
+          <div id="v1Badge">
+            <div id="v1Text">
+              <div id="v1Rule"></div>
+              <div id="v1Label" class="lbl" data-layout-allow-overflow></div>
+              <div id="v1Title" data-layout-allow-overflow></div>
+              <div id="v1Segs" class="segs"></div>
+            </div>
+            <div id="v1Fly"><div id="v1Lift"><div id="v1In"><div id="v1Slam"><div id="v1Num" class="numi"></div></div></div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const CONFIG = {
+        variants: {
+          "0": {
+            list: "Top 5 · Trailer moments",      // series label (kicker, then the bug's label)
+            rank: 3, total: 5,
+            title: "Vice City nights",
+            // sample shots (keep in sync with the <video data-v="0"> tags): cut on the beats below
+            shots: ["assets/shots/s055-night-truck-v.mp4", "assets/clips/s098-ramp.mp4", "assets/shots/s039-blue-club-v.mp4",
+                    "assets/shots/s014-driveby-police-v.mp4", "assets/shots/s027-sunset-dock-v.mp4"],
+            // cuts: 0.33 (slam), 2.02 (mid-dock), 3.06, 5.2. The title rises on the slam, is fully legible from ~0.55 s and holds until
+            // it drops at 1.78 s (gone by the 2.02 s cut): a 1.23 s read.
+            timing: { kicker: 0.03, slam: 0.33, title: 0.33, sheen: 1.03, dock: 1.84, dockDur: 0.45, bug: 2.23, clipEnd: 6.25, out: 6.3, end: 7.0 },
+            glow: { rgb: "254,120,166", base: 0.62, peak: 1.5, land: 1.25 }   // bloom in the blast's pink-orange light (#FE78A6)
+          },
+          "1": {
+            list: "Top 5 · Police chases",
+            rank: 2, total: 5,
+            title: "SUV rollover",
+            shots: ["assets/shots/s096-police-street-v.mp4", "assets/shots/s119-gameplay-shootout-v.mp4", "assets/shots/s011-vice-highway-v.mp4"],
+            // spin = "#" and "5" blur in together on frame 0 and the reel climbs 5→4→3; slam = it locks on "2" ON the 0.72 s cut
+            // (s096 → s119). title = the item name rises on the slam (never over the white cruiser), fully up ≈ 0.85 s, and reads
+            // until it drops at 2.02 s (legible ≈ 0.83–2.1 s).
+            // cuts: 0.72 (slam), 2.26 (punch-in on the same take, mid-dock), 4.43 (flash).
+            // beat = the SUV's hard flip (s119 media 2.43 s) = the payoff: hit, RGB split, sheen, bloom flare, tick.
+            timing: { spin: 0.0, slam: 0.72, title: 0.72, dock: 2.08, dockDur: 0.45, bug: 2.48, beat: 2.8, cut2: 4.43, clipEnd: 6.1, out: 6.15, end: 7.0 },
+            glow: { rgb: "254,142,78", base: 0.72, peak: 1.5 }    // bloom in the street's warm light (#FE8E4E), matched to v0's
+          }
+        },
+        // Leonida core sunset. v0: diagonal across the Archivo numeral. v1: vertical, so the slot reel reads lit from above.
+        gradient: "linear-gradient(118deg, #F84FA4 0%, #FE78A6 26%, #FE8E4E 62%, #FEB747 100%)",
+        gradientV: "linear-gradient(180deg, #F84FA4 0%, #FE78A6 30%, #FE8E4E 66%, #FEB747 100%)",
+        heroNumeralPx: 580,   // v0 hero numeral font size (figure ink ≈ 0.72 × this)
+        dockNumeralPx: 168,   // v0 docked numeral size (the same element, scaled)
+        badgeHeroPx: 700,     // v1 hero numeral (Inter display 800), centred; ink ≈ 0.73 × this (≈ 510 px tall, ≈ 620 px wide)
+        badgeHeroInkTop: 250, // v1 hero numeral ink top (y): the building band above the SUV's roof
+        badgeTitleGap: 42,    // v1 hero title cap top sits this far under the numeral's ink (title fitted to the numeral's ink width)
+        badgeDockPx: 150,     // v1 docked numeral size (the same element, scaled)
+        badgeTop: 250,        // v1 badge: numeral ink top-left at (72, badgeTop)
+        reelPitch: 1.12,      // v1 slot reel: row pitch in window heights (a small gap between figures, like a real reel strip)
+        // v1 reel ticks (s): "#5" holds while it blurs in, then quick rolls 5→4 and 4→3 (each figure holds ≈ 2.5 frames), then an
+        // accelerating roll that slams onto "2" on the cut (timing.slam)
+        reelTicks: [{ at: 0.26, dur: 0.11, ease: "power3.inOut" }, { at: 0.45, dur: 0.09, ease: "power3.inOut" }, { at: 0.62, ease: "power2.in" }],
+        settle: 0.97,         // docked badge drifts 1 → settle (linear) across the hold so it never sits frozen
+        shakePx: 12,          // impact shake on the payoff (footage only)
+        flash: 0.3,           // v0 light on the slam (plate only): the blast's light, peak opacity of the directional burst
+        flashColor: "#FFBB95", // white mixed with 60 % #FE8E4E: the even part of that light (at flashEven)
+        flashEven: 0.08,      // a thin even warm lift under the burst, so the whole frame registers the hit
+        flash1: 0.45,         // v1 exposure flash on the reel stop (white, daylight)
+        grain: 0.14
+      };
+
+      (function () {
+        const VARS = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+        const vKey = CONFIG.variants[String(VARS.variant)] ? String(VARS.variant) : "0";
+        const plate = VARS.bg !== "none";
+        const V = CONFIG.variants[vKey], T = V.timing;
+        const $ = (s) => document.querySelector(s);
+        const root = $("#root");
+        root.classList.add("v" + vKey);
+        document.querySelectorAll("video.shot").forEach((v) => { if (!plate || v.dataset.v !== vKey) v.style.display = "none"; });
+        if (!plate) $("#stage").style.display = "none";
+
+        // ---- text ----
+        const figHTML = (r) => '<span class="hash">#</span><span class="fig">' + r + "</span>";
+        if (vKey === "0") {
+          $("#kicker").textContent = V.list;
+          $("#title").textContent = V.title;
+          $("#bLabel").textContent = V.list;
+          $("#bTitle").textContent = V.title;
+          $("#num").innerHTML = figHTML(V.rank);
+        } else {
+          $("#v1HeroTitle").textContent = V.title;
+          $("#v1Label").textContent = V.list;
+          $("#v1Title").textContent = V.title;
+        }
+        function buildSegs(el) {
+          const out = [];
+          for (let r = V.total; r >= 1; r--) {
+            const s = document.createElement("div"); s.className = "seg";
+            const b = document.createElement("b"), f = document.createElement("i");
+            s.appendChild(b); s.appendChild(f); el.appendChild(s); out.push({ r, b, f });
+          }
+          return out;
+        }
+
+        // ---- ink metrics (canvas) so type aligns on glyph ink, not on line boxes ----
+        const cx = document.createElement("canvas").getContext("2d");
+        function metrics(weight, px, txt, fam) {
+          fam = fam || "Archivo";
+          cx.font = weight + " " + px + "px " + fam;
+          try { cx.fontStretch = fam === "Archivo" ? "expanded" : "normal"; } catch (e) {}
+          const m = cx.measureText(txt);
+          return { asc: m.actualBoundingBoxAscent, desc: m.actualBoundingBoxDescent, l: m.actualBoundingBoxLeft, r: m.actualBoundingBoxRight, w: m.width,
+                   fa: m.fontBoundingBoxAscent || px * 0.878, fd: m.fontBoundingBoxDescent || px * 0.21 };
+        }
+        // baseline position from the top of a line box of height L (CSS half-leading model)
+        const baseOf = (m, L) => (L - (m.fa + m.fd)) / 2 + m.fa;
+        // top of the line box so that the caps' ink top lands at y
+        const capTopAt = (m, L, y) => y - (baseOf(m, L) - m.asc);
+        // ---- one measure: fit a single-line text's INK width to a target and centre its ink on an axis ----
+        // DOM advance of an element's text (letter-spacing is added after every glyph, the last one too)
+        function advW(el) { const r = document.createRange(); r.selectNodeContents(el); return r.getBoundingClientRect().width; }
+        // size = target / (ink per px + tracking·(n−1)). The advance comes from the DOM (true width, stretch and optical size),
+        // the side bearings from canvas. padTrack: padding-left = tracking (the centring trick for tracked caps).
+        function inkFit(el, txt, weight, fam, target, lsEm, minPx, maxPx, padTrack) {
+          const n = txt.length;
+          el.style.fontSize = "100px"; el.style.letterSpacing = (lsEm * 100).toFixed(3) + "px"; if (padTrack) el.style.paddingLeft = "0px";
+          const a = advW(el) / 100 - lsEm * n;                 // advance per px of font size, tracking excluded
+          const m = metrics(weight, 100, txt, fam), lb = -m.l / 100, rb = (m.w - m.r) / 100;
+          const ink = a - lb - rb;                               // ink width per px, tracking excluded
+          let px = Math.max(minPx, Math.min(maxPx, target / (ink + lsEm * (n - 1)))), ls = lsEm;
+          // clamped size: let the tracking take up the rest of the measure
+          if (Math.abs(px * (ink + ls * (n - 1)) - target) > 1 && n > 1) ls = (target / px - ink) / (n - 1);
+          const s = ls * px;
+          el.style.fontSize = px.toFixed(2) + "px"; el.style.letterSpacing = s.toFixed(3) + "px";
+          if (padTrack) el.style.paddingLeft = s.toFixed(3) + "px";
+          return { px, s, ls, lb: lb * px, inkW: ink * px + s * (n - 1) };
+        }
+        // x shift that puts the fitted text's ink centre on `axis` (its block: left 72, width 864, text-align centre, padding-left pad)
+        function inkShift(el, fit, pad, axis) { const W = advW(el); return axis - (504 + pad / 2 - W / 2 + fit.lb + fit.inkW / 2); }
+        const LH = 0.84;   // numeral line-height: the box hugs the ink (cap top to just under the baseline)
+        // numeral: top-align the small hash to the figure's ink top; returns ink geometry inside the numeral box
+        function setupNumeral(el, F, rankTxt, fam, weight, hashEm) {
+          const mf = metrics(weight, F, rankTxt, fam), mh = metrics(weight, F * hashEm, "#", fam);
+          const figInkTop = baseOf(mf, F * LH) - mf.asc, hashInkTop = baseOf(mh, F * hashEm * LH) - mh.asc;
+          el.querySelector(".hash").style.marginTop = (figInkTop - hashInkTop).toFixed(2) + "px";
+          return { inkTop: figInkTop, base: baseOf(mf, F * LH), inkL: -mh.l, mf };
+        }
+        function fitFont(el, maxW, minPx) {
+          let px = parseFloat(getComputedStyle(el).fontSize);
+          while (el.getBoundingClientRect().width > maxW && px > minPx) { px -= 1; el.style.fontSize = px + "px"; }
+          return px;
+        }
+        // directional motion blur that follows the speed of an eased move (peak px at the fastest frame)
+        let fid = 0;
+        // floor: a minimum blur held across the whole move (so a slow start never shows bare glyph fragments)
+        // shape (optional): blur = peak · shape(p), in place of the speed-following curve
+        function speedBlur(tl, el, at, dur, ease, ux, uy, peak, floor, shape) {
+          const NS = "http://www.w3.org/2000/svg", id = "rbBlur" + (fid++);
+          let defs = $("#rbDefs");
+          if (!defs) {
+            const svg = document.createElementNS(NS, "svg"); svg.setAttribute("width", "0"); svg.setAttribute("height", "0");
+            svg.setAttribute("style", "position:absolute;width:0;height:0;overflow:hidden");
+            defs = document.createElementNS(NS, "defs"); defs.id = "rbDefs"; svg.appendChild(defs); document.body.appendChild(svg);
+          }
+          const f = document.createElementNS(NS, "filter");
+          f.setAttribute("id", id); f.setAttribute("x", "-40%"); f.setAttribute("y", "-40%"); f.setAttribute("width", "180%"); f.setAttribute("height", "180%");
+          f.setAttribute("color-interpolation-filters", "sRGB");
+          const g = document.createElementNS(NS, "feGaussianBlur"); g.setAttribute("in", "SourceGraphic"); g.setAttribute("stdDeviation", "0 0");
+          f.appendChild(g); defs.appendChild(f);
+          const E = gsap.parseEase(ease), h = 0.004;
+          const vel = (p) => (E(Math.min(1, p + h)) - E(Math.max(0, p - h))) / ((Math.min(1, p + h) - Math.max(0, p - h)) || 1);
+          let vmax = 0; for (let i = 0; i <= 200; i++) vmax = Math.max(vmax, vel(i / 200));
+          Look.drive(tl, at, dur, (p) => {
+            const s = (p <= 0 || p >= 1) ? 0 : (shape ? peak * shape(p) : Math.max(floor || 0, peak * vel(p) / vmax));
+            if (s < 0.3) { el.style.filter = ""; return; }
+            g.setAttribute("stdDeviation", (s * ux).toFixed(2) + " " + (s * uy).toFixed(2));
+            el.style.filter = "url(#" + id + ")";
+          });
+        }
+        // bloom: light around the gradient numeral, in the scene's colour. Stacked drop-shadows on the numeral's WRAPPER
+        // (Look.bloom is a text-shadow, which Look.fill strips from gradient type). Strength is driven per frame: a flare on each
+        // hit that settles to `base`.
+        function glowCss(rgb, s) {
+          if (s < 0.01) return "none";
+          const a = (x) => Math.min(1, x * s).toFixed(3);
+          return "drop-shadow(0px 0px 12px rgba(" + rgb + "," + a(0.42) + ")) drop-shadow(0px 0px 38px rgba(" + rgb + "," + a(0.30) + ")) " +
+                 "drop-shadow(0px 0px 96px rgba(" + rgb + "," + a(0.17) + "))";
+        }
+        // hits: [{at, peak}], each flares in 2 frames and decays (expo) to base; 0 before `from`
+        function glowDrive(tl, el, G, from, hits, D) {
+          const node = $(el);
+          node.style.filter = "none";
+          Look.drive(tl, 0, D, (p) => {
+            const t = p * D;
+            if (t < from) { node.style.filter = "none"; return; }
+            let s = G.base;
+            hits.forEach((h) => {
+              const dt = t - h.at;
+              if (dt < 0) return;
+              const up = Math.min(1, dt / (2 / 30)), dn = Math.exp(-Math.max(0, dt - 2 / 30) / (h.decay || 0.22));
+              s = Math.max(s, G.base + (h.peak - G.base) * up * dn);
+            });
+            node.style.filter = glowCss(G.rgb, s);
+          });
+        }
+        // segments: finished ranks fill fast, the current rank fills across the clip, the rest stay as tracks
+        function segTimeline(tl, segs, drawAt, fillAt, endAt) {
+          segs.forEach(({ r, b, f }, i) => {
+            gsap.set(b, { scaleX: 0 }); gsap.set(f, { scaleX: 0 });
+            tl.fromTo(b, { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease: "expo.out", immediateRender: false }, drawAt + i * 0.045);
+            if (r > V.rank) tl.fromTo(f, { scaleX: 0 }, { scaleX: 1, duration: 0.32, ease: "power3.out", immediateRender: false }, fillAt + i * 0.06);
+            else if (r === V.rank) tl.fromTo(f, { scaleX: 0 }, { scaleX: 1, duration: endAt - fillAt - 0.15, ease: "none", immediateRender: false }, fillAt + 0.15);
+          });
+        }
+
+        const ready = Promise.all([document.fonts.load("900 100px Archivo"), document.fonts.load("600 26px Archivo"),
+                                   document.fonts.load("800 100px Inter"), document.fonts.load("600 26px Inter")]).catch(() => {});
+        ready.then(() => document.fonts.ready).then(() => {
+          const tl = gsap.timeline({ paused: true });
+          const D = T.end;
+          if (plate) Look.push(tl, "#push", 0, D, { from: 1.0, to: vKey === "0" ? 1.08 : 1.07 });
+
+          if (vKey === "0") {
+            // ================= VARIANT 0: hero numeral → dock =================
+            const num = $("#num"), fly = $("#numFly"), slam = $("#numSlam");
+            let F = CONFIG.heroNumeralPx;
+            num.style.fontSize = F + "px";
+            let g = setupNumeral(num, F, String(V.rank), "Archivo", 900, 0.42);
+            // two-digit ranks: shrink the hero until the group fits 820 px
+            while (num.getBoundingClientRect().width > 820 && F > 300) { F -= 10; num.style.fontSize = F + "px"; g = setupNumeral(num, F, String(V.rank), "Archivo", 900, 0.42); }
+            const nb = num.getBoundingClientRect();
+            const capH = g.base - g.inkTop;
+            // hero layout = a film poster, centred on the safe-zone axis (x 504). Jason's face fills y ≈ 300–760, so the kicker,
+            // numeral (ink top ≈ 900) and title stack on the dark of his jacket below it, built up from the title's baseline.
+            const AX = 504, mk = metrics(600, 26, "T");
+            const title = $("#title");
+            fitFont(title, 840, 44);
+            const tPx = parseFloat(getComputedStyle(title).fontSize), mt = metrics(800, tPx, "H");
+            const TITLE_CAP = 1408 - mt.asc;                             // title baseline at y 1408 (72 px clear of the 1480 safe line)
+            const inkBot = TITLE_CAP - 56;                               // numeral baseline
+            const inkTop = inkBot - capH;                                // numeral ink top
+            const KICK_CAP = inkTop - 44 - mk.asc;
+            const kick = $("#kicker");
+            kick.style.top = capTopAt(mk, 26, KICK_CAP).toFixed(1) + "px";
+            const heroL = AX - nb.width / 2, heroT = inkTop - g.inkTop;
+            fly.style.left = heroL.toFixed(1) + "px"; fly.style.top = heroT.toFixed(1) + "px";
+            $("#titleWrap").style.top = capTopAt(mt, tPx, TITLE_CAP).toFixed(1) + "px";
+
+            // dock target: numeral ink top-left at (72, 266), scaled to dockNumeralPx
+            const k = CONFIG.dockNumeralPx / F, BUG_TOP = 266;
+            const tgtL = 72 - g.inkL * k, tgtT = BUG_TOP - g.inkTop * k;
+            const dx = tgtL - heroL, dy = tgtT - heroT;
+            // bug type column: label cap top on the numeral's ink top, segments on its baseline, title centred between
+            const colL = tgtL + nb.width * k + 28, bugCap = capH * k, bugBase = BUG_TOP + bugCap;
+            const bL = $("#bLabel"), bT = $("#bTitle"), bS = $("#bSegs");
+            const ml = metrics(600, 24, "T");
+            bL.style.left = colL + "px"; bL.style.top = capTopAt(ml, 24, BUG_TOP).toFixed(1) + "px";
+            fitFont(bT, 936 - colL, 34);
+            const bPx = parseFloat(getComputedStyle(bT).fontSize), mb = metrics(800, bPx, "H");
+            const labelBot = BUG_TOP + ml.asc, segTop = bugBase - 6;
+            const titleCap = (labelBot + segTop) / 2 - mb.asc / 2;
+            bT.style.left = colL + "px"; bT.style.top = capTopAt(mb, bPx, titleCap).toFixed(1) + "px";
+            const segW = Math.max(bT.getBoundingClientRect().width, 360);
+            bS.style.left = colL + "px"; bS.style.top = segTop + "px"; bS.style.width = segW.toFixed(0) + "px";
+            const segs = buildSegs(bS);
+
+            Look.fill(num, CONFIG.gradient, { sheen: true });
+
+            // ---- entrance: kicker, then the slam on the cut to the blast ----
+            tl.fromTo("#scrimHero", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out", immediateRender: true }, 0);
+            Look.enter(tl, kick, T.kicker, { from: "blur", dur: 0.45, blur: 12, scale: 1.06 });
+            gsap.set(slam, { opacity: 0, scale: 1.42, filter: "blur(26px)" });
+            tl.fromTo(slam, { opacity: 0 }, { opacity: 1, duration: 2 / 30, ease: "none", immediateRender: false }, T.slam);
+            tl.fromTo(slam, { scale: 1.42, filter: "blur(26px)" }, { scale: 1, filter: "blur(0px)", duration: 0.34, ease: "expo.out", immediateRender: false }, T.slam);
+            tl.set(slam, { filter: "none" }, T.slam + 0.34);
+            if (plate) {
+              // the blast's light, not a flat wash: a thin even warm lift plus a directional burst from the explosion (upper right)
+              // that falls off across Jason, in the blast's amber → orange → pink
+              Look.impact(tl, T.slam, { shake: "#shake", amp: CONFIG.shakePx, flash: CONFIG.flashEven, flashColor: CONFIG.flashColor, zoom: 1.045 });
+              const burst = document.createElement("div");
+              burst.className = "lk-flash"; burst.style.zIndex = "80";
+              burst.style.background = "radial-gradient(ellipse 1250px 1500px at 96% 26%, rgba(255,214,150,1) 0%, rgba(254,183,71,.9) 18%, " +
+                "rgba(254,142,78,.6) 38%, rgba(254,120,110,.16) 58%, rgba(254,120,110,0) 74%)";
+              root.appendChild(burst);
+              tl.set(burst, { opacity: 0 }, 0);
+              tl.fromTo(burst, { opacity: CONFIG.flash * 2 }, { opacity: 0, duration: 0.26, ease: "power2.out", immediateRender: false }, T.slam);
+              // the one light leak: the blast's colours sweep across the numeral as it lands
+              Look.leak(tl, T.slam - 0.02, 0.62, { colors: ["#F84FA4", "#FEB747"], y: 0.6, opacity: 0.46 });
+            } else tl.fromTo("#numLift", { scale: 1.05 }, { scale: 1, duration: 3 / 30, ease: "power2.out", immediateRender: false }, T.slam + 2 / 30);
+            Look.chroma(tl, num, T.slam, 0.38, { px: 16 });
+            const land = T.dock + T.dockDur;
+            glowDrive(tl, "#numLift", V.glow, T.slam, [{ at: T.slam, peak: V.glow.peak }, { at: land - 0.02, peak: V.glow.land, decay: 0.3 }], D);
+            // the title rises on the slam (fully legible by ~0.7 s) and holds until 2.02 s: a 1.3 s read
+            Look.reveal(tl, title, T.title, { by: "words", stagger: 0.05, dur: 0.45 });
+            // hold: the numeral keeps breathing in (linear), and one specular sheen crosses it
+            tl.fromTo(slam, { scale: 1 }, { scale: 1.03, duration: T.dock - (T.slam + 0.36), ease: "none", immediateRender: false }, T.slam + 0.36);
+            Look.sheen(tl, num, T.sheen, { dur: 0.95 });
+
+            // ---- dock, across the 2.02 s cut: kicker blurs out, title words drop into their masks, the numeral flies home ----
+            // (both are fully gone by the cut, so no hero type is left over the club shot)
+            Look.exit(tl, kick, T.dock - 0.06, { to: "blur", dur: 0.22, blur: 10 });
+            tl.fromTo(title.querySelectorAll(".lk-in"), { yPercent: 0 }, { yPercent: 118, duration: 0.2, ease: "power3.in", stagger: 0.02, immediateRender: false }, T.dock - 0.06);
+            tl.to("#scrimHero", { opacity: 0, duration: 0.45, ease: "power2.inOut" }, T.dock);
+            tl.fromTo("#scrimTop", { opacity: 0 }, { opacity: 1, duration: 0.55, ease: "power2.inOut", immediateRender: true }, T.dock + 0.08);
+            gsap.set(fly, { x: 0, y: 0, scale: 1, transformOrigin: "0 0" });
+            tl.fromTo(fly, { x: 0, y: 0, scale: 1 }, { x: dx, y: dy, scale: k, duration: T.dockDur, ease: "expo.inOut", immediateRender: false }, T.dock);
+            tl.fromTo(slam, { scale: 1.03 }, { scale: 1, duration: T.dockDur, ease: "expo.inOut", immediateRender: false }, T.dock);
+            const L = Math.hypot(dx, dy);
+            speedBlur(tl, fly, T.dock, T.dockDur, "expo.inOut", Math.abs(dx) / L, Math.abs(dy) / L, 22);
+            // the bug's type rises in beside the landed numeral (its container is held at opacity 0 until then)
+            gsap.set("#bugText", { opacity: 0 });
+            tl.fromTo("#bugText", { opacity: 0 }, { opacity: 1, duration: 0.001, ease: "none", immediateRender: false }, T.bug - 0.02);
+            tl.set("#titleWrap", { opacity: 0 }, T.dock + 0.3);
+            Look.reveal(tl, bL, T.bug, { by: "words", stagger: 0.05, dur: 0.55 });
+            Look.reveal(tl, bT, T.bug + 0.06, { by: "words", stagger: 0.06, dur: 0.6 });
+            segTimeline(tl, segs, T.bug + 0.1, T.bug + 0.3, T.clipEnd);
+            // ---- the landing's light moment: a quick sheen and a bloom flare, then the bug settles 1 → .97 (linear) ----
+            Look.sheen(tl, num, land - 0.04, { dur: 0.5, ease: "power2.inOut" });
+            gsap.set("#bug0", { transformOrigin: "72px " + BUG_TOP + "px" });
+            tl.fromTo("#bug0", { scale: 1 }, { scale: CONFIG.settle, duration: T.out - land, ease: "none", immediateRender: false }, land);
+
+            // ---- exit: type rises out of its masks, the numeral blurs away, footage plays clean to the end ----
+            tl.fromTo(bL.querySelectorAll(".lk-in"), { yPercent: 0 }, { yPercent: -118, duration: 0.3, ease: "power3.in", stagger: 0.03, immediateRender: false }, T.out);
+            tl.fromTo(bT.querySelectorAll(".lk-in"), { yPercent: 0 }, { yPercent: -118, duration: 0.3, ease: "power3.in", stagger: 0.03, immediateRender: false }, T.out + 0.04);
+            tl.fromTo(bS, { opacity: 1 }, { opacity: 0, duration: 0.28, ease: "power2.in", immediateRender: false }, T.out + 0.04);
+            tl.fromTo(slam, { opacity: 1, filter: "blur(0px)" }, { opacity: 0, filter: "blur(12px)", duration: 0.34, ease: "power3.in", immediateRender: false }, T.out + 0.06);
+            tl.to("#scrimTop", { opacity: 0, duration: 0.45, ease: "power2.in" }, T.out + 0.05);
+          } else {
+            // ================= VARIANT 1: corner badge (full-bleed, Inter display) =================
+            const F = CONFIG.badgeHeroPx, inner = $("#v1Num"), fly = $("#v1Fly"), slam = $("#v1Slam");
+            inner.style.fontSize = F + "px";
+            const start = Math.min(V.total, V.rank + 3), rows = [];
+            for (let r = start; r >= V.rank; r--) rows.push(r);
+            inner.innerHTML = '<span class="hash">#</span><div id="v1Win"><div id="v1Reel">' +
+              rows.map((r) => '<div class="row">' + r + "</div>").join("") + "</div></div>";
+            const g = setupNumeral(inner, F, String(V.rank), "Inter", 800, 0.46);
+            const win = $("#v1Win"), reel = $("#v1Reel");
+            const rowEls = Array.from(reel.children);
+            const wMax = Math.max(...rowEls.map((r) => { r.style.display = "inline-block"; const w = r.getBoundingClientRect().width; r.style.display = ""; return w; }));
+            const RH = F * LH, P = RH * CONFIG.reelPitch;
+            win.style.width = Math.ceil(wMax) + "px"; win.style.height = RH + "px";
+            rowEls.forEach((r) => { r.style.height = P + "px"; });
+            const capH = g.base - g.inkTop;
+            // hero: ink centred on the safe axis (x 504), ink top at badgeHeroInkTop, in the shaded building band above the
+            // SUV's roof; the item title sits badgeTitleGap under the ink, so the hero reads rank + item
+            const hashEl = inner.querySelector(".hash");
+            const inkL0 = hashEl.offsetLeft + g.inkL, inkR0 = win.offsetLeft + g.mf.r;   // ink extents inside the numeral box
+            const heroL = 504 - (inkL0 + inkR0) / 2, heroT = CONFIG.badgeHeroInkTop - g.inkTop;
+            fly.style.left = heroL.toFixed(1) + "px"; fly.style.top = heroT.toFixed(1) + "px";
+            // the item title is set on the numeral's measure: Inter 800 caps (−0.012em), sized so its ink spans the "#2"'s ink width
+            const hTitle = $("#v1HeroTitle");
+            const hFit = inkFit(hTitle, V.title.toUpperCase(), 800, "Inter", inkR0 - inkL0, -0.012, 56, 100, false);
+            const htPx = hFit.px, mht = metrics(800, htPx, "H", "Inter");
+            $("#v1HeroTitleWrap").style.left = (72 + inkShift(hTitle, hFit, 0, 504)).toFixed(1) + "px";
+            $("#v1HeroTitleWrap").style.top = capTopAt(mht, htPx, CONFIG.badgeHeroInkTop + capH + CONFIG.badgeTitleGap).toFixed(1) + "px";
+
+            // dock target: numeral ink top-left at (72, badgeTop), scaled to badgeDockPx
+            const k = CONFIG.badgeDockPx / F, TOP = CONFIG.badgeTop;
+            const tgtL = 72 - inkL0 * k, tgtT = TOP - g.inkTop * k;
+            const dx = tgtL - heroL, dy = tgtT - heroT;
+            const dCap = capH * k, dBase = TOP + dCap, inkRight = tgtL + inkR0 * k;
+            // the badge: hairline rule, then a column (label cap top on the numeral's ink top, ticks on its baseline, title between)
+            const rule = $("#v1Rule"), ruleX = Math.round(inkRight + 26);
+            rule.style.left = ruleX + "px"; rule.style.top = (TOP - 8) + "px"; rule.style.height = (dCap + 16).toFixed(0) + "px";
+            const colL = ruleX + 2 + 26;
+            const bL = $("#v1Label"), bT = $("#v1Title"), bS = $("#v1Segs");
+            const ml = metrics(600, 22, "T", "Inter");
+            bL.style.left = colL + "px"; bL.style.top = capTopAt(ml, 22, TOP).toFixed(1) + "px";
+            fitFont(bT, 936 - colL, 34);
+            const bPx = parseFloat(getComputedStyle(bT).fontSize), mb = metrics(800, bPx, "H", "Inter");
+            const labelBot = TOP + ml.asc, segTop = dBase - 5;
+            const titleCap = (labelBot + segTop) / 2 - mb.asc / 2;
+            bT.style.left = colL + "px"; bT.style.top = capTopAt(mb, bPx, titleCap).toFixed(1) + "px";
+            // ticks span the column: as wide as the label (its trailing tracking excluded), at least the title
+            const lw = bL.getBoundingClientRect().width - 22 * 0.3;
+            const segW = Math.min(936 - colL, Math.max(bT.getBoundingClientRect().width, lw, 300));
+            bS.style.left = colL + "px"; bS.style.top = segTop + "px"; bS.style.width = segW.toFixed(0) + "px";
+            const segs = buildSegs(bS);
+
+            // gradient: one vertical sweep across hash + figure; every reel row samples it at the window's spot
+            const leaves = Look.fill(inner, CONFIG.gradientV, { sheen: true });
+            leaves.forEach((n) => {
+              if (!n.classList.contains("row")) return;
+              n.__lk.x = -win.offsetLeft; n.__lk.y = -win.offsetTop;
+              const W = n.__lk.W;
+              n.style.backgroundPosition = (W * 1.6) + "px 0px, " + n.__lk.x + "px " + n.__lk.y + "px";
+            });
+
+            // ---- entrance: "#" and "5" blur in together on frame 0; the reel climbs 5→4→3 and locks on "2" ON the 0.72 s cut ----
+            tl.fromTo("#v1ScrimHero", { opacity: 0 }, { opacity: 1, duration: 0.45, ease: "power2.out", immediateRender: true }, 0);
+            gsap.set("#v1In", { transformOrigin: "50% 50%" });
+            Look.enter(tl, "#v1In", T.spin, { from: "blur", dur: 0.5, blur: 14, scale: 1.1 });
+            // the reel ticks like a counter: "#5" blurs in with its figure in the window (the slot is never empty) and holds, then two
+            // quick rolls show "#4" and "#3" for ≈ 2.5 frames each, then an accelerating roll slams onto "2" on the cut. One drive sets
+            // the position, a vertical blur that follows the roll speed (0 at rest, 30 px at full speed; it rides the reel, so it never
+            // smears past the window) and a reel-drum shade on the window (a fade at the top and a deeper one at the bottom while it
+            // rolls, so the next figure rises out of the shade; 0 at rest, so a resting figure is untouched).
+            const steps = rows.length;
+            const ticks = CONFIG.reelTicks.map((k, i) => ({ at: T.spin + k.at, dur: i === CONFIG.reelTicks.length - 1 ? T.slam - (T.spin + k.at) : k.dur, E: gsap.parseEase(k.ease) }));
+            const rollPos = (t) => {   // rows travelled at time t
+              let r = 0;
+              ticks.forEach((k, i) => { if (t >= k.at + k.dur) r = i + 1; else if (t > k.at) r = i + k.E((t - k.at) / k.dur); });
+              return Math.min(r, steps - 1);
+            };
+            const NS = "http://www.w3.org/2000/svg", rf = document.createElementNS(NS, "filter");
+            rf.setAttribute("id", "rbReel"); rf.setAttribute("x", "-40%"); rf.setAttribute("y", "-40%"); rf.setAttribute("width", "180%"); rf.setAttribute("height", "180%");
+            rf.setAttribute("color-interpolation-filters", "sRGB");
+            const rg = document.createElementNS(NS, "feGaussianBlur"); rg.setAttribute("in", "SourceGraphic"); rg.setAttribute("stdDeviation", "0 0");
+            rf.appendChild(rg);
+            let rdefs = $("#rbDefs");
+            if (!rdefs) {
+              const svg = document.createElementNS(NS, "svg"); svg.setAttribute("width", "0"); svg.setAttribute("height", "0");
+              svg.setAttribute("style", "position:absolute;width:0;height:0;overflow:hidden");
+              rdefs = document.createElementNS(NS, "defs"); rdefs.id = "rbDefs"; svg.appendChild(rdefs); document.body.appendChild(svg);
+            }
+            rdefs.appendChild(rf);
+            const feather = (k) => {
+              if (k <= 0.01) { win.style.webkitMaskImage = "none"; win.style.maskImage = "none"; return; }
+              const top = 24 * k, bot = 46 * k;
+              const m = "linear-gradient(180deg, transparent 0%, #000 " + top.toFixed(2) + "%, #000 " + (100 - bot).toFixed(2) + "%, " +
+                "rgba(0,0,0,.32) " + (100 - bot * 0.42).toFixed(2) + "%, transparent 100%)";
+              win.style.webkitMaskImage = m; win.style.maskImage = m;
+            };
+            const h = 1 / 240;
+            gsap.set(reel, { y: 0 });
+            Look.drive(tl, T.spin, T.slam - T.spin, (p) => {
+              const t = T.spin + p * (T.slam - T.spin);
+              gsap.set(reel, { y: -rollPos(t) * P });
+              const v = Math.abs(rollPos(Math.min(T.slam, t + h)) - rollPos(Math.max(T.spin, t - h))) / (2 * h);   // rows per second
+              const b = p >= 1 ? 0 : 30 * Math.min(1, v / 18);
+              if (b < 0.3) reel.style.filter = ""; else { rg.setAttribute("stdDeviation", "0 " + b.toFixed(2)); reel.style.filter = "url(#rbReel)"; }
+              if (p < 1) feather(Math.min(1, v / 7));
+            });
+            Look.drive(tl, T.slam, D - T.slam, (p) => {
+              const t = T.slam + p * (D - T.slam);
+              if (p <= 0) return;
+              if (t < T.slam + 0.14) feather(1 - (t - T.slam) / 0.14);
+              else if (t < T.out + 0.06) feather(0);
+              else feather(Math.min(1, (t - T.out - 0.06) / 0.1));
+            });
+            // the stop: a 2-frame recoil and a small punch sell the weight
+            tl.to(reel, { y: -(steps - 1) * P + RH * 0.05, duration: 2 / 30, ease: "power2.out" }, T.slam);
+            tl.to(reel, { y: -(steps - 1) * P, duration: 0.16, ease: "power3.out" }, T.slam + 2 / 30);
+            gsap.set(slam, { scale: 1.06, transformOrigin: "50% 50%" });   // = the punch's start, so a backward seek renders the same
+            tl.fromTo(slam, { scale: 1.06 }, { scale: 1, duration: 0.32, ease: "expo.out", immediateRender: false }, T.slam);
+            if (plate) {
+              Look.impact(tl, T.slam, { shake: "#shake", amp: CONFIG.shakePx * 0.85, flash: CONFIG.flash1, zoom: 1.04 });
+              // the one light leak: warm street light sweeping across the landed figure
+              Look.leak(tl, T.slam - 0.02, 0.6, { colors: ["#F84FA4", "#FEB747"], y: 0.27, opacity: 0.42 });
+            }
+            Look.chroma(tl, inner, T.slam, 0.24, { px: 14 });
+            // the item title rises into its masks under the numeral, word by word, on the slam
+            Look.reveal(tl, hTitle, T.title, { by: "words", stagger: 0.04, dur: 0.4 });
+            // hold: the figure breathes in (linear) until the dock
+            tl.fromTo(slam, { scale: 1 }, { scale: 1.025, duration: T.dock - (T.slam + 0.32), ease: "none", immediateRender: false }, T.slam + 0.32);
+
+            // ---- dock at 2.05 s, across the 2.27 s punch-in cut: the title drops into its masks, the numeral flies into the corner ----
+            tl.fromTo(hTitle.querySelectorAll(".lk-in"), { yPercent: 0 }, { yPercent: 118, duration: 0.2, ease: "power3.in", stagger: 0.03, immediateRender: false }, T.dock - 0.06);
+            tl.set("#v1HeroTitleWrap", { opacity: 0 }, T.dock + 0.3);
+            tl.to("#v1ScrimHero", { opacity: 0, duration: 0.5, ease: "power2.inOut" }, T.dock);
+            tl.fromTo("#v1ScrimTop", { opacity: 0 }, { opacity: 1, duration: 0.55, ease: "power2.inOut", immediateRender: true }, T.dock + 0.06);
+            gsap.set(fly, { x: 0, y: 0, scale: 1, transformOrigin: "0 0" });
+            tl.fromTo(fly, { x: 0, y: 0, scale: 1 }, { x: dx, y: dy, scale: k, duration: T.dockDur, ease: "expo.inOut", immediateRender: false }, T.dock);
+            tl.fromTo(slam, { scale: 1.025 }, { scale: 1, duration: T.dockDur, ease: "expo.inOut", immediateRender: false }, T.dock);
+            const Ld = Math.hypot(dx, dy);
+            speedBlur(tl, fly, T.dock, T.dockDur, "expo.inOut", Math.abs(dx) / Ld, Math.abs(dy) / Ld, 22);
+            // the badge builds beside the landed numeral: the hairline draws down, then label, title and ticks rise in
+            gsap.set("#v1Text", { opacity: 0 });
+            tl.fromTo("#v1Text", { opacity: 0 }, { opacity: 1, duration: 0.001, ease: "none", immediateRender: false }, T.bug - 0.02);
+            gsap.set(rule, { scaleY: 0 });
+            tl.fromTo(rule, { scaleY: 0 }, { scaleY: 1, duration: 0.42, ease: "expo.out", immediateRender: false }, T.bug - 0.02);
+            Look.reveal(tl, bL, T.bug + 0.02, { by: "words", stagger: 0.05, dur: 0.55 });
+            Look.reveal(tl, bT, T.bug + 0.08, { by: "words", stagger: 0.07, dur: 0.6 });
+            // the ticks draw early so the current one is up for the flip's tick pop
+            segTimeline(tl, segs, T.bug - 0.04, T.bug + 0.24, T.clipEnd);
+            // the docked badge drifts 1 → .97 (linear) from the landing to the exit, so it never sits frozen
+            const land = T.dock + T.dockDur;
+            gsap.set("#v1Badge", { transformOrigin: "72px " + TOP + "px" });
+            tl.fromTo("#v1Badge", { scale: 1 }, { scale: CONFIG.settle, duration: T.out - land, ease: "none", immediateRender: false }, land);
+
+            // ---- payoff: the SUV's real rollover. Hit, RGB split, numeral punch, sheen, bloom flare, the current tick pops ----
+            if (plate) Look.impact(tl, T.beat, { shake: "#shake", amp: 8, flash: 0.26, zoom: 1.025 });
+            Look.chroma(tl, inner, T.beat, 0.32, { px: 10 });
+            tl.fromTo(slam, { scale: 1.09 }, { scale: 1, duration: 0.36, ease: "expo.out", immediateRender: false }, T.beat);
+            Look.sheen(tl, inner, T.beat + 0.02, { dur: 0.5, ease: "power2.inOut" });
+            const cur = segs.find((s) => s.r === V.rank);
+            if (cur) {
+              tl.fromTo(cur.b, { backgroundColor: "rgba(255,255,255,1)" }, { backgroundColor: "rgba(255,255,255,.28)", duration: 0.14, ease: "power2.in", immediateRender: false }, T.beat);
+              tl.fromTo(cur.b.parentNode, { scaleY: 1.8 }, { scaleY: 1, duration: 0.22, ease: "power3.out", immediateRender: false }, T.beat);
+            }
+            // ---- the 4.43 s cut to the highway: an exposure flash and a small bloom flare ----
+            if (plate) Look.impact(tl, T.cut2, { flash: 0.3 });
+            glowDrive(tl, "#v1Lift", V.glow, T.spin, [{ at: T.slam, peak: V.glow.peak }, { at: T.beat, peak: V.glow.peak, decay: 0.32 }, { at: T.cut2, peak: V.glow.peak * 0.7 }], D);
+
+            // ---- exit: the figure spins on up and out of its window, the badge type rises out of its masks ----
+            tl.fromTo(reel, { y: -(steps - 1) * P }, { y: -steps * P, duration: 0.34, ease: "power3.in", immediateRender: false }, T.out + 0.06);
+            speedBlur(tl, reel, T.out + 0.06, 0.34, "power3.in", 0, 1, 20);
+            Look.exit(tl, hashEl, T.out + 0.1, { to: "blur", dur: 0.3, blur: 10 });
+            tl.fromTo(bL.querySelectorAll(".lk-in"), { yPercent: 0 }, { yPercent: -118, duration: 0.3, ease: "power3.in", stagger: 0.03, immediateRender: false }, T.out);
+            tl.fromTo(bT.querySelectorAll(".lk-in"), { yPercent: 0 }, { yPercent: -118, duration: 0.3, ease: "power3.in", stagger: 0.03, immediateRender: false }, T.out + 0.04);
+            tl.fromTo(bS, { opacity: 1 }, { opacity: 0, duration: 0.28, ease: "power2.in", immediateRender: false }, T.out + 0.04);
+            tl.fromTo(rule, { scaleY: 1 }, { scaleY: 0, duration: 0.3, ease: "power3.in", immediateRender: false }, T.out + 0.08);
+            tl.to("#v1ScrimTop", { opacity: 0, duration: 0.45, ease: "power2.in" }, T.out + 0.05);
+            // the sky shade comes in on the 4.43 s cut (under its flash) and leaves with the badge
+            tl.fromTo("#v1ScrimTail", { opacity: 0 }, { opacity: 0.35, duration: 0.2, ease: "power2.out", immediateRender: true }, T.cut2);
+            tl.to("#v1ScrimTail", { opacity: 0, duration: 0.45, ease: "power2.in" }, T.out + 0.05);
+          }
+
+          const fin = Look.install(tl, { duration: D, grain: CONFIG.grain, vignette: 0.5, enabled: plate });
+          // True blacks: Look.install puts the grain inside its own z-indexed wrapper, which is an isolated stacking context, so the
+          // grain's overlay blend has nothing to blend with and composites as a flat grey layer (measured in r05: black 16→32 luma).
+          // Re-parented straight into #root, it overlays the footage for real: the grain texture's mean is 127.5/255, so it is
+          // zero-mean, pure black stays black and contrast is untouched.
+          if (fin && fin.grain) { fin.grain.style.zIndex = "91"; root.appendChild(fin.grain); }
+          tl.set({}, {}, D);
+          window.__timelines = window.__timelines || {};
+          window.__timelines["main"] = tl;
+          tl.seek(0);
+        });
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,703 @@
+<!doctype html>
+<!-- GTA 6 component #1 — Clip counter (Compilation scaffolding), craft v2. 1080x1920 (9:16), 30 fps, 8 s.
+     Persistent top tracker for a numbered compilation. On every cut the clip number SLAMS in as a 400–430 px wide-type
+     numeral (the chapter beat), then DOCKS so the clip plays clean under a small tracker:
+       v0 Segmented bar  — title and the 10-segment bar are fixed at the top left; the numeral hangs under the bar and
+                           retracts into a 150 px lockup (it scales about its cap-left corner, so the bar never moves).
+       v1 Numbered dots  — a compact centred tracker (title + ten numbered stations) sits at the top; the numeral slams
+                           under it and docks by flying into its own station label.
+     Every cut is a counter step. The cut to the last clip is the payoff: the number rolls in already lit in the Leonida
+     sunset on a crisp flash, a specular sheen crosses the "10" and swells its bloom. As the tenth slot fills, the whole
+     tracker sweeps to the sunset (40 ms stagger) with a glint, then blurs out.
+     Variables: variant "0" Segmented bar / "1" Numbered dots (both full-bleed vertical footage)
+                bg "plate" (graded 4K trailer shots + finishing layer) / "none" (transparent overlay, no finishing).
+     Safe zone: all type inside x 72–936, y 230–1480. -->
+<html lang="en" data-composition-variables='[
+  {"id":"variant","type":"enum","label":"Variant","default":"0","options":[{"value":"0","label":"Segmented bar"},{"value":"1","label":"Numbered dots"}]},
+  {"id":"bg","type":"enum","label":"Background","default":"plate","options":[{"value":"plate","label":"Sample footage"},{"value":"none","label":"Transparent"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link rel="stylesheet" href="assets/fonts/fonts.css" />
+    <link rel="stylesheet" href="assets/kit/look/look.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="assets/kit/look/look.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: transparent; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; font-family: "Inter", sans-serif; color: #fff;
+        -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; }
+      #root.plate { background: #000; }
+      #shake, #push { position: absolute; inset: 0; }
+      .shot { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      #b2 { transform: scale(1.1); transform-origin: 50% 0%; }   /* the pier: heads sit ~70 px lower, clear of the slam numeral */
+      #ov { position: absolute; inset: 0; z-index: 10; }
+      /* exposure hit: a short crisp flash on the footage, under the type (the incoming numeral stays sharp on the flash frame) */
+      .wflash { position: absolute; inset: 0; pointer-events: none; mix-blend-mode: screen; opacity: 0; z-index: 9; }
+
+      /* ---------- shared: rolling numeral (odometer). Built and measured in JS. ---------- */
+      .num { position: absolute; left: 0; top: 0; display: flex; }
+      .num .slot { position: relative; display: block; overflow: hidden; flex: none; }
+      .num .col { position: absolute; left: 0; top: 0; width: 100%; will-change: transform; }
+      .num .col b { position: absolute; left: 0; right: 0; text-align: center; font-weight: inherit; white-space: nowrap; }
+      .numtype { font-family: "Archivo", "Inter", sans-serif; font-stretch: 125%; font-weight: 800; letter-spacing: 0;
+        font-variant-numeric: tabular-nums lining-nums; color: #fff; }
+      .glow { position: absolute; left: 0; top: 0; }   /* the numeral's light (white bloom + slam flare; sunset bloom at the payoff) */
+      .lift { position: absolute; left: 0; top: 0; filter: drop-shadow(0 2px 2px rgba(0,0,0,.34)) drop-shadow(0 10px 30px rgba(0,0,0,.44)); }
+      .tot { position: absolute; font-family: "Archivo", "Inter", sans-serif; font-stretch: 125%; font-weight: 700; white-space: nowrap;
+        color: rgba(255,255,255,.86); font-variant-numeric: tabular-nums lining-nums; text-shadow: 0 1px 2px rgba(0,0,0,.35), 0 6px 22px rgba(0,0,0,.45); }
+      .tot > span { display: inline-block; }
+      .kick { font-size: 28px; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 18px rgba(0,0,0,.45); }
+      /* masked one-line swap (title -> "FINAL CLIP") */
+      .kslot { position: relative; overflow: hidden; padding: .1em 0 .2em; }
+      .kslot > span { display: block; white-space: nowrap; }
+      .kslot > span + span { position: absolute; left: 0; right: 0; top: .1em; }
+      .scrim { position: absolute; left: 0; right: 0; pointer-events: none; }
+
+      /* ---------- variant 0: Segmented bar (top-left lockup that slams, then docks) ---------- */
+      #scrim0 { top: 0; height: 1240px; transform-origin: 50% 0%;
+        background: linear-gradient(180deg, rgba(14,6,26,.76) 0%, rgba(14,6,26,.62) 26%, rgba(14,6,26,.36) 52%, rgba(14,6,26,.12) 78%, rgba(14,6,26,0) 100%); }
+      /* the payoff clip's sky is graded down to dusk behind the lit "10", so the sunset fill and its bloom read as light */
+      #dusk0 { top: 0; height: 1000px; opacity: 0;
+        background: linear-gradient(180deg, rgba(14,6,26,.52) 0%, rgba(14,6,26,.44) 40%, rgba(14,6,26,.16) 72%, rgba(14,6,26,0) 100%); }
+      #scrim0.soft { height: 760px; background: linear-gradient(180deg, rgba(5,5,9,.42) 0%, rgba(5,5,9,.22) 48%, rgba(5,5,9,0) 100%); }
+      #hud0 { position: absolute; left: 72px; top: 246px; width: 864px; }
+      #numdock0, #numrow0, #bardock0 { position: relative; }
+      #bar0 { position: relative; width: 864px; height: 14px; }
+      #segs0 { position: absolute; inset: 0; display: flex; gap: 10px; }
+      .seg { position: relative; flex: 1; height: 14px; transform-origin: 0 50%; }
+      .seg > i { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; border-radius: 2px; }
+      .seg .base { background: rgba(255,255,255,.30); box-shadow: inset 0 0 0 1px rgba(0,0,0,.16), 0 1px 3px rgba(0,0,0,.45); }
+      .seg .done { background: #fff; opacity: 0; box-shadow: 0 1px 3px rgba(0,0,0,.4), 0 0 10px rgba(255,255,255,.25); }
+      .seg .fill { width: 0; background-repeat: no-repeat;
+        box-shadow: 0 0 1px rgba(255,236,220,.5), 0 0 14px rgba(254,142,78,.75), 0 0 34px rgba(248,79,164,.45), 0 0 70px rgba(254,142,78,.25); }
+      .seg .fill::after { content: ""; position: absolute; right: 0; top: -2px; bottom: -2px; width: 3px; border-radius: 2px; background: #fff;
+        box-shadow: 0 0 10px rgba(255,255,255,.9); }   /* the playhead tip: a lit leading edge on the filling segment */
+      .seg .fl { background: #fff; opacity: 0; }
+      /* completion beat: every segment sweeps to the sunset (one continuous gradient across the bar), then a glint runs it */
+      .seg .sun { opacity: 0; background-repeat: no-repeat;
+        box-shadow: 0 0 1px rgba(255,236,220,.5), 0 0 12px rgba(254,142,78,.6), 0 0 30px rgba(248,79,164,.35); }
+      .seg .gl { background-repeat: no-repeat; background-image: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.95) 50%, rgba(255,255,255,0) 100%); }
+
+      /* ---------- variant 1: Numbered dots (compact centred top tracker; the numeral slams under it and docks into its label) ---------- */
+      #scrim1t { top: 0; height: 760px;
+        background: linear-gradient(180deg, rgba(14,6,26,.42) 0%, rgba(14,6,26,.3) 34%, rgba(14,6,26,.12) 68%, rgba(14,6,26,0) 100%); }
+      #scrim1t.soft { background: linear-gradient(180deg, rgba(5,5,9,.36) 0%, rgba(5,5,9,.18) 45%, rgba(5,5,9,0) 100%); }
+      /* a soft spot behind the slammed numeral only (not a slab); it lifts when the numeral docks */
+      #spot1 { position: absolute; left: -160px; width: 1400px; height: 760px; pointer-events: none;
+        background: radial-gradient(ellipse 50% 50% at 50% 50%, rgba(14,6,26,.40) 0%, rgba(14,6,26,.26) 45%, rgba(14,6,26,0) 100%); }
+      #numwrap1 { position: absolute; }
+      #numslam1, #num1w { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+      #kick1wrap { position: absolute; left: 72px; right: 72px; top: 0; text-align: center; }
+      #kick1 { display: inline-block; padding-left: .3em; font-size: 30px; }
+      #row1 { position: absolute; left: 0; top: 0; width: 1080px; height: 0; }
+      #row1 .dot { position: absolute; top: 0; width: 0; height: 0; }
+      #row1 .dot > i { position: absolute; border-radius: 50%; }
+      #row1 .up, #row1 .dn, #row1 .sn { left: -8px; top: -8px; width: 16px; height: 16px; }
+      #row1 .cu, #row1 .pg { left: -15px; top: -15px; width: 30px; height: 30px; }
+      #row1 .up { background: rgba(255,255,255,.36); box-shadow: 0 1px 4px rgba(0,0,0,.45); }
+      #row1 .dn { background: #fff; opacity: 0; box-shadow: 0 1px 4px rgba(0,0,0,.4), 0 0 10px rgba(255,255,255,.35); }
+      #row1 .cu { opacity: 0;
+        background: radial-gradient(circle at 35% 30%, #FFD1A0 0%, #FEB747 18%, #FE8E4E 48%, #F84FA4 100%);
+        box-shadow: 0 0 16px rgba(254,120,166,.85), 0 0 44px rgba(248,79,164,.45), 0 0 90px rgba(254,142,78,.25); }
+      #row1 .sn { opacity: 0;   /* completion beat: the station turns sunset */
+        background: radial-gradient(circle at 35% 30%, #FFD1A0 0%, #FEB747 22%, #FE8E4E 55%, #F84FA4 100%);
+        box-shadow: 0 0 10px rgba(254,120,166,.8), 0 0 28px rgba(248,79,164,.4); }
+      #row1 .pg { opacity: 0; box-shadow: inset 0 0 0 2px rgba(255,255,255,.9); }
+      #row1 .rg { position: absolute; left: -26px; top: -26px; width: 52px; height: 52px; overflow: visible; opacity: 0; }
+      #row1 .rg circle { fill: none; stroke-width: 2.5; }
+      #row1 .rg .rt { stroke: rgba(255,255,255,.24); }
+      #row1 .rg .ra { stroke: #fff; stroke-linecap: round; }
+      /* every station is numbered: past 86% white, upcoming 40%, the current one in the sunset (shown once the numeral docks into it) */
+      #row1 .n { position: absolute; top: 28px; width: 80px; margin-left: -40px; height: 36px; opacity: 0; }
+      #row1 .n .w, #row1 .n .s { position: absolute; left: 0; right: 0; top: 0; text-align: center; font-family: "Archivo", "Inter", sans-serif;
+        font-stretch: 125%; font-weight: 700; font-size: 30px; letter-spacing: .06em; text-indent: .06em; line-height: 36px; white-space: nowrap;
+        font-variant-numeric: tabular-nums lining-nums; }
+      #row1 .n .w { color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.5), 0 3px 12px rgba(0,0,0,.45); }
+      #row1 .n .s { opacity: 0; }
+      #row1 .n .sg { position: absolute; left: 0; top: 0; width: 100%; height: 100%;
+        filter: drop-shadow(0 0 8px rgba(254,142,78,.55)) drop-shadow(0 1px 2px rgba(0,0,0,.45)); }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="8" data-width="1080" data-height="1920">
+      <div id="shake"><div id="push">
+        <!-- variant 0 sample edit: day into sunset (track 0). Cuts on frames 39 / 99 / 150 -->
+        <video id="a1" class="clip shot set0" src="assets/shots/s011-vice-highway-v.mp4" muted playsinline data-start="0" data-duration="1.2995" data-media-start="0.9" data-track-index="0"></video>
+        <video id="a2" class="clip shot set0" src="assets/shots/s012-muscle-beach-v.mp4" muted playsinline data-start="1.2995" data-duration="2.0" data-media-start="0.8" data-track-index="0"></video>
+        <video id="a3" class="clip shot set0" src="assets/shots/s100-biplane-beach-v.mp4" muted playsinline data-start="3.2995" data-duration="1.7" data-media-start="0.03" data-track-index="0"></video>
+        <video id="a4" class="clip shot set0" src="assets/clips/s027-sunset-dock-slow60-v.mp4" muted playsinline data-start="4.9995" data-duration="3.0005" data-media-start="0" data-track-index="0"></video>
+        <!-- variant 1 sample edit: day, sunset, then night (track 1). Cuts on frames 53 / 146. s096 plays at native speed;
+             s026 and s055 are motion-compensated slow-mo (minterpolate mci, no blend ghosting) -->
+        <video id="b1" class="clip shot set1" src="assets/shots/s096-police-street-v.mp4" muted playsinline data-start="0" data-duration="1.7662" data-media-start="0" data-track-index="1"></video>
+        <video id="b2" class="clip shot set1" src="assets/clips/s026-sunset-pier-mci47-v.mp4" muted playsinline data-start="1.7662" data-duration="3.1" data-media-start="0" data-track-index="1"></video>
+        <video id="b3" class="clip shot set1" src="assets/clips/s055-night-truck-mci41-v.mp4" muted playsinline data-start="4.8662" data-duration="3.1338" data-media-start="0" data-track-index="1"></video>
+      </div></div>
+
+      <div id="ov" class="clip" data-start="0" data-duration="8" data-track-index="2">
+        <!-- variant 0 -->
+        <div id="v0">
+          <div class="scrim" id="scrim0"></div>
+          <div class="scrim" id="dusk0"></div>
+          <div id="hud0">
+            <div id="kick0wrap"><div class="kslot t-label-wide kick" id="kick0"><span data-layout-allow-overflow data-layout-allow-occlusion></span><span data-layout-allow-overflow data-layout-allow-occlusion></span></div></div>
+            <div id="bardock0"><div id="bar0"><div id="segs0"></div></div></div>
+            <div id="numdock0"><div id="numrow0">
+              <div id="num0w"><div class="lift" id="lift0"><div class="glow" id="glow0"><div class="num numtype" id="num0"></div></div></div></div>
+              <div class="tot" id="tot0"><span id="tot0i" data-layout-allow-overflow></span></div>
+            </div></div>
+          </div>
+        </div>
+        <!-- variant 1 -->
+        <div id="v1">
+          <div class="scrim" id="scrim1t"></div>
+          <div id="spot1"></div>
+          <div id="numwrap1"><div id="numslam1"><div id="num1w"><div class="lift" id="lift1"><div class="glow" id="glow1"><div class="num numtype" id="num1"></div></div></div></div></div></div>
+          <div id="kick1wrap"><div class="kslot t-label-wide kick" id="kick1"><span data-layout-allow-overflow data-layout-allow-occlusion></span><span data-layout-allow-overflow data-layout-allow-occlusion></span></div></div>
+          <div id="row1"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      /* ======================= CONFIG — everything editable lives here ======================= */
+      const CONFIG = {
+        variants: {
+          // Segmented bar: title + bar fixed at the top left; the numeral slams in under the bar on each cut, then retracts to 150 px.
+          "0": {
+            style: "bar",
+            title: "Details you missed",       // compilation title (small wide-tracked caps above the number)
+            finalTitle: "Final clip",          // replaces the title on the cut to the last clip ("" keeps the title)
+            total: 10,                         // clips in the compilation
+            startClip: 7,                      // clip on screen when the overlay starts (1 for a full-length overlay)
+            startFill: 0.3,                    // how far into that clip we already are (0–1)
+            cuts: [1.2995, 3.2995, 4.9995],    // seconds of each cut (= the next shot's data-start); the counter steps on each.
+                                               // put each half a millisecond before the cut frame's time (frame 39 @30fps = 1.3 → 1.2995)
+            numSize: 430,                      // slam size (px): "10" spans ~615 px, 71% of the safe width
+            dockSize: 150,                     // docked size (px) between slams
+            totSize: 72,                       // "/10" size (px) at slam size, sitting on the numeral's baseline 16 px right of the ink
+            totDock: 48,                       // "/10" size (px) when docked
+            barGap: 18,                        // px from the title's box to the bar
+            numGap: 26,                        // px from the bar to the numeral's cap line
+            hold: 0.65,                        // slam hold after a cut before the numeral docks (s)
+            entranceDock: 0.9,                 // first dock, after the entrance (s after timing.in)
+            scrim: "plate",                    // soft top gradient: "plate" = only over footage, true = always (lighter on bg:none), false = never
+            sampleShots: "s011 vice highway · s012 muscle beach · s100 biplane beach · s027 sunset dock (0.6x)"
+          },
+          // Numbered dots: a compact top tracker (title + ten numbered stations); the numeral slams under it and docks into its label.
+          "1": {
+            style: "dots",
+            title: "Wildest trailer moments",
+            finalTitle: "Final clip",
+            total: 10,
+            startClip: 8,
+            startFill: 0.35,
+            cuts: [1.7662, 4.8662],            // frames 53 / 146
+            numSize: 400,
+            labelSize: 30,                     // station numbers (px); the numeral docks into the current one
+            titleY: 240,                       // y of the title's cap line (top of the tracker)
+            railY: 306,                        // y of the stations' centre line (labels hang under it)
+            railW: 720,                        // width of the station row (centred; 83% of the safe width, labels stay inside x 936)
+            capY: 404,                         // y of the slam numeral's cap line
+            hold: 1.0,                         // each slam reads for 1.0 s before it docks
+            entranceDock: 1.2,
+            scrim: "plate",
+            sampleShots: "s096 police street · s026 sunset pier (0.47x mci) · s055 night truck (0.41x mci)"
+          }
+        },
+        sunset: "linear-gradient(90deg, #F84FA4 0%, #FE78A6 26%, #FE8E4E 64%, #FEB747 100%)", // current slot + the final numeral
+        pearl: "linear-gradient(180deg, #FFFFFF 0%, #FFFFFF 40%, #F4F0F6 64%, #DCD3E6 100%)",   // the counting numerals: lit from above
+        bloom: { color: "#FE8E4E", peak: 1, settle: 0.5, sheen: 0.95 },  // payoff bloom: peaks on the slam, settles, swells as the sheen crosses
+        sheen: { delay: 0.25, dur: 0.5 },          // the payoff sheen across the "10": PAY + delay, power2.inOut
+        flash: { color: "#FFF4EA", peak: 0.35, decay: 0.2, cut: 0.18, expose: 1.5 }, // crisp hits on the footage: payoff flash · cut flash · payoff exposure push
+        dock: { dur: 0.5, finalHold: 1.2 },        // dock move · payoff hold
+        sweep: { stagger: 0.04 },                  // completion beat: each slot turns sunset 40 ms after the previous one
+        timing: { in: 0.1, complete: 6.8, out: 7.45, end: 8.0 }  // entrance · the last slot fills (completion beat) · exit (blur-out) · end
+      };
+      /* ====================================================================================== */
+
+      (function () {
+        const VARS = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+        const vKey = CONFIG.variants[String(VARS.variant)] ? String(VARS.variant) : "0";
+        const plate = VARS.bg !== "none";
+        const V = CONFIG.variants[vKey], T = CONFIG.timing, D = CONFIG.dock, isBar = V.style !== "dots";
+        const $ = (s) => document.querySelector(s);
+        const $$ = (s) => Array.from(document.querySelectorAll(s));
+
+        // only this variant's sample shots, and none on a transparent export
+        $$("video.shot").forEach((v) => { if (!plate || !v.classList.contains(isBar ? "set0" : "set1")) v.style.display = "none"; });
+        if (plate) $("#root").classList.add("plate");
+        $(isBar ? "#v1" : "#v0").style.display = "none";
+        const scrimOn = V.scrim === true || (V.scrim === "plate" && plate);
+        const scrimEl = $(isBar ? "#scrim0" : "#scrim1t");
+        if (!scrimOn) scrimEl.style.display = "none"; else if (!plate) scrimEl.classList.add("soft");
+        if (!isBar && !(scrimOn && plate)) $("#spot1").style.display = "none";
+
+        /* ---- schedule ---- */
+        const total = Math.max(2, V.total | 0);
+        const start = Math.min(Math.max(1, V.startClip | 0), total);
+        const cuts = V.cuts.filter((t) => t > T.in && t < T.out).slice(0, total - start);
+        const spans = [];                      // clip c is on screen over [s, e)
+        for (let k = 0; k <= cuts.length; k++) spans.push({ c: start + k, s: k === 0 ? 0 : cuts[k - 1], e: k < cuts.length ? cuts[k] : T.out });
+        const last = spans[spans.length - 1];
+        const final = last.c === total && spans.length > 1;   // the edit reaches the last clip: that cut is the payoff
+        const PAY = final ? last.s : null;
+        // the completion beat: the last slot finishes filling at T.complete and the whole tracker sweeps to the sunset
+        const C = final && T.complete > last.s + 0.6 && T.complete < T.out - 0.3 ? T.complete : null;
+        const fillEnd = (k) => (C != null && k === spans.length - 1 ? C : spans[k].e);
+        const pad = String(total).length < 2 ? 2 : String(total).length;
+        const fmt = (n) => String(n).padStart(pad, "0");
+        // when each clip's numeral docks: a slam hold after the cut, a longer hold on the payoff
+        spans.forEach((sp, k) => {
+          const at = k === 0 ? T.in + V.entranceDock : (final && k === spans.length - 1) ? sp.s + D.finalHold : sp.s + V.hold;
+          sp.dock = at + D.dur <= sp.e - 0.05 ? at : null;
+        });
+
+        const setSwap = (el, a, b) => { el.children[0].textContent = a; el.children[1].textContent = b || a; };
+        setSwap($(isBar ? "#kick0" : "#kick1"), V.title, V.finalTitle);
+
+        /* ---- odometer: one rolling column per digit; a column only gets a new row when its digit changes.
+               On the payoff every column gets a fresh final row, so the final number rolls in already lit (sunset fill). ---- */
+        const numEl = $(isBar ? "#num0" : "#num1");
+        numEl.style.fontSize = V.numSize + "px";
+        const seq = spans.map((sp) => fmt(sp.c));
+        const L = seq[0].length;
+        const slots = [];
+        for (let j = 0; j < L; j++) {
+          const chars = [], idx = [];
+          seq.forEach((s, k) => {
+            const lit = final && k === seq.length - 1;
+            if (!chars.length || chars[chars.length - 1] !== s[j] || lit) chars.push(s[j]);
+            idx.push(chars.length - 1);
+          });
+          const slot = document.createElement("span"); slot.className = "slot";
+          slot.setAttribute("data-layout-allow-overflow", "");
+          const col = document.createElement("span"); col.className = "col";
+          col.setAttribute("data-layout-allow-overflow", ""); col.setAttribute("data-layout-allow-overlap", "");
+          col.innerHTML = chars.map((ch) => "<b data-layout-allow-occlusion>" + ch + "</b>").join("");
+          slot.appendChild(col); numEl.appendChild(slot);
+          slots.push({ slot, col, rows: Array.from(col.children), idx });
+        }
+        const totIn = isBar ? $("#tot0i") : null;
+        if (totIn) { totIn.textContent = "/" + fmt(total); $("#tot0").style.fontSize = V.totSize + "px"; }
+
+        document.fonts.ready.then(() => {
+          const tl = gsap.timeline({ paused: true });
+          const FT = (el, from, to, at) => tl.fromTo(el, from, Object.assign({ immediateRender: false }, to), at);
+          const hard = (el, from, to, at) => FT(el, from, Object.assign({ duration: 0, ease: "none" }, to), at);
+          // a hit that jumps to a state and decays back: the hard step first, so a backward seek past it lands on `pre`, not `from`
+          const pulse = (el, pre, from, to, at) => { hard(el, pre, from, at); FT(el, from, to, at); };
+
+          /* ---- measure the numeral (Archivo wide, loaded) ---- */
+          const fs = V.numSize;
+          const probeBase = (host) => {   // baseline y of host's text relative to host's top
+            const pr = document.createElement("i");
+            pr.style.cssText = "display:inline-block;width:0;height:0;vertical-align:baseline";
+            host.appendChild(pr); const y = pr.getBoundingClientRect().top - host.getBoundingClientRect().top; pr.remove(); return y;
+          };
+          const meas = document.createElement("span");
+          meas.className = "numtype"; meas.style.cssText = "position:absolute;left:0;top:0;white-space:nowrap;visibility:hidden;line-height:" + fs + "px;font-size:" + fs + "px";
+          numEl.parentNode.appendChild(meas);
+          let dW = 0;
+          "0123456789".split("").forEach((d) => { meas.textContent = d; dW = Math.max(dW, meas.getBoundingClientRect().width); });
+          meas.textContent = "0";
+          const rowBase = probeBase(meas);
+          meas.remove();
+          let inkA = 0.72 * fs, inkD = 0.012 * fs;
+          try {
+            const ctx = document.createElement("canvas").getContext("2d");
+            ctx.font = "800 " + fs + 'px "Archivo"';
+            const m = ctx.measureText("0123456789");
+            if (m.actualBoundingBoxAscent > 0.5 * fs) { inkA = m.actualBoundingBoxAscent; inkD = Math.max(0, m.actualBoundingBoxDescent); }
+          } catch (e) {}
+          // The roll window is the numeral's own line box: the ink plus 10 px. A rolling digit is clipped (6 px feather) right at
+          // the cap line and the baseline, so it never crosses the title above or the bar below; the resting digit is never faded.
+          const EDGE = 10, FEATHER = 6;
+          const winH = Math.round(inkA + inkD + 2 * EDGE);
+          const P = winH + Math.round(0.16 * fs);                // row pitch > window: neighbours are never in view at rest
+          const rowTop = EDGE + inkA - rowBase;                   // puts each row's baseline at EDGE + inkA inside the window
+          const mask = "linear-gradient(180deg, transparent 0px, #000 " + FEATHER + "px, #000 " + (winH - FEATHER) + "px, transparent " + winH + "px)";
+          slots.forEach((S) => {
+            Object.assign(S.slot.style, { width: dW + "px", height: winH + "px", webkitMaskImage: mask, maskImage: mask });
+            S.rows.forEach((r, ri) => Object.assign(r.style, { top: (rowTop + ri * P) + "px", height: fs + "px", lineHeight: fs + "px" }));
+          });
+          const numW = dW * L, inkH = inkA + inkD;
+          // Optical side bearings of Archivo 125% / 800 tabular figures inside their slot, as a fraction of the size, measured
+          // from renders. The flat-footed "1" sits much further in than the round "0" (r08 defect: the "1" of "10" started
+          // 31 px inside the column), so the left edge is set from the FIRST glyph of each number. The "0" overshoots 2 px.
+          const LSBF = { "0": 0.049, "1": 0.108 };
+          const lsbOf = (s) => (LSBF[s[0]] != null ? LSBF[s[0]] : LSBF["0"]) * fs;
+          const LSB = lsbOf(seq[0]), RSB = 0.03 * fs, TGAP = 16;   // "/10" sits 16 px right of the ink
+
+          /* ---- the numeral's material: a pearl fill lit from above (counting numbers) or the sunset (the final number), each
+                 with a specular sheen layer; one drive owns the sheen position and the bloom for the whole timeline ---- */
+          const glowEl = $(isBar ? "#glow0" : "#glow1");
+          const SHEEN = "linear-gradient(105deg, rgba(255,255,255,0) 22%, rgba(255,255,255,.95) 50%, rgba(255,255,255,0) 78%)";
+          const SW = Math.round(0.42 * numW);                    // sheen band layer width
+          const allRows = [];
+          slots.forEach((S, j) => S.rows.forEach((r, ri) => {
+            const lit = final && ri === S.rows.length - 1, s = r.style;
+            s.backgroundImage = SHEEN + ", " + (lit ? CONFIG.sunset : CONFIG.pearl);
+            s.backgroundRepeat = "no-repeat";
+            s.backgroundSize = SW + "px " + fs + "px, " + numW + "px " + fs + "px";
+            s.webkitBackgroundClip = "text"; s.backgroundClip = "text";
+            s.color = "transparent"; s.webkitTextFillColor = "transparent";
+            allRows.push({ el: r, x: -j * dW });
+          }));
+          const PARK = -SW - 40, SPAN = numW + SW + 80;
+          let lastBand = null;
+          const setBand = (bx) => {
+            if (bx === lastBand) return; lastBand = bx;
+            allRows.forEach((R) => { R.el.style.backgroundPosition = (bx + R.x) + "px 0px, " + R.x + "px 0px"; });
+          };
+          setBand(PARK);
+          // sheen passes: the entrance, a quick one on every slam, and the payoff pass across the lit "10"
+          const SH = CONFIG.sheen;
+          const sheens = [{ at: T.in + 0.62, dur: 0.6 }];
+          cuts.forEach((c, k) => sheens.push(final && k === cuts.length - 1 ? { at: PAY + SH.delay, dur: SH.dur } : { at: c + 0.07, dur: 0.55 }));
+          // bloom: a white bloom while counting with a flare on every slam; the payoff swaps to a warm sunset bloom
+          const whiteCss = (s) => "drop-shadow(0 0 1px rgba(255,255,255," + (0.3 * s).toFixed(3) + ")) drop-shadow(0 0 16px rgba(255,255,255," +
+            (0.2 * s).toFixed(3) + ")) drop-shadow(0 0 46px rgba(255,255,255," + (0.1 * s).toFixed(3) + "))";
+          const B = CONFIG.bloom, brgb = (() => { const n = parseInt(B.color.slice(1), 16); return ((n >> 16) & 255) + "," + ((n >> 8) & 255) + "," + (n & 255); })();
+          const sunCss = (s) => "drop-shadow(0 0 2px rgba(255,230,205," + (0.5 * s).toFixed(3) + ")) drop-shadow(0 0 18px rgba(" + brgb + "," + (0.62 * s).toFixed(3) +
+            ")) drop-shadow(0 0 56px rgba(248,79,164," + (0.4 * s).toFixed(3) + "))";
+          const flares = cuts.filter((c, k) => !(final && k === cuts.length - 1));
+          const HE = gsap.parseEase("power2.inOut"), PO = gsap.parseEase("power2.out");
+          let lastGlow = null;
+          Look.drive(tl, 0, T.end, (p) => {
+            const t = p * T.end;
+            let bx = PARK;
+            sheens.forEach((w) => { if (t > w.at && t < w.at + w.dur) bx = PARK + SPAN * HE((t - w.at) / w.dur); });
+            setBand(Math.round(bx));
+            let css;
+            if (final && t >= PAY - 0.002) {
+              // the slam peaks the bloom, it settles by the time the sheen starts, swells while the sheen crosses the "10"
+              // (the light reads as passing over the surface), settles again; a small flare on the completion beat
+              const d = Math.max(0, t - PAY);
+              let s = B.settle;
+              if (d < SH.delay) s = B.peak - (B.peak - B.settle) * PO(d / SH.delay);
+              else if (d < SH.delay + SH.dur) s = B.settle + (B.sheen - B.settle) * Math.sin(Math.PI * (d - SH.delay) / SH.dur);
+              if (C != null && t > C && t < C + 0.7) s = Math.max(s, B.settle + 0.35 * Math.sin(Math.PI * (t - C) / 0.7));
+              css = sunCss(s);
+            } else {
+              let s = 1;
+              flares.forEach((c) => { const d = t - c; if (d > -0.002 && d < 0.6) s = Math.max(s, 1 + 1.8 * (1 - PO(Math.max(0, d) / 0.6))); });
+              css = whiteCss(s);
+            }
+            if (css !== lastGlow) { glowEl.style.filter = css; lastGlow = css; }
+          });
+          if (final) Look.chroma(tl, isBar ? "#num0w" : "#num1w", PAY + 0.034, 0.2, { px: 6 });   // a short RGB hit on the incoming "10"
+
+          /* ---- exposure hits (plate only): a crisp flash frame on the footage that decays fast, under the type ---- */
+          const F = CONFIG.flash;
+          const flash = (at, peak, decay) => {
+            const el = document.createElement("div"); el.className = "wflash";
+            // nearly even across the frame (a camera flash, not a soft glow), a touch hotter behind the numeral
+            el.style.background = "radial-gradient(ellipse 110% 80% at " + (isBar ? "36% 25%" : "50% 28%") + ", #FFFFFF 0%, " +
+              F.color + " 45%, rgba(255,240,228,.78) 100%)";
+            $("#root").insertBefore(el, $("#ov"));
+            pulse(el, { opacity: 0 }, { opacity: peak }, { opacity: 0, duration: decay, ease: "expo.out" }, at - 0.002);
+          };
+          // exposure push on the footage with the flash: highlights (lamps, tail lights, sky) flare, shadows stay dark
+          const expose = (at, peak, dur) => pulse("#push", { filter: "brightness(1)" }, { filter: "brightness(" + peak + ")" },
+            { filter: "brightness(1)", duration: dur, ease: "expo.out" }, at - 0.002);
+
+          /* ---- per-clip footage pushes and cut hits (plate only) ---- */
+          if (plate) {
+            gsap.set("#push", { scale: 1, transformOrigin: "50% 42%" });
+            spans.forEach((sp, k) => {
+              const end = k < spans.length - 1 ? spans[k + 1].s : T.end;
+              FT("#push", { scale: 1.0 }, { scale: 1.055, duration: end - sp.s, ease: "none" }, sp.s);
+            });
+            flares.forEach((c) => { flash(c, F.cut, 0.16); expose(c, 1.18, 0.22); });
+            if (final) {
+              flash(PAY, F.peak, F.decay);
+              expose(PAY, F.expose || 1.5, 0.32);
+              Look.impact(tl, PAY, { shake: "#shake", amp: 9, flash: 0, zoom: 1.04, dur: 0.34 });
+            }
+          }
+
+          /* ---- numeral rolls: on the cut (starts half a frame early so the cut frame is mid-roll, with motion blur) ---- */
+          // the frame before the cut is untouched, the cut frame is 25% into the roll
+          const RD = 0.4, RE = "expo.out", LEAD = 0.0165;
+          slots.forEach((S) => gsap.set(S.col, { y: -S.idx[0] * P + winH }));
+          slots.forEach((S, j) => {
+            FT(S.col, { y: winH }, { y: 0, duration: 0.85, ease: "expo.out" }, T.in + 0.12 + j * 0.07);
+            Look.mblur(tl, S.col, T.in + 0.12 + j * 0.07, 0.4, { y: 14 });
+          });
+          cuts.forEach((c, k) => {
+            slots.forEach((S) => {
+              const a = S.idx[k], b = S.idx[k + 1];
+              if (a === b) return;
+              FT(S.col, { y: -a * P }, { y: -b * P, duration: RD, ease: RE }, c - LEAD);
+              Look.mblur(tl, S.col, c - LEAD, RD * 0.55, { y: 22 });
+            });
+          });
+
+          if (isBar) {
+            /* ================= variant 0: Segmented bar ================= */
+            const w0 = $("#num0w");
+            const ML = -Math.round(LSB);                          // optical left edge: the first glyph's ink lines up with the title
+            Object.assign(w0.style, { position: "relative", width: numW + "px", height: winH + "px", marginLeft: ML + "px" });
+            numEl.style.width = numW + "px"; numEl.style.height = winH + "px";
+            $("#numrow0").style.height = winH + "px";
+            // fixed tracker on top: the title, then the bar (barGap under the title's box); the numeral hangs under the bar with
+            // its cap line numGap below it. The roll window is the line box, so a rolling digit never crosses the bar.
+            $("#bardock0").style.marginTop = (V.barGap || 18) + "px";
+            $("#numdock0").style.marginTop = ((V.numGap || 26) - EDGE) + "px";
+            // "/10" sits on the numeral's baseline, TGAP right of the ink (86% white)
+            const totEl = $("#tot0");
+            totEl.style.lineHeight = V.totSize + "px";
+            const tBase = probeBase(totEl), tBaseI = probeBase(totIn);
+            Object.assign(totEl.style, { left: (ML + numW - RSB + TGAP) + "px", top: (EDGE + inkA - tBase).toFixed(1) + "px" });
+
+            // dock geometry: ONLY the numeral moves. It scales about its cap-left corner (right under the bar), so the title and
+            // the bar never relocate. "/10" counter-scales about its baseline-left to totDock px and keeps a 14 px gap to the ink.
+            const K = V.dockSize / fs;
+            const TS = (V.totDock || V.totSize * K) / (V.totSize * K), TX = (14 - TGAP * K) / K;
+            gsap.set(["#numdock0", "#numrow0"], { transformOrigin: "0px " + EDGE + "px" });
+            gsap.set("#tot0i", { transformOrigin: "0px " + tBaseI.toFixed(1) + "px" });
+            const dock = (at) => {
+              FT("#numdock0", { scale: 1 }, { scale: K, duration: D.dur, ease: "expo.inOut" }, at);
+              FT("#tot0i", { scale: 1, x: 0 }, { scale: TS, x: TX, duration: D.dur, ease: "expo.inOut" }, at);
+              if (scrimOn) FT("#scrim0", { scaleY: 1 }, { scaleY: 0.6, duration: D.dur, ease: "expo.inOut" }, at);
+            };
+            const slam = (t, docked) => {   // back to full size on the cut frame, with a punch (it drops out of the bar)
+              if (docked) {   // (seek-safe: the from-state is the real state before the cut)
+                hard("#numdock0", { scale: K }, { scale: 1 }, t - 0.002);
+                hard("#tot0i", { scale: TS, x: TX }, { scale: 1, x: 0 }, t - 0.002);
+                if (scrimOn) hard("#scrim0", { scaleY: 0.6 }, { scaleY: 1 }, t - 0.002);
+              }
+              pulse("#numrow0", { scale: 1 }, { scale: 1.06 }, { scale: 1, duration: 0.5, ease: "expo.out" }, t);
+            };
+            // when the first glyph changes (09 → 10), the row re-aligns on the cut so the new first glyph's ink sits on x 72
+            cuts.forEach((c, k) => {
+              const a = Math.round(lsbOf(seq[k])) - Math.round(LSB), b = Math.round(lsbOf(seq[k + 1])) - Math.round(LSB);
+              if (a !== b) hard("#numrow0", { x: -a }, { x: -b }, c - 0.002);
+            });
+
+            let h = "";
+            for (let i = 1; i <= total; i++) h += '<div class="seg"><i class="base"></i><i class="done"></i><i class="fill"></i><i class="fl"></i><i class="sun"></i><i class="gl"></i></div>';
+            $("#segs0").innerHTML = h;
+            const segs = $$("#segs0 .seg"), W = $("#segs0").getBoundingClientRect().width;
+            const lefts = segs.map((s) => s.offsetLeft);
+            const lay = (cls) => segs.map((s) => s.querySelector("." + cls));
+            const done = lay("done"), fill = lay("fill"), fl = lay("fl"), sun = lay("sun"), gl = lay("gl");
+            const GW = 260;                                       // completion glint band width
+            segs.forEach((s, i) => {
+              [fill[i], sun[i]].forEach((e) => { e.style.backgroundImage = CONFIG.sunset; e.style.backgroundSize = W + "px 100%"; e.style.backgroundPosition = -lefts[i] + "px 0px"; });
+              gl[i].style.backgroundSize = GW + "px 100%";
+              gsap.set(done[i], { opacity: i + 1 < start ? 1 : 0 });
+              gsap.set(fill[i], { opacity: i + 1 === start ? 1 : 0 });   // only the current segment's fill (and its lit tip) is ever shown
+              gsap.set(sun[i], { opacity: 0, scaleY: 1 });
+            });
+
+            // entrance: scrim, kicker blur-in, numeral rises through its mask, "/10" slides in, the bar draws left to right
+            gsap.set("#scrim0", { opacity: 0, scaleY: 1 });
+            FT("#scrim0", { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "power2.out" }, 0);
+            Look.enter(tl, "#kick0wrap", T.in, { from: "blur", dur: 0.6, blur: 10 });
+            Look.enter(tl, "#tot0", T.in + 0.42, { from: "right", dist: 40, dur: 0.6, blur: 10 });
+            gsap.set(segs, { scaleX: 0, opacity: 0 });
+            segs.forEach((s, i) => FT(s, { scaleX: 0, opacity: 0 }, { scaleX: 1, opacity: 1, duration: 0.5, ease: "expo.out" }, T.in + 0.25 + i * 0.03));
+
+            // clip by clip: slam on the cut, dock after the hold; the current segment fills through its clip in sunset,
+            // and on the cut it lands white and flashes
+            spans.forEach((sp, k) => {
+              const i = sp.c - 1, from = k === 0 ? (V.startFill || 0) : 0, s0 = k === 0 ? T.in + 0.3 : sp.s;
+              if (k > 0) { slam(sp.s, spans[k - 1].dock != null); hard(fill[i], { opacity: 0 }, { opacity: 1 }, sp.s - 0.002); }
+              if (sp.dock != null) dock(sp.dock);
+              FT(fill[i], { width: from * 100 + "%" }, { width: "100%", duration: Math.max(0.05, fillEnd(k) - s0), ease: "none" }, s0);
+              if (k < spans.length - 1) {
+                hard(done[i], { opacity: 0 }, { opacity: 1 }, sp.e - 0.002);
+                hard(fill[i], { opacity: 1 }, { opacity: 0 }, sp.e - 0.002);
+                pulse(fl[i], { opacity: 0 }, { opacity: 0.95 }, { opacity: 0, duration: 0.35, ease: "power2.out" }, sp.e - 0.002);
+              }
+            });
+
+            if (final) {
+              // PAYOFF on the cut to the last clip: warm exposure hit + shake on the footage; the number rolls in lit, slams,
+              // blooms and takes one sheen (above). The bar stays white; only segment 10 fills.
+              pulse(fl[total - 1], { opacity: 0 }, { opacity: 0.9 }, { opacity: 0, duration: 0.3, ease: "power2.out" }, PAY);
+              const ks = $("#kick0").children;
+              gsap.set(ks[1], { yPercent: 120 });
+              // sequenced: the old line is fully out (and hidden) before the new one starts rising, so they never share a frame
+              FT(ks[0], { yPercent: 0 }, { yPercent: -120, duration: 0.18, ease: "power3.in" }, PAY);
+              hard(ks[0], { opacity: 1 }, { opacity: 0 }, PAY + 0.185);
+              FT(ks[1], { yPercent: 120 }, { yPercent: 0, duration: 0.6, ease: "expo.out" }, PAY + 0.19);
+              // the sky behind the lit "10" drops to dusk on the cut (eases back halfway when it docks)
+              if (scrimOn && plate) {
+                hard("#dusk0", { opacity: 0 }, { opacity: 1 }, PAY - 0.002);
+                if (last.dock != null) FT("#dusk0", { opacity: 1 }, { opacity: 0.5, duration: D.dur, ease: "expo.inOut" }, last.dock);
+                FT("#dusk0", { opacity: last.dock != null ? 0.5 : 1 }, { opacity: 0, duration: 0.42, ease: "power2.in" }, T.out + 0.05);
+              }
+            }
+
+            if (C != null) {
+              // COMPLETION BEAT as segment 10 fills: all ten sweep to the sunset left to right (40 ms stagger, each lands with a
+              // vertical pop), then one glint runs the bar. The sunset is one continuous gradient across the whole bar.
+              const ST = CONFIG.sweep.stagger;
+              segs.forEach((s, i) => FT(sun[i], { opacity: 0, scaleY: 2.4 }, { opacity: 1, scaleY: 1, duration: 0.42, ease: "expo.out" }, C + i * ST));
+              hard(fill[total - 1], { opacity: 1 }, { opacity: 0 }, C + (total - 1) * ST + 0.03);   // its lit tip hands over to the sweep
+              const setG = (bx) => gl.forEach((g, i) => { g.style.backgroundPosition = (bx - lefts[i]) + "px 0px"; });
+              Look.drive(tl, C + 0.2, 0.5, (p) => setG(Math.round(-GW + (W + GW) * HE(p))));
+            }
+
+            // exit: blur out, staggered top to bottom; the scrim follows
+            Look.exit(tl, ["#kick0wrap", "#bar0", "#numrow0"], T.out, { to: "blur", dur: 0.35, stagger: 0.05, blur: 14 });
+            FT("#scrim0", { opacity: 1 }, { opacity: 0, duration: 0.42, ease: "power2.in" }, T.out + 0.05);
+          } else {
+            /* ================= variant 1: Numbered dots ================= */
+            const CX = 540, CAPY = V.capY || 404, RY = V.railY || 302, TY = V.titleY || 240;
+            const lockW = numW - LSB - RSB;                      // centre the ink, not the slot box
+            const nx = Math.round(CX - lockW / 2 - LSB);
+            const wrap = $("#numwrap1");
+            Object.assign(wrap.style, { left: nx + "px", top: (CAPY - EDGE) + "px", width: numW + "px", height: winH + "px" });
+            numEl.style.width = numW + "px"; numEl.style.height = winH + "px";
+            const icy = CAPY + inkH / 2;                         // the numeral's ink centre (x = CX)
+            gsap.set(wrap, { transformOrigin: (CX - nx) + "px " + (EDGE + inkH / 2).toFixed(1) + "px" });
+            gsap.set("#numslam1", { transformOrigin: "50% 50%" });
+            $("#spot1").style.top = Math.round(icy - 380) + "px";
+            // when the first glyph changes (09 → 10), re-centre the ink on the cut
+            cuts.forEach((c, k) => {
+              const a = (lsbOf(seq[k]) - LSB) / 2, b = (lsbOf(seq[k + 1]) - LSB) / 2;
+              if (a !== b) hard("#numslam1", { x: -a }, { x: -b }, c - 0.002);
+            });
+
+            // the tracker: title cap line at TY, ten numbered stations at RY (centred, about the numeral's ink width)
+            const k1 = $("#kick1"), k1s = k1.children[0];
+            const kBase = probeBase(k1s) + k1s.offsetTop, kCap = 0.72 * parseFloat(getComputedStyle(k1).fontSize);
+            $("#kick1wrap").style.top = Math.round(TY + kCap - kBase) + "px";
+            const RW = V.railW || 576, x0 = CX - RW / 2, PITCH = RW / (total - 1);
+            const row = $("#row1");
+            row.style.top = RY + "px";
+            let h = "";
+            for (let i = 1; i <= total; i++) {
+              const x = (x0 + (i - 1) * PITCH).toFixed(1);
+              h += '<div class="dot" style="left:' + x + 'px"><i class="up"></i><i class="dn"></i><i class="sn"></i><i class="pg"></i><i class="cu"></i>' +
+                '<svg class="rg" viewBox="0 0 52 52"><circle class="rt" cx="26" cy="26" r="23"/><circle class="ra" cx="26" cy="26" r="23" transform="rotate(-90 26 26)"/></svg>' +
+                '</div><div class="n" style="left:' + x + 'px"><span class="w">' + fmt(i) + '</span><div class="sg"><span class="s">' + fmt(i) + "</span></div></div>";
+            }
+            row.innerHTML = h;
+            const dots = $$("#row1 .dot"), nums = $$("#row1 .n");
+            const L1 = (cls) => dots.map((d) => d.querySelector("." + cls));
+            const up = L1("up"), dn = L1("dn"), sn = L1("sn"), cu = L1("cu"), pg = L1("pg"), rg = L1("rg"), ra = dots.map((d) => d.querySelector(".ra"));
+            const nw = nums.map((n) => n.querySelector(".w")), ns = nums.map((n) => n.querySelector(".s"));
+            ns.forEach((s) => Look.fill(s, CONFIG.sunset, { sheen: true }));
+            const RL = 2 * Math.PI * 23;
+            ra.forEach((a) => { a.style.strokeDasharray = RL; a.style.strokeDashoffset = RL; });
+            const PAST = 0.86, FUT = 0.4;
+            dots.forEach((d, i) => {
+              const isDone = i + 1 < start, isCur = i + 1 === start;
+              gsap.set(up[i], { opacity: isDone || isCur ? 0 : 1 });
+              gsap.set(dn[i], { opacity: isDone ? 1 : 0 });
+              gsap.set(cu[i], { opacity: 0, scale: 0.3 });
+              gsap.set(sn[i], { opacity: 0, scale: 0.3 });
+              gsap.set(pg[i], { opacity: 0 });
+              gsap.set(rg[i], { opacity: 0 });
+              gsap.set(nums[i], { opacity: 0, y: 10 });
+              gsap.set(nw[i], { opacity: isDone ? PAST : isCur ? 0 : FUT });   // the current label is the numeral's landing spot
+              gsap.set(ns[i], { opacity: 0 });
+            });
+
+            // dock target: each station label's ink centre; the numeral flies into it and becomes the label
+            const LS = V.labelSize || 30, labTop = parseFloat(getComputedStyle(nums[0]).top) || 28;
+            const labBase = RY + labTop + probeBase(nw[0]), labCap = LS * inkA / fs;
+            const ty = labBase - labCap / 2, KL = LS / fs;
+            const xOf = (c) => x0 + (c - 1) * PITCH;
+            const dockTo = (c) => ({ x: xOf(c) - CX, y: ty - icy, scale: KL });
+            gsap.set(wrap, { x: 0, y: 0, scale: 1, opacity: 1 });
+            const dock = (sp) => {
+              const at = sp.dock, i = sp.c - 1, to = dockTo(sp.c);
+              FT(wrap, { x: 0, y: 0, scale: 1 }, Object.assign({ duration: D.dur, ease: "expo.inOut" }, to), at);
+              FT(wrap, { opacity: 1 }, { opacity: 0, duration: 0.12, ease: "power1.in" }, at + D.dur - 0.12);
+              FT(ns[i], { opacity: 0 }, { opacity: 1, duration: 0.14, ease: "power1.out" }, at + D.dur - 0.14);
+              if (scrimOn && plate) FT("#spot1", { opacity: 1 }, { opacity: 0, duration: D.dur, ease: "power2.inOut" }, at);
+            };
+            const slam = (sp, prev) => {   // back to full size on the cut frame, with a punch
+              const t = sp.s - 0.002, from = prev.dock != null ? Object.assign({ opacity: 0 }, dockTo(prev.c)) : { x: 0, y: 0, scale: 1, opacity: 1 };
+              hard(wrap, from, { x: 0, y: 0, scale: 1, opacity: 1 }, t);
+              if (scrimOn && plate) hard("#spot1", { opacity: prev.dock != null ? 0 : 1 }, { opacity: 1 }, t);
+              pulse("#numslam1", { scale: 1 }, { scale: 1.07 }, { scale: 1, duration: 0.55, ease: "expo.out" }, sp.s);
+            };
+
+            // entrance: scrim, title blur-in, the stations pop in left to right with their numbers, the numeral rises under them
+            gsap.set(["#scrim1t", "#spot1"], { opacity: 0 });
+            FT("#scrim1t", { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "power2.out" }, 0);
+            if (scrimOn && plate) FT("#spot1", { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "power2.out" }, 0.05);
+            Look.enter(tl, "#kick1wrap", T.in, { from: "blur", dur: 0.6, blur: 10 });
+            gsap.set(dots, { opacity: 0, scale: 0.4 });
+            dots.forEach((d, i) => {
+              FT(d, { opacity: 0, scale: 0.4 }, { opacity: 1, scale: 1, duration: 0.5, ease: "expo.out" }, T.in + 0.2 + i * 0.03);
+              FT(nums[i], { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.5, ease: "expo.out" }, T.in + 0.26 + i * 0.03);
+            });
+            const cs = start - 1;
+            FT(cu[cs], { opacity: 0, scale: 0.3 }, { opacity: 1, scale: 1, duration: 0.6, ease: "back.out(2.2)" }, T.in + 0.2 + cs * 0.03);
+
+            // clip by clip: slam on the cut, dock into the station label after the hold. The current station's ring times
+            // its clip; on the cut that station turns white (its number to 86%), and the next one ignites with a ping.
+            spans.forEach((sp, k) => {
+              const i = sp.c - 1;
+              if (k > 0) slam(sp, spans[k - 1]);
+              if (sp.dock != null) dock(sp);
+              const s0 = k === 0 ? T.in + 0.5 : sp.s, f0 = k === 0 ? (V.startFill || 0) : 0;
+              if (k === 0) FT(rg[i], { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power2.out" }, s0);
+              FT(ra[i], { strokeDashoffset: RL * (1 - f0) }, { strokeDashoffset: 0, duration: Math.max(0.05, fillEnd(k) - s0), ease: "none" }, s0);
+              if (k < spans.length - 1) {
+                const t = sp.e - 0.002;
+                hard(rg[i], { opacity: 1 }, { opacity: 0 }, t);
+                hard(rg[i + 1], { opacity: 0 }, { opacity: 1 }, t);
+                FT(cu[i], { opacity: 1, scale: 1 }, { opacity: 0, scale: 0.5, duration: 0.22, ease: "power2.in" }, t);
+                hard(dn[i], { opacity: 0 }, { opacity: 1 }, t);
+                hard(up[i + 1], { opacity: 1 }, { opacity: 0 }, t);
+                FT(cu[i + 1], { opacity: 0, scale: 0.3 }, { opacity: 1, scale: 1, duration: 0.55, ease: "back.out(2.4)" }, t);
+                pulse(pg[i + 1], { opacity: 0, scale: 1 }, { opacity: 0.9, scale: 1 }, { opacity: 0, scale: 2.6, duration: 0.55, ease: "expo.out" }, t);
+                hard(ns[i], { opacity: sp.dock != null ? 1 : 0 }, { opacity: 0 }, t);
+                hard(nw[i], { opacity: 0 }, { opacity: PAST }, t);
+                hard(nw[i + 1], { opacity: FUT }, { opacity: 0 }, t);
+              }
+            });
+
+            if (final) {
+              // PAYOFF on the cut to the last clip: warm exposure hit + shake; the number rolls in lit, slams, blooms and takes
+              // one sheen (above), then docks into station 10. The title swaps to FINAL CLIP.
+              const ks = $("#kick1").children;
+              gsap.set(ks[1], { yPercent: 120 });
+              // sequenced: the old line is fully out (and hidden) before the new one starts rising, so they never share a frame
+              FT(ks[0], { yPercent: 0 }, { yPercent: -120, duration: 0.18, ease: "power3.in" }, PAY);
+              hard(ks[0], { opacity: 1 }, { opacity: 0 }, PAY + 0.185);
+              FT(ks[1], { yPercent: 120 }, { yPercent: 0, duration: 0.6, ease: "expo.out" }, PAY + 0.19);
+            }
+
+            if (C != null) {
+              // COMPLETION BEAT as station 10's ring closes: the ring hands over with a ping, then every station turns sunset left
+              // to right (40 ms stagger) and its number lights, with a glint travelling along the numbers.
+              const ST = CONFIG.sweep.stagger, n = total - 1;
+              FT(rg[n], { opacity: 1 }, { opacity: 0, duration: 0.3, ease: "power2.out" }, C);
+              pulse(pg[n], { opacity: 0, scale: 1 }, { opacity: 0.9, scale: 1 }, { opacity: 0, scale: 2.6, duration: 0.55, ease: "expo.out" }, C);
+              dots.forEach((d, i) => {
+                const at = C + i * ST;
+                if (i < n) {
+                  FT(sn[i], { opacity: 0, scale: 0.3 }, { opacity: 1, scale: 1, duration: 0.45, ease: "back.out(2.2)" }, at);
+                  FT(nw[i], { opacity: PAST }, { opacity: 0, duration: 0.2, ease: "power1.out" }, at);
+                  FT(ns[i], { opacity: 0 }, { opacity: 1, duration: 0.2, ease: "power1.out" }, at);
+                }
+                Look.sheen(tl, ns[i], at + 0.14, { dur: 0.42, ease: "power2.inOut" });
+              });
+            }
+
+            // exit: title and stations blur out (the numeral has already docked); the scrim follows
+            Look.exit(tl, ["#kick1wrap", "#row1"].concat(last.dock == null ? ["#numslam1"] : []), T.out, { to: "blur", dur: 0.35, stagger: 0.05, blur: 14 });
+            FT("#scrim1t", { opacity: 1 }, { opacity: 0, duration: 0.42, ease: "power2.in" }, T.out + 0.05);
+          }
+
+          Look.install(tl, { duration: T.end, grain: 0.12, vignette: 0.45, enabled: plate });
+          tl.set({}, {}, T.end);
+          window.__timelines = window.__timelines || {};
+          window.__timelines["main"] = tl;
+          tl.seek(0);
+        });
+      })();
+    </script>
+  </body>
+</html>

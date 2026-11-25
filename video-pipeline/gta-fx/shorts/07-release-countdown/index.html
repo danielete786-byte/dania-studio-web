@@ -1,0 +1,744 @@
+<!doctype html>
+<!-- GTA 6 component #7: Release countdown (craft v2). 1080x1920 (9:16), 30 fps, 7 s.
+     variant "0" Rolling digits: full-bleed vertical shots cut on every clock tick (day -> sunset -> night -> midnight at the club).
+                 The digits own the top of the frame: a 460 px sunset day numeral alone and centred (cap y 300-631), "DAYS LEFT"
+                 under it (Archivo Expanded 800, 64 px, tracked), then the live clock in Inter 800 at 128 px (cap top y 820);
+                 "GTA 6 · NOVEMBER 19, 2026" (Rockstar date style) and the platforms sit low at 26 px. Every roll starts 0.12 s
+                 ahead of its tick, so each new digit settles on its cut. Payoff 4.2 s: midnight, the day rolls 30 -> 29 on the
+                 hard cut to the sequin dancer under blue flares (a warm additive flash, punch, shake, RGB split, the numeral's
+                 bloom spikes and settles into the club's blue, then a sheen), the clock cascades to 23:59:59, and the shot holds
+                 in slow motion to the end.
+     variant "1" One day left: full-bleed golden hour, a left-aligned title block in the lower half (faces stay clear above).
+                 The numeral counts 3 -> 2 -> 1 on the cuts, the "S" of DAYS drops out as the 1 lands on the cut to Lucia
+                 (payoff 2.9 s: flash, light leak, RGB split, golden bloom, then a sheen), then the live clock drops in at the
+                 words' size, "23:59:01 TO GO", and ticks while she holds the lens (a pre-slowed, motion-interpolated clip).
+     bg "plate" (graded 4K shots + Look finishing) / "none" (transparent overlay: type + its own soft scrim only).
+     Safe zone: all type inside x 72-936, y 230-1480. -->
+<html lang="en" data-composition-variables='[
+  {"id":"variant","type":"enum","label":"Variant","default":"0","options":[{"value":"0","label":"Rolling digits"},{"value":"1","label":"One day left"}]},
+  {"id":"bg","type":"enum","label":"Background","default":"plate","options":[{"value":"plate","label":"Sample footage"},{"value":"none","label":"Transparent"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link rel="stylesheet" href="assets/fonts/fonts.css" />
+    <link rel="stylesheet" href="assets/kit/look/look.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="assets/kit/look/look.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: transparent; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; font-family: "Inter", sans-serif; color: #fff;
+        -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; }
+      .shot { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform-origin: 50% 45%; }
+      #full0, #full1 { position: absolute; inset: 0; overflow: hidden; }
+      /* the gameplay night drive is darker than the trailer shots around it: lift it to match the cuts around it; scaled from
+         its top edge so the skyline fills the frame and the dark hood at the bottom of the shot drops out */
+      #v0d { filter: brightness(1.14) contrast(1.06) saturate(1.15); }
+      /* the club hold is a dark trailer shot: lift it so the sequins, the flares and the neon carry the frame */
+      #v0e { filter: brightness(1.32) contrast(1.08) saturate(1.18); }
+      .lift { position: absolute; inset: 0; transform-origin: 50% 0%; }
+      #lift123 { transform: scale(1.2); }
+      #lift100 { transform: scale(1.18); }
+      #lift026 { transform: scale(1.36); }
+      /* the club hold is reframed 1.15x from its right edge, so the defocused clubber at the left of the flare section sits
+         off the numeral's left edge instead of behind the "2" */
+      #lift039 { transform: scale(1.15); transform-origin: 100% 40%; }
+      /* the payoff's warm light: an additive (screen) wash between the footage and the type, so it lights the scene, not the glyphs */
+      .wflash { position: absolute; inset: 0; pointer-events: none; mix-blend-mode: screen; opacity: 0; z-index: 5; }
+      #shake0, #push0, #shake1, #push1 { position: absolute; inset: 0; }
+      #ov { position: absolute; inset: 0; z-index: 10; }
+      .layer { position: absolute; inset: 0; display: none; }
+      .abs { position: absolute; }
+
+      /* type */
+      .wide { font-family: "Archivo", "Inter", sans-serif; font-stretch: 125%; text-transform: uppercase; }
+      .kick { font-family: "Archivo", "Inter", sans-serif; font-stretch: 125%; font-weight: 600; text-transform: uppercase;
+        white-space: nowrap; color: rgba(255,255,255,.86); }
+      .plat { font-family: "Inter", sans-serif; font-weight: 600; text-transform: uppercase; white-space: nowrap; color: rgba(255,255,255,.86); }
+      .plat i { font-style: normal; color: rgba(255,255,255,.72); padding: 0 .45em; }
+      /* Rockstar date style: white wide-tracked caps, a hairline #EE08F2 offset and a soft magenta bloom */
+      .rdate { font-family: "Archivo", "Inter", sans-serif; font-stretch: 125%; font-weight: 600; text-transform: uppercase; white-space: nowrap; color: #fff; }
+
+      /* odometer reels: a feathered window over a strip of cells; pitch = window height (a real drum) */
+      .reel { position: relative; overflow: hidden; flex: none; }
+      .strip { position: absolute; left: 0; top: 0; width: 100%; will-change: transform; }
+      .cell { display: block; width: 100%; white-space: nowrap; color: #fff; font-feature-settings: normal; }
+      .cell.c { text-align: center; }
+      .cell.g { color: transparent; -webkit-text-fill-color: transparent; -webkit-background-clip: text; background-clip: text; background-repeat: no-repeat; }
+      .row { position: absolute; display: flex; align-items: flex-start; }
+      .colon .cell { color: rgba(255,255,255,.86); }
+      /* the clock, the second voice: Inter 800, pure white digits in fixed tabular slots (canvas metrics match the DOM because
+         the digits keep default features), case-height colons at 86% */
+      .ck .cell { color: #fff; }
+      .ck .colon .cell { color: rgba(255,255,255,.86); font-feature-settings: "case" 1; }
+      .word { position: relative; flex: none; white-space: nowrap; }
+
+      /* v0 */
+      #blk0, #foot0 { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; }
+      /* soft scrims, part of the graphic (they stay on a transparent export): the sky above the lockup, the floor under the date */
+      .scrimT { position: absolute; left: 0; right: 0; top: 0; height: 820px;
+        background: linear-gradient(180deg, rgba(5,5,9,.6) 0%, rgba(5,5,9,.52) 30%, rgba(5,5,9,.3) 62%, rgba(5,5,9,.1) 84%, rgba(5,5,9,0) 100%); }
+      .scrimB { position: absolute; left: 0; right: 0; bottom: 0; height: 840px; }
+      /* v1 */
+      #scrim1 { position: absolute; left: 0; right: 0; bottom: 0; height: 1180px; }
+      #scrim1b { position: absolute; inset: 0;
+        background: radial-gradient(ellipse 820px 580px at 380px 1180px, rgba(5,5,9,.42) 0%, rgba(5,5,9,.2) 55%, rgba(5,5,9,0) 100%); }
+      #blk1 { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="7" data-width="1080" data-height="1920">
+      <!-- v0 footage: full-bleed vertical shots, every cut on a clock tick (day -> sunset -> night -> midnight at the club).
+           1.2 s and 2.2 s: the biplane and the sunset pier are scaled from their top edge (#lift100, #lift026) so the plane and the
+           couple on the pier sit under the clock, not behind it. 3.2 s: the Vice City night drive (assets/clips copy with the
+           gameplay aim reticle removed by ffmpeg delogo), scaled 1.2x from its top edge so the skyline fills the type zone and the
+           dark convertible hood drops out of frame. 4.2 s (the payoff, midnight): the sequin dancer under the blue flares, held to
+           the end as one speed-ramped shot (reframed 1.15x from its right edge, #lift039, so no face sits behind the numeral): assets/clips/s039-dancer-ramp-v.mp4 is s039 frames 34-56 (the hair whip, the
+           sequins, the flare) slowed to 0.34x with motion-compensated interpolation (2.07 s, no repeated frames), then frames 57-79
+           at native speed (0.77 s: the dancer turns into the neon tubes), ending before the clip's own cut at 2.667 s. The ramp
+           back to real time lands on the 6.2 s exit, and the faces in the crowd behind her only rise once the type has gone.
+           Keep CONFIG.variants["0"].firstTick/tick in step with these cuts. -->
+      <div id="full0">
+        <div id="shake0" data-layout-allow-overflow><div id="push0">
+          <video id="v0a" class="clip shot" src="assets/shots/s135-skydive-city-v.mp4" muted playsinline data-start="0" data-duration="1.2" data-media-start="0.2" data-track-index="0"></video>
+          <div id="lift100" class="lift" data-layout-allow-overflow><video id="v0b" class="clip shot" src="assets/shots/s100-biplane-beach-v.mp4" muted playsinline data-start="1.2" data-duration="1" data-media-start="0.5" data-track-index="0"></video></div>
+          <div id="lift026" class="lift" data-layout-allow-overflow><video id="v0c" class="clip shot" src="assets/shots/s026-sunset-pier-v.mp4" muted playsinline data-start="2.2" data-duration="1" data-media-start="0.3" data-track-index="0"></video></div>
+          <div id="lift123" class="lift" data-layout-allow-overflow><video id="v0d" class="clip shot" src="assets/clips/s123-night-drive-clean-v.mp4" muted playsinline data-start="3.2" data-duration="1" data-media-start="0.2" data-track-index="0"></video></div>
+          <div id="lift039" class="lift" data-layout-allow-overflow><video id="v0e" class="clip shot" src="assets/clips/s039-dancer-ramp-v.mp4" muted playsinline data-start="4.2" data-duration="2.8" data-media-start="0" data-track-index="0"></video></div>
+        </div></div>
+      </div>
+      <!-- v1 footage: full-bleed golden hour. 3 on the sunset dock, 2 on the couple on the balcony (a dark shirt under the type),
+           1 lands on the cut to Lucia (2.9 s) and holds on her to the end. The hold is assets/clips/s018-lucia-slow-v.mp4: s018 from
+           its frame 16 (frames 5-15 are the trailer's own motion blur on her head-lift), pre-slowed to 0.565x with motion-compensated
+           interpolation (ffmpeg minterpolate mci), so every output frame is new (no repeated-frame judder). 4.2 s long, 4.1 s used. -->
+      <div id="full1">
+        <div id="shake1" data-layout-allow-overflow><div id="push1">
+          <video id="v1a" class="clip shot" src="assets/shots/s027-sunset-dock-v.mp4" muted playsinline data-start="0" data-duration="1.6" data-media-start="0.2" data-track-index="1"></video>
+          <video id="v1b" class="clip shot" src="assets/shots/s108-balcony-sunset-v.mp4" muted playsinline data-start="1.6" data-duration="1.3" data-media-start="0" data-track-index="1"></video>
+          <video id="v1c" class="clip shot" src="assets/clips/s018-lucia-slow-v.mp4" muted playsinline data-start="2.9" data-duration="4.1" data-media-start="0.05" data-track-index="1"></video>
+        </div></div>
+      </div>
+
+      <div id="ov" class="clip" data-start="0" data-duration="7" data-track-index="2">
+        <svg width="0" height="0" style="position:absolute;width:0;height:0" aria-hidden="true"><defs id="fxdefs"></defs></svg>
+        <!-- variant 0: Rolling digits -->
+        <div class="layer" id="L0">
+          <div class="scrimT lk-scrim-top" id="scrim0t"></div>
+          <div class="scrimB lk-scrim-bottom" id="scrim0b"></div>
+          <div class="lk-scrim-spot abs" id="scrim0d"></div>
+          <div id="blk0">
+            <div id="lift0" class="abs" style="inset:0">
+              <div class="kick abs" id="kick0" data-layout-allow-overflow></div>
+              <div class="abs" id="numWrap0"><div class="row" id="dgrp" style="position:relative"></div></div>
+              <div class="abs" id="words0">
+                <div class="word abs" id="w01"></div>
+                <div class="word abs" id="w02"></div>
+              </div>
+              <div class="row" id="line2"></div>
+            </div>
+          </div>
+          <div id="foot0">
+            <div class="rdate abs" id="date0"></div>
+            <div class="plat abs" id="plat0"></div>
+          </div>
+        </div>
+        <!-- variant 1: One day left -->
+        <div class="layer" id="L1">
+          <div class="lk-scrim-bottom" id="scrim1"></div>
+          <div id="scrim1b"></div>
+          <div id="blk1">
+            <div id="lift1" class="abs" style="inset:0">
+              <div class="rdate abs" id="kick1"></div>
+              <div class="abs" id="numWrap"></div>
+              <div class="abs" id="words1">
+                <div class="word abs" id="w1"></div>
+                <div class="word abs" id="w2"></div>
+              </div>
+              <div class="row" id="clock1"></div>
+              <div class="kick abs" id="lab1"></div>
+              <div class="plat abs" id="plat1"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const CONFIG = {
+        // the real release (research/gta6/FACTS.md)
+        release: {
+          at: "2026-11-19T00:00:00",                        // countdown target (local midnight on release day)
+          date: "November 19, 2026",
+          platforms: ["PS5", "Xbox Series X|S"]
+        },
+        // the one accent (Leonida sunset core) and the Rockstar date offset colour
+        sunset: "linear-gradient(100deg, #F84FA4 0%, #FE78A6 24%, #FE8E4E 62%, #FEB747 100%)",
+        rockstar: "#EE08F2",
+        variants: {
+          "0": {
+            name: "Rolling digits",
+            dateLine: "GTA 6 · November 19, 2026",           // the footer line, in the Rockstar date style (the platforms sit under it)
+            words: [["Day", "Days"], "Left"],               // one line under the day numeral: "DAYS LEFT" ([singular, plural] from the starting count)
+            // the "now" the clock starts from. Demo: one month out, three seconds before midnight, so the clip ticks
+            // 30 DAYS 00:00:03 -> 00:00:00 and rolls over to 29 DAYS 23:59:59 at the 4th tick (4.2 s, the cut to the club).
+            from: "2026-10-19T23:59:57",
+            firstTick: 1.2, tick: 1.0,                       // s; ticks 1.2, 2.2, 3.2 are footage cuts, 4.2 the payoff cut, 5.2 / 6.2 tick in the hold
+            lead: 0.12,                                      // s, every tick's roll starts this far ahead (expo.out) so the new digit settles on the cut frame
+            width: 792,                                      // px, max ink width of the day numeral, centred on x 540 (x 144-936)
+            maxNum: 460,                                     // px, the day numeral (solved to fit the width, capped at this size)
+            capTop: 300,                                     // px, cap top of the day numeral
+            unit: { size: 64, weight: 800, track: 0.12, gap: 46 },   // "DAYS LEFT": Archivo Expanded 800, tracked, its cap top `gap` px under the numeral
+            clock: { size: 128, weight: 800, track: -0.02, capTop: 820 }, // the second voice: Inter 800, digits in fixed tabular slots
+            label: 26,                                       // px, the footer lines (date, platforms): Archivo 600, tracked .3em
+            footTop: 1336,                                   // px, cap top of the date line (the platforms sit under it)
+            // the light on the type at the payoff: the warm flash, then the club's blue flare light it settles into
+            lights: [{ at: 4.2, color: "#FFD3A0" }, { at: 4.45, color: "#8E8CFF" }],
+            flash: { color: "#FFE2B8", peak: 0.28 },         // a warm additive light on the payoff cut (screen blend, 2 frames up, 4 down)
+            out: 6.2                                         // s, the exit, on the ramp back to real time: the last 0.8 s is the clean club shot
+          },
+          "1": {
+            name: "One day left",
+            kicker: "GTA 6 · November 19, 2026",
+            count: [3, 2, 1],                                // the numeral counts down on the cuts; the last value is the hero
+            cuts: [1.6, 2.9],                                // s, when the numeral steps (= the footage cuts); the last is the payoff
+            words: [["Day", "Days"], "Left"],               // stacked beside the numeral; the "S" drops out when it reaches 1
+            clockLabel: "To go",                             // a small label on the live clock's baseline: "23:59:01 TO GO"
+            // the "now" of the live clock: just after midnight on launch eve, so 23:59:02 is left and agrees with "1 DAY LEFT";
+            // it ticks :01, :00, then the minutes roll over to 23:58:59 at 5.8 s, mid-hold
+            from: "2026-11-18T00:00:58",
+            clockIn: 3.05, firstTick: 3.8, tick: 1.0,
+            light: "#FEB747",                                // the golden-hour light the type picks up at the payoff
+            x: 84,                                           // px, left edge of the title block (ink)
+            capTop: 990,                                     // px, top of the numeral's cap height
+            numSize: 320,                                    // px, numeral font size (the words and the clock are solved to its cap height);
+                                                             // "3 DAYS" (the widest state) spans x 84-852, and "23:59:01 TO GO" x 84-905
+            label: 26                                        // px, kicker, clock label and platforms
+          }
+        },
+        timing: { out: 6.45, end: 7.0 }
+      };
+
+      (function () {
+        const VARS = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+        const vKey = CONFIG.variants[String(VARS.variant)] ? String(VARS.variant) : "0";
+        const plate = VARS.bg !== "none";
+        const V = CONFIG.variants[vKey], T = Object.assign({}, CONFIG.timing, V.out ? { out: V.out } : {});
+        const $ = (s) => document.querySelector(s);
+        const PLATS = CONFIG.release.platforms.map((p) => p.replace(/&/g, "&amp;").replace(/</g, "&lt;")).join("<i>·</i>");
+
+        // footage: only this variant's shots, and none on a transparent export
+        document.querySelectorAll("video.shot").forEach((v) => {
+          if (!plate || v.id.slice(0, 2) !== "v" + vKey) v.style.display = "none";
+        });
+        $("#full0").style.display = (plate && vKey === "0") ? "block" : "none";
+        $("#full1").style.display = (plate && vKey === "1") ? "block" : "none";
+        $("#L" + vKey).style.display = "block";
+
+        /* ---------- measuring (canvas metrics match the DOM: Archivo wide is selected with fontStretch "expanded") ---------- */
+        const cv = document.createElement("canvas").getContext("2d");
+        const setF = (f) => { cv.font = f.w + " " + f.s + "px " + (f.fam || "Archivo"); try { cv.fontStretch = f.fam === "Inter" ? "normal" : "expanded"; } catch (e) {} };
+        const tw = (f, t) => { setF(f); return cv.measureText(t).width; };
+        const ink = (f, t) => { setF(f); return cv.measureText(t); };
+        function dmet(f) {
+          setF(f); let adv = 0;
+          for (let d = 0; d < 10; d++) adv = Math.max(adv, cv.measureText(String(d)).width);
+          const m = cv.measureText("0123456789");
+          return { adv, fA: m.fontBoundingBoxAscent, fD: m.fontBoundingBoxDescent, cap: m.actualBoundingBoxAscent };
+        }
+        function styleF(el, f) {
+          el.style.fontFamily = f.fam === "Inter" ? "Inter, sans-serif" : "Archivo, Inter, sans-serif";
+          el.style.fontStretch = f.fam === "Inter" ? "100%" : "125%"; el.style.fontWeight = f.w; el.style.fontSize = f.s + "px";
+        }
+        // place a single-line text element so its cap top sits at capTop (line box = 1.25 x size)
+        function placeCap(el, f, capTop, ls) {
+          styleF(el, f); const L = Math.round(f.s * 1.25); el.style.lineHeight = L + "px";
+          if (ls) { el.style.letterSpacing = ls + "em"; }
+          const m = ink(f, "HNOX"); const base = (L - (m.fontBoundingBoxAscent + m.fontBoundingBoxDescent)) / 2 + m.fontBoundingBoxAscent;
+          el.style.top = (capTop - (base - m.actualBoundingBoxAscent)).toFixed(1) + "px";
+          return { cap: m.actualBoundingBoxAscent, baseline: capTop + m.actualBoundingBoxAscent };
+        }
+        // tracked text centred on x: letter-spacing trails the last glyph, so pad the left by the same amount
+        function centreTracked(el, cx, ls) { el.style.paddingLeft = ls + "em"; el.style.left = "0px"; el.style.width = "1080px"; el.style.textAlign = "center"; if (cx !== 540) el.style.left = (cx - 540) + "px"; }
+
+        // kerned per-character masks: each glyph in its own clip line, spaced by its real advance + the font's kerning pair
+        function kernSplit(el, text, f, lsPx) {
+          el.textContent = ""; const chars = Array.from(text), inners = [], masks = [];
+          chars.forEach((ch, i) => {
+            const m = document.createElement("span"); m.className = "lk-mask"; m.setAttribute("data-layout-allow-overflow", "");
+            const inn = document.createElement("span"); inn.className = "lk-in"; inn.textContent = ch;
+            m.appendChild(inn);
+            if (i > 0) { const k = tw(f, chars[i - 1] + ch) - tw(f, chars[i - 1]) - tw(f, ch); m.style.marginLeft = "calc(-.06em + " + (k + (lsPx || 0)).toFixed(2) + "px)"; }
+            el.appendChild(m); inners.push(inn); masks.push(m);
+          });
+          return { inners, masks };
+        }
+
+        /* ---------- the reel: a feathered window over a drum of cells, pitch = window height ----------
+           Cells top -> bottom: [blank, v_last ... v_1, v_0, blank]. It starts on the bottom blank, rolls in to v_0, then each
+           tick moves one cell up the list (the strip slides DOWN, so the new, smaller digit drops in from above), and the exit
+           rolls the last value away to the top blank. (Lessons from r01-r04: pitch = window so a rolling slot is never empty;
+           the outgoing digit dims as it turns away so its flat top never reads as an underscore; vertical-only motion blur that
+           is exactly 0 at rest; the gradient is anchored to the window, not the cell.) */
+        let fid = 0;
+        function makeReel(vals, f, M, pad, slotW, o) {
+          o = o || {};
+          const pT = pad[0], pB = pad[1], H = Math.round(M.cap + pT + pB), P = H;
+          const win = document.createElement("div"); win.className = "reel" + (o.colon ? " colon" : "");
+          win.setAttribute("data-layout-allow-overflow", "");
+          win.style.width = slotW + "px"; win.style.height = H + "px";
+          if (!o.colon) {
+            const ft = Math.max(6, pT - 2), fb = Math.max(6, pB - 2);
+            win.style.webkitMaskImage = win.style.maskImage = "linear-gradient(180deg, transparent 0px, rgba(0,0,0,.55) " + (ft * 0.5).toFixed(1) + "px, #000 " + ft + "px, #000 calc(100% - " + fb + "px), rgba(0,0,0,.55) calc(100% - " + (fb * 0.5).toFixed(1) + "px), transparent 100%)";
+          }
+          const strip = document.createElement("div"); strip.className = "strip";
+          const baseIn = (P - (M.fA + M.fD)) / 2 + M.fA, top = pT + M.cap - baseIn;
+          strip.style.top = top.toFixed(2) + "px";
+          const seq = o.colon ? [vals[0]] : [""].concat(vals.slice().reverse(), [""]);
+          const cells = seq.map((v) => {
+            const c = document.createElement("div"); c.className = "cell" + (o.align === "left" ? "" : " c") + (o.grad ? " g" : "");
+            c.textContent = v; styleF(c, f); c.style.height = P + "px"; c.style.lineHeight = P + "px";
+            c.setAttribute("data-layout-allow-occlusion", ""); c.setAttribute("data-layout-allow-overlap", "");
+            strip.appendChild(c); return c;
+          });
+          win.appendChild(strip);
+          let blurEl = null;
+          if (!o.colon) {
+            const NS = "http://www.w3.org/2000/svg", id = "rb" + (fid++);
+            const fl = document.createElementNS(NS, "filter");
+            fl.setAttribute("id", id); fl.setAttribute("x", "-5%"); fl.setAttribute("y", "-10%"); fl.setAttribute("width", "110%"); fl.setAttribute("height", "120%");
+            fl.setAttribute("color-interpolation-filters", "sRGB");
+            blurEl = document.createElementNS(NS, "feGaussianBlur"); blurEl.setAttribute("stdDeviation", "0 0");
+            fl.appendChild(blurEl); $("#fxdefs").appendChild(fl);
+            strip.style.filter = "url(#" + id + ")";
+          }
+          const R = { win, strip, cells, P, H, top, n: seq.length, start: seq.length - 1, land: seq.length - 2, y: (i) => -i * P, blurEl, size: f.s, cap: M.cap };
+          if (!o.colon) gsap.set(strip, { y: R.y(R.start), "--sy": R.y(R.start) + "px" });
+          return R;
+        }
+        // sunset (+ a sheen band) across a group of reels, anchored to each WINDOW so it never travels with the digits
+        const SHEEN = "linear-gradient(105deg, rgba(255,255,255,0) 40%, rgba(255,255,255,.85) 50%, rgba(255,255,255,0) 60%)";
+        function gradReels(reels, group) {
+          const GW = group.offsetWidth;
+          reels.forEach((R) => {
+            const gx = R.win.offsetLeft;
+            R.cells.forEach((c, k) => {
+              const oy = "calc(" + (-(R.top + k * R.P)).toFixed(1) + "px - var(--sy, 0px))";
+              c.style.backgroundImage = SHEEN + ", " + CONFIG.sunset;
+              c.style.backgroundSize = (3 * GW) + "px " + R.H + "px, " + GW + "px " + R.H + "px";
+              c.style.backgroundPosition = "calc(var(--shx, " + (1.6 * GW) + "px) - " + gx + "px) " + oy + ", " + (-gx) + "px " + oy;
+            });
+          });
+          group.style.setProperty("--shx", (1.6 * GW) + "px");
+          return GW;
+        }
+        const bell = (p) => (p <= 0 || p >= 1) ? 0 : (p < 0.5 ? 4 * p * p : 4 * (1 - p) * (1 - p));       // speed of an inOut roll
+        const decay = (p) => (p <= 0 || p >= 1) ? 0 : Math.pow(2, -8 * p) * (1 - p);                      // speed of an expo.out roll
+        const rise = (p) => (p <= 0 || p >= 1) ? 0 : Math.min(1, 1.8 * p * p);                              // speed of a power3.in roll
+        function roll(tl, R, from, to, t0, dur, ease) {
+          ease = ease || "power3.inOut";
+          tl.fromTo(R.strip, { y: R.y(from), "--sy": R.y(from) + "px" }, { y: R.y(to), "--sy": R.y(to) + "px", duration: dur, ease, immediateRender: false }, t0);
+          // the outgoing digit turns away: slow rolls fade it over 60% of the move; fast-start rolls (expo.out) clear it in the
+          // first sixth, before its top can sit in the bottom feather under the landed digit (r05 snapshot: a "2" arc at 2.9 s)
+          const fast = ease === "expo.out";
+          tl.fromTo(R.cells[from], { opacity: 1 }, { opacity: 0, duration: dur * (fast ? 0.16 : 0.6), ease: fast ? "none" : "power3.in", immediateRender: false }, t0);
+          tl.fromTo(R.cells[to], { opacity: 0.25 }, { opacity: 1, duration: dur * 0.5, ease: "power1.out", immediateRender: false }, t0);
+          if (R.blurEl) {
+            const k = ease === "power3.inOut" ? 3 : ease === "power3.in" ? 3 : 6;
+            const sd = Math.max(1, Math.min(Math.round(0.08 * R.size), Math.round(0.1 * k * R.P / (dur * 30))));
+            tl.fromTo(R.blurEl, { attr: { stdDeviation: "0 0" } }, { attr: { stdDeviation: "0 " + sd }, duration: dur,
+              ease: ease === "power3.inOut" ? bell : ease === "power3.in" ? rise : decay, immediateRender: false }, t0);
+          }
+        }
+        // countdown arithmetic from the CONFIG strings (no clock at render time)
+        const secs = (s) => { const m = s.match(/(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)/); return Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]) / 1000; };
+        const split4 = (x) => { x = Math.max(0, x); return [Math.floor(x / 86400), Math.floor(x % 86400 / 3600), Math.floor(x % 3600 / 60), x % 60]; };
+        const distinct = (frames, r) => { const out = []; frames.forEach((f) => { if (!out.length || out[out.length - 1] !== f[r]) out.push(f[r]); }); return out; };
+
+        Promise.all([
+          document.fonts.load("900 100px Archivo"), document.fonts.load("800 100px Archivo"), document.fonts.load("600 30px Archivo"),
+          document.fonts.load("600 30px Inter"), document.fonts.ready
+        ]).then(() => {
+          const tl = gsap.timeline({ paused: true });
+          if (vKey === "0") build0(tl); else build1(tl);
+          Look.install(tl, { duration: T.end, grain: 0.16, vignette: 0.5, enabled: plate });
+          tl.set({}, {}, T.end);
+          window.__timelines = window.__timelines || {};
+          window.__timelines["main"] = tl;
+          tl.seek(0);
+        });
+
+        // white type catching the scene's light: a bloom as drop-shadows on the line's container (outside the line masks, so
+        // the glow is never clipped into a band). Strength s scales the layers (Look.bloom's range, .3-.7, at rest).
+        const bloomF = (hex, s) => {
+          const n = parseInt(hex.replace("#", ""), 16), rgb = ((n >> 16) & 255) + "," + ((n >> 8) & 255) + "," + (n & 255);
+          const a = (x) => Math.min(1, x * s).toFixed(3);
+          return "drop-shadow(0 0 8px rgba(" + rgb + "," + a(0.5) + ")) drop-shadow(0 0 26px rgba(" + rgb + "," + a(0.34) + ")) drop-shadow(0 0 70px rgba(" + rgb + "," + a(0.2) + "))";
+        };
+        const mixHex = (a, b, k) => {
+          const A = parseInt(a.slice(1), 16), B = parseInt(b.slice(1), 16), ch = (x, sh) => (x >> sh) & 255;
+          const m = (sh) => Math.round(ch(A, sh) + (ch(B, sh) - ch(A, sh)) * k);
+          return "#" + ((1 << 24) + (m(16) << 16) + (m(8) << 8) + m(0)).toString(16).slice(1);
+        };
+        // light on the sunset numeral: Look.bloom's three layers (14 / 42 / 110 px at .42 / .28 / .16 x strength) as drop-shadows
+        // on the reel group, outside the reel masks, so the glow follows the glyphs and is never clipped into a band
+        const numBloom = (hex, s) => {
+          const n = parseInt(hex.replace("#", ""), 16), rgb = ((n >> 16) & 255) + "," + ((n >> 8) & 255) + "," + (n & 255);
+          const a = (x) => Math.min(1, x * s).toFixed(3);
+          return "drop-shadow(0 0 14px rgba(" + rgb + "," + a(0.42) + ")) drop-shadow(0 0 42px rgba(" + rgb + "," + a(0.28) + ")) drop-shadow(0 0 110px rgba(" + rgb + "," + a(0.16) + "))";
+        };
+        const NUM_GLOW = "drop-shadow(0 0 22px rgba(248,79,164,.32)) drop-shadow(0 0 70px rgba(254,142,78,.16))";   // its own light, before the hit
+        // the scene's light on the type, one per-frame driver for the whole clip. Before the payoff the numeral carries its own
+        // sunset glow and the white type a faint white bloom. On the payoff the numeral's bloom spikes to `peak` in the light's
+        // colour and decays to `rest` (expo.out over `decay` s, default 0.6); the white type flares to `typePeak` (default 1.5)
+        // and its fill flushes `tintK` (default 50%) toward the light, settling to pure white over 1.2 s; it keeps a bloom in the
+        // scene's colour. Later keys re-colour it (0.35 s). v1 runs on the defaults (its r08 look, locked at 8).
+        function sceneLight(tl, o) {
+          const D = T.end, eN = gsap.parseEase("expo.out"), eT = gsap.parseEase("power2.out"), dec = o.decay || 0.6, tp = o.typePeak || 1.5, tk = o.tintK == null ? 0.5 : o.tintK;
+          const colorAt = (t) => { let c = o.keys[0].color; for (let i = 1; i < o.keys.length; i++) if (t >= o.keys[i].at) c = mixHex(c, o.keys[i].color, Math.min(1, (t - o.keys[i].at) / 0.35)); return c; };
+          Look.drive(tl, 0, D, (p) => {
+            const t = p * D;
+            if (t < o.pay) {
+              o.num.style.filter = NUM_GLOW;
+              o.type.forEach((el) => { el.style.filter = bloomF("#FFFFFF", 0.3); });
+              o.tint.forEach((el) => { el.style.color = "#FFFFFF"; });
+              return;
+            }
+            const c = colorAt(t), kN = 1 - eN(Math.min(1, (t - o.pay) / dec)), kT = 1 - eT(Math.min(1, (t - o.pay) / 1.2));
+            o.num.style.filter = numBloom(c, o.rest + (o.peak - o.rest) * kN);
+            const f = bloomF(mixHex(c, "#FFFFFF", 0.2 * kT), o.typeRest + (tp - o.typeRest) * kT);
+            o.type.forEach((el) => { el.style.filter = f; });
+            o.tint.forEach((el) => { el.style.color = mixHex("#FFFFFF", c, tk * kT); });
+          });
+        }
+
+        // the payoff light: a warm additive wash (screen blend) between the footage and the type, brightest around the numeral and
+        // falling off to the frame edges, so the hit reads as light and never as a grey veil. 2 frames up (peak on the frame after
+        // the cut), 4 frames down. Plate renders only.
+        function warmFlash(tl, at, color, peak, cy) {
+          if (!plate) return;
+          const n = parseInt(color.replace("#", ""), 16), rgb = ((n >> 16) & 255) + "," + ((n >> 8) & 255) + "," + (n & 255);
+          const fl = document.createElement("div"); fl.className = "wflash";
+          fl.style.background = "radial-gradient(ellipse 95% 62% at 50% " + cy + "px, rgba(" + rgb + ",1) 0%, rgba(" + rgb + ",.62) 45%, rgba(" + rgb + ",.26) 100%)";
+          $("#root").appendChild(fl);
+          const F = 1 / 30;
+          tl.fromTo(fl, { opacity: 0 }, { opacity: peak, duration: 2 * F, ease: "none", immediateRender: false }, at - F);
+          tl.fromTo(fl, { opacity: peak }, { opacity: 0, duration: 4 * F, ease: "power2.out", immediateRender: false }, at + F);
+          tl.set(fl, { opacity: 0 }, 0);
+        }
+
+        // per-shot slow push (each cut starts a fresh move, like an editor's keyframed push-in); `to` may be one value or one per shot
+        function pushShots(tl, ids, toAll) {
+          ids.forEach((id, i) => {
+            const v = document.getElementById(id), s = +v.dataset.start, d = +v.dataset.duration;
+            const to = Array.isArray(toAll) ? toAll[i] : toAll;
+            const a = (i % 2) ? to : 1.0, b = (i % 2) ? 1.0 + (to - 1) * 0.15 : to;   // alternate push-in / ease-back
+            gsap.set(v, { scale: a });
+            tl.fromTo(v, { scale: a }, { scale: b, duration: d, ease: "none", immediateRender: false }, s);
+          });
+        }
+
+        /* ======================= variant 0: Rolling digits (full bleed, the digits own the top of the frame) ======================= */
+        function build0(tl) {
+          // the countdown owns the top of every shot: a giant sunset day numeral, "DAYS LEFT" under it, then the live clock, over a
+          // soft top scrim; the Rockstar date and the platforms sit low in the frame over a floor scrim. The scrims are part of the
+          // graphic, so they stay on a transparent export too.
+          $("#kick0").style.display = "none"; $("#w02").style.display = "none";
+          $("#lift0").style.filter = plate
+            ? "drop-shadow(0 2px 6px rgba(0,0,0,.28)) drop-shadow(0 10px 34px rgba(0,0,0,.3))"
+            : "drop-shadow(0 3px 10px rgba(0,0,0,.45)) drop-shadow(0 12px 40px rgba(0,0,0,.4))";
+          $("#foot0").style.filter = "drop-shadow(0 2px 8px rgba(0,0,0,.5))";
+
+          // ---- the clock: one digit array per tick ----
+          const total = Math.max(0, secs(CONFIG.release.at) - secs(V.from));
+          const nTicks = Math.max(0, Math.floor((T.out - 0.1 - V.firstTick) / V.tick) + 1);
+          const d0 = split4(total)[0], dDig = Math.max(1, String(d0).length);
+          const digitsAt = (x) => { const g = split4(x); return (String(g[0]).padStart(dDig, "0") + [1, 2, 3].map((i) => String(g[i]).padStart(2, "0")).join("")).split(""); };
+          const frames = []; for (let k = 0; k <= nTicks; k++) frames.push(digitsAt(total - k));
+          const unitText = ((d0 === 1 ? V.words[0][0] : V.words[0][1]) + " " + V.words[1]).toUpperCase();
+          const held = frames[nTicks];                                              // the digits on the hold (e.g. 29 23:59:57)
+
+          /* ---- the day numeral, alone and centred: Archivo Expanded 900, solved so its ink is at most V.width, capped at maxNum ---- */
+          function lay(N) {
+            const fN = { w: 900, s: N }, MN = dmet(fN), slot = Math.ceil(MN.adv), capN = ink(fN, "H").actualBoundingBoxAscent;
+            const inkL = (d) => (slot - tw(fN, d)) / 2 - ink(fN, d).actualBoundingBoxLeft;   // digit ink inside its centred slot
+            const inkR = (d) => (slot - tw(fN, d)) / 2 + ink(fN, d).actualBoundingBoxRight;
+            const numL = inkL(held[0]), numR = (dDig - 1) * slot + inkR(held[dDig - 1]);
+            return { fN, MN, slot, capN, numL, numR, W: numR - numL };
+          }
+          const N = Math.min(V.maxNum, Math.floor(100 * V.width / lay(100).W));
+          const Lk = lay(N), fN = Lk.fN, capN = Lk.capN;
+          const capTop = V.capTop, numBase = capTop + capN;
+
+          // ---- the unit line, "DAYS LEFT", centred under the numeral ----
+          const fW = { w: V.unit.weight, s: V.unit.size }, capW = ink(fW, "H").actualBoundingBoxAscent;
+          const unitCap = Math.round(numBase + V.unit.gap), unitBase = unitCap + capW;
+          // ---- the clock, the second voice ----
+          const fC = { w: V.clock.weight, s: V.clock.size, fam: "Inter" }, MC = dmet(fC), capC = MC.cap;
+          const clockCap = V.clock.capTop;
+          const padN = [Math.round(0.2 * capN), Math.min(Math.round(0.12 * capN), Math.floor(V.unit.gap) - 6)];
+          const padC = [Math.round(0.3 * capC), Math.round(0.3 * capC)];
+
+          // the day numeral: one sunset reel per digit, in tabular slots, the held value's ink centred on x 540
+          const reels = [];
+          const nw = $("#numWrap0"), dgrp = $("#dgrp");
+          const numLeft = Math.round(540 - Lk.W / 2 - Lk.numL);
+          nw.style.left = numLeft + "px"; nw.style.top = (capTop - padN[0]) + "px";
+          for (let r = 0; r < dDig; r++) { const R = makeReel(distinct(frames, r), fN, Object.assign({}, Lk.MN, { cap: capN }), padN, Lk.slot, { grad: true }); dgrp.appendChild(R.win); reels.push(R); }
+          nw.style.width = (dDig * Lk.slot) + "px"; nw.style.height = reels[0].H + "px";
+          const GW = gradReels(reels.slice(0, dDig), dgrp);
+          dgrp.style.filter = NUM_GLOW;
+          gsap.set(nw, { transformOrigin: (dDig * Lk.slot / 2) + "px " + (padN[0] + capN / 2) + "px" });   // the punch grows from the numeral's centre
+
+          // DAYS LEFT: one tracked line, every glyph in its own mask (kerned), the line clipped to its cap band with short feathers
+          const words = $("#words0"); words.style.left = "0px"; words.style.top = "0px";
+          const w1 = $("#w01"), LW = Math.round(fW.s * 1.25), lsPx = V.unit.track * fW.s;
+          const mW = ink(fW, "HNOX"); const baseIn = (LW - (mW.fontBoundingBoxAscent + mW.fontBoundingBoxDescent)) / 2 + mW.fontBoundingBoxAscent;
+          const capInBox = baseIn - capW, fT = Math.round(0.2 * capW), fB = Math.round(0.2 * capW);
+          w1.style.position = "absolute"; styleF(w1, fW); w1.style.lineHeight = LW + "px"; w1.style.height = LW + "px";
+          w1.style.left = "0px"; w1.style.width = "1080px"; w1.style.textAlign = "center"; w1.style.whiteSpace = "pre";
+          w1.style.webkitMaskImage = w1.style.maskImage = "linear-gradient(180deg, transparent " + (capInBox - fT) + "px, #000 " + (capInBox - 2) + "px, #000 " + (baseIn + 3) + "px, transparent " + (baseIn + fB) + "px)";
+          w1.style.top = (unitCap + capW - baseIn).toFixed(1) + "px";
+          const s1 = kernSplit(w1, unitText, fW, lsPx);
+          gsap.set(s1.inners, { yPercent: -112 });
+
+          // HH:MM:SS, centred on x 540. Every glyph is centred in its own tabular slot (tracking -0.02em), so the line is
+          // symmetric and the digits never shift as they roll.
+          const line2 = $("#line2"); line2.classList.add("ck");
+          const trkPx = V.clock.track * fC.s, slotC = Math.ceil(MC.adv + trkPx), colW = Math.ceil(tw(fC, ":") + trkPx);
+          const lineW = 6 * slotC + 2 * colW;
+          line2.style.left = (540 - lineW / 2).toFixed(1) + "px"; line2.style.top = (clockCap - padC[0]) + "px";
+          const colons = [];
+          for (let g = 0; g < 3; g++) {
+            if (g) { const c = makeReel([":"], fC, MC, padC, colW, { colon: true }); line2.appendChild(c.win); colons.push(c.win); }
+            for (let i = 0; i < 2; i++) { const R = makeReel(distinct(frames, dDig + g * 2 + i), fC, MC, padC, slotC); line2.appendChild(R.win); reels.push(R); }
+          }
+          words.style.filter = line2.style.filter = bloomF("#FFFFFF", 0.3);
+
+          // low in the frame: GTA 6 + the date in the Rockstar style, then the platforms
+          const date = $("#date0"); date.textContent = V.dateLine;
+          const fR = { w: 600, s: V.label };
+          const mR = placeCap(date, fR, V.footTop, 0.3); centreTracked(date, 540, 0.3);
+          date.style.textShadow = "1.5px 0 0 " + CONFIG.rockstar + ", 0 0 18px rgba(238,8,242,.28), 0 0 44px rgba(238,8,242,.12)";
+          const plat = $("#plat0"); plat.innerHTML = PLATS;
+          placeCap(plat, fR, mR.baseline + 24, 0.3); centreTracked(plat, 540, 0.3);
+          // the top scrim runs down past the clock; the floor scrim starts well above the date and is darkest at the frame's
+          // bottom edge; a very soft, wide spot sits behind the date block itself, so it holds on bright passing detail
+          $("#scrim0t").style.height = (clockCap + capC + 260) + "px";
+          $("#scrim0b").style.height = (1920 - (V.footTop - 300)) + "px";
+          const dMid = Math.round((V.footTop + mR.baseline + 24 + 19) / 2), dsc = $("#scrim0d");
+          dsc.style.left = "0px"; dsc.style.width = "1080px"; dsc.style.top = (dMid - 190) + "px"; dsc.style.height = "380px"; dsc.style.opacity = "0.55";
+
+          /* ---------------- timeline ---------------- */
+          const shotIds = ["v0a", "v0b", "v0c", "v0d", "v0e"];
+          if (plate) pushShots(tl, shotIds, [1.06, 1.06, 1.06, 1.06, 1.08]);
+          tl.fromTo(["#scrim0t", "#scrim0b"], { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out", immediateRender: true }, 0);
+          tl.fromTo("#scrim0d", { opacity: 0 }, { opacity: 0.55, duration: 0.5, ease: "power2.out", immediateRender: true }, 0.5);
+          // entrance: the day digits drop in from above (motion blur), the unit's letters follow, then the clock, then the footer
+          reels.slice(0, dDig).forEach((R, k) => roll(tl, R, R.start, R.land, 0.12 + 0.06 * k, 0.55, "expo.out"));
+          tl.fromTo(s1.inners, { yPercent: -112 }, { yPercent: 0, duration: 0.5, ease: "expo.out", stagger: 0.03, immediateRender: false }, 0.3);
+          reels.slice(dDig).forEach((R, i) => roll(tl, R, R.start, R.land, 0.46 + 0.035 * i, 0.5, "expo.out"));
+          colons.forEach((c, k) => tl.fromTo(c, { opacity: 0 }, { opacity: 1, duration: 0.2, ease: "power2.out", immediateRender: true }, 0.46 + 0.035 * (2 * k + 2) + 0.06));
+          Look.enter(tl, "#date0", 0.66, { from: "blur", dur: 0.7, blur: 12, scale: 1.06 });
+          Look.enter(tl, "#plat0", 0.78, { from: "up", dist: 18, dur: 0.6, blur: 6 });
+
+          // ticks: every changed reel starts V.lead s ahead of its tick (expo.out, 0.35 s), so the new digit has settled by the cut
+          // frame. The rollover tick (most reels) is the payoff, on the cut: the day turns first, the clock cascades 15 ms behind it.
+          const idx = reels.map((R) => R.land);
+          let big = 0, bigN = 0, payAt = -1;
+          for (let t = 1; t <= nTicks; t++) { let n = 0; for (let i = 0; i < reels.length; i++) if (frames[t][i] !== frames[t - 1][i]) n++; if (n > bigN) { bigN = n; big = t; } }
+          for (let t = 1; t <= nTicks; t++) {
+            const at = V.firstTick + (t - 1) * V.tick, pay = (t === big && bigN >= 3), t0 = at - V.lead;
+            const step = (i, ts, dur, ease) => { roll(tl, reels[i], idx[i], idx[i] - 1, ts, dur, ease); idx[i]--; };
+            if (pay) {
+              payAt = at;
+              let dayTurns = false;
+              for (let i = 0; i < dDig; i++) if (frames[t][i] !== frames[t - 1][i]) { step(i, t0 + 0.01 * i, 0.35, "expo.out"); dayTurns = true; }
+              let order = 0;
+              for (let i = reels.length - 1; i >= dDig; i--) if (frames[t][i] !== frames[t - 1][i]) step(i, t0 + 0.015 * order++, 0.35, "expo.out");
+              if (dayTurns) {
+                // the new day count punches 1 -> 1.05 -> 1 on the cut; once the light has cleared (+0.3 s), one sheen crosses it
+                tl.fromTo(nw, { scale: 1 }, { scale: 1.05, duration: 0.1, ease: "power2.out", immediateRender: false }, at - 0.03);
+                tl.fromTo(nw, { scale: 1.05 }, { scale: 1, duration: 0.3, ease: "power2.inOut", immediateRender: false }, at + 0.07);
+                tl.fromTo(dgrp, { "--shx": (1.6 * GW) + "px" }, { "--shx": (-3.2 * GW) + "px", duration: 0.6, ease: "power2.inOut", immediateRender: false }, at + 0.3);
+              }
+              if (plate) Look.impact(tl, at, { shake: "#shake0", amp: 12, flash: 0, zoom: 1.05 });
+              warmFlash(tl, at, V.flash.color, V.flash.peak, capTop + capN / 2);
+              Look.chroma(tl, "#blk0", at, 0.42, { px: 16 });
+            } else {
+              let order = 0;
+              for (let i = reels.length - 1; i >= 0; i--) if (frames[t][i] !== frames[t - 1][i]) step(i, t0 + 0.03 * order++, 0.35, "expo.out");
+            }
+          }
+
+          // the club is dark already: the top scrim eases back on the payoff so the shot's light carries the frame
+          if (payAt >= 0) tl.fromTo("#scrim0t", { opacity: 1 }, { opacity: 0.55, duration: 0.6, ease: "power2.out", immediateRender: false }, payAt + 0.1);
+          // light: on the payoff the numeral's bloom spikes in the flash's warm light (.7) and settles to .35 in the club's blue
+          // (expo.out, 0.5 s); DAYS LEFT and the clock flare with it
+          if (payAt >= 0) sceneLight(tl, { pay: payAt, keys: V.lights, num: dgrp, peak: 0.7, rest: 0.35, decay: 0.5, type: [words, line2], typeRest: 0.45, typePeak: 1.0, tintK: 0.35, tint: [words] });
+
+          // exit: every reel rolls its last value away, the unit's letters drop out of their line (fading before their top bars
+          // can sit on the line's bottom edge as an underscore), the footer blurs out, then the scrims lift
+          const X = T.out;
+          reels.forEach((R, i) => roll(tl, R, 1, 0, X + 0.025 * i, 0.32, "power3.in"));
+          tl.fromTo(s1.inners, { yPercent: 0 }, { yPercent: 112, duration: 0.3, ease: "power3.in", stagger: 0.02, immediateRender: false }, X + 0.06);
+          tl.fromTo(s1.inners, { opacity: 1 }, { opacity: 0, duration: 0.2, ease: "power1.in", stagger: 0.02, immediateRender: false }, X + 0.06);
+          // each colon leaves with the digit before it, so no colon is left floating
+          colons.forEach((c, k) => tl.fromTo(c, { opacity: 1 }, { opacity: 0, duration: 0.15, ease: "power2.in", immediateRender: false }, X + 0.025 * (dDig + 2 * k + 1)));
+          Look.exit(tl, ["#plat0", "#date0"], X, { to: "blur", dur: 0.34, stagger: 0.04 });
+          tl.fromTo("#scrim0t", { opacity: payAt >= 0 ? 0.55 : 1 }, { opacity: 0, duration: 0.4, ease: "power2.in", immediateRender: false }, X + 0.12);
+          tl.fromTo("#scrim0b", { opacity: 1 }, { opacity: 0, duration: 0.4, ease: "power2.in", immediateRender: false }, X + 0.12);
+          tl.fromTo("#scrim0d", { opacity: 0.55 }, { opacity: 0, duration: 0.35, ease: "power2.in", immediateRender: false }, X + 0.05);
+        }
+
+        /* ======================= variant 1: One day left (full bleed, lower title block) ======================= */
+        function build1(tl) {
+          const x0 = V.x, capTop = V.capTop;
+          const count = V.count.map(String), last = V.count[V.count.length - 1];
+          // numeral + stacked words, solved from font metrics: the first word's caps align to the numeral's top, the second
+          // word's baseline to the numeral's baseline
+          const fN = { w: 900, s: V.numSize };
+          const MN = dmet(fN);
+          const capN = ink(fN, String(last)).actualBoundingBoxAscent;               // the landed numeral's flat cap height
+          const capRW = ink({ w: 900, s: 100 }, "DAYLEFT").actualBoundingBoxAscent / 100;
+          const gapRatio = 0.26;                                                     // leading between the words, x their cap
+          const Fw = Math.round(capN / ((2 + gapRatio) * capRW));
+          const fW = { w: 900, s: Fw };
+          const capW = ink(fW, "H").actualBoundingBoxAscent;
+          const wordA = V.words[0][1].toUpperCase(), wordAone = V.words[0][0].toUpperCase(), wordB = V.words[1].toUpperCase();
+
+          // numeral window: left-aligned cells, slot = widest count digit; the block's left edge is the landed numeral's ink
+          const advs = count.map((d) => tw(fN, d)), slot = Math.ceil(Math.max(...advs));
+          const inkL = (d) => -ink(fN, d).actualBoundingBoxLeft, inkR = (d) => ink(fN, d).actualBoundingBoxRight;
+          const winLeft = Math.round(x0 - inkL(String(last)));
+          const padN = [Math.round(0.17 * capN), Math.round(0.17 * capN)];
+          const RN = makeReel(count, fN, Object.assign({}, MN, { cap: capN }), padN, slot, { grad: true, align: "left" });
+          const nw = $("#numWrap"); nw.appendChild(RN.win);
+          nw.style.left = winLeft + "px"; nw.style.top = (capTop - padN[0]) + "px"; nw.style.width = slot + "px"; nw.style.height = RN.H + "px";
+          gradReels([RN], nw);
+          nw.style.filter = NUM_GLOW;
+
+          // words: left edge sits a fixed gap after the CURRENT numeral's ink, so it re-spaces as 3 -> 2 -> 1
+          const GAP = Math.round(0.085 * V.numSize);
+          const wordsX = (d) => winLeft + inkR(d) + GAP;
+          const words = $("#words1"); words.style.left = "0px"; words.style.top = "0px";
+          const w1 = $("#w1"), w2 = $("#w2");
+          const capTopW1 = capTop, baseW2 = capTop + capN;
+          const L = Math.round(Fw * 1.25);
+          const mW = ink(fW, "HNOX"); const baseIn = (L - (mW.fontBoundingBoxAscent + mW.fontBoundingBoxDescent)) / 2 + mW.fontBoundingBoxAscent;
+          // each word line is clipped to its own cap band with short feathers, so a letter falling in (or the "S" falling out)
+          // never shows over the neighbouring line; 40 px side padding keeps glyph overhangs inside the mask box
+          const capInBox = baseIn - capW, fT = Math.round(0.16 * capW), fB = Math.round(0.16 * capW);
+          const lineMask = "linear-gradient(180deg, transparent " + (capInBox - fT) + "px, #000 " + (capInBox - 2) + "px, #000 " + (baseIn + 3) + "px, transparent " + (baseIn + fB) + "px)";
+          [w1, w2].forEach((w) => { w.style.position = "absolute"; styleF(w, fW); w.style.lineHeight = L + "px"; w.style.height = L + "px"; w.style.left = "0px";
+            w.style.padding = "0 40px"; w.style.marginLeft = "-40px"; w.style.webkitMaskImage = w.style.maskImage = lineMask; });
+          w1.style.top = (capTopW1 + capW - baseIn).toFixed(1) + "px";
+          w2.style.top = (baseW2 - baseIn).toFixed(1) + "px";
+          const s1 = kernSplit(w1, wordA, fW, 0), s2 = kernSplit(w2, wordB, fW, 0);
+          const sInner = s1.inners[s1.inners.length - 1];                            // the "S" that drops out at 1
+          const hasS = wordA !== wordAone;
+          gsap.set([s1.inners, s2.inners], { yPercent: -112 });
+          gsap.set(words, { x: wordsX(count[0]) });
+          $("#lift1").style.filter = "drop-shadow(0 3px 10px rgba(0,0,0,.30)) drop-shadow(0 14px 44px rgba(0,0,0,.36))";
+          // DAY / LEFT carry a faint white bloom until the payoff, then catch the golden-hour light (sceneLight below)
+          words.style.filter = bloomF("#FFFFFF", 0.3);
+
+          // kicker above: GTA 6 + the date in Rockstar's style
+          const kick = $("#kick1"); kick.textContent = V.kicker;
+          const fL = { w: 600, s: V.label }, capL = ink(fL, "H").actualBoundingBoxAscent;
+          placeCap(kick, fL, capTop - 46 - capL, 0.3); kick.style.left = x0 + "px";
+          kick.style.textShadow = "1.5px 0 0 " + CONFIG.rockstar + ", 0 0 16px rgba(238,8,242,.26), 0 2px 10px rgba(0,0,0,.45)";
+
+          /* the live clock, the second voice: HH:MM:SS in Inter 800 at the words' size (so the frame keeps three sizes: numeral,
+             words + clock, labels), left-aligned on the block's ink edge under LEFT, with a small TO GO on its baseline */
+          const total = Math.max(0, secs(CONFIG.release.at) - secs(V.from)) % 86400;
+          const nT = Math.max(0, Math.floor((T.out - 0.1 - V.firstTick) / V.tick) + 1);
+          const frames = []; for (let k = 0; k <= nT; k++) { const g = split4(total - k); frames.push([1, 2, 3].map((i) => String(g[i]).padStart(2, "0")).join("").split("")); }
+          const fC = { w: 800, s: Fw, fam: "Inter" }, MC = dmet(fC), capC = MC.cap;
+          const trk = -0.02 * Fw, slotC = Math.ceil(MC.adv + trk), colW = Math.ceil(tw(fC, ":") + trk);
+          const rowGap = Math.round(0.45 * capW), clockCap = capTop + capN + rowGap;
+          const padC = [Math.floor(0.45 * rowGap), Math.round(0.24 * capC)];
+          const d0 = frames[0][0], inkIn = (slotC - tw(fC, d0)) / 2 - ink(fC, d0).actualBoundingBoxLeft;
+          const clock = $("#clock1"); clock.classList.add("ck");
+          const clockLeft = Math.round(x0 - inkIn);
+          clock.style.left = clockLeft + "px"; clock.style.top = (clockCap - padC[0]) + "px";
+          const creels = [], ccol = [];
+          for (let g = 0; g < 3; g++) {
+            if (g) { const c = makeReel([":"], fC, MC, padC, colW, { colon: true }); clock.appendChild(c.win); ccol.push(c.win); }
+            for (let i = 0; i < 2; i++) { const R = makeReel(distinct(frames, g * 2 + i), fC, MC, padC, slotC); clock.appendChild(R.win); creels.push(R); }
+          }
+          const clockRight = clockLeft + 6 * slotC + 2 * colW - (slotC - tw(fC, "0")) / 2;     // the last digit's ink edge
+          const lab = $("#lab1"); lab.textContent = V.clockLabel;
+          placeCap(lab, fL, clockCap + capC - capL, 0.3); lab.style.left = Math.round(clockRight + 0.24 * capC) + "px";
+          const plat = $("#plat1"); plat.innerHTML = PLATS;
+          placeCap(plat, fL, clockCap + capC + 30, 0.3); plat.style.left = x0 + "px";
+          clock.style.filter = bloomF("#FFFFFF", 0.3);
+
+          /* ---------------- timeline ---------------- */
+          if (plate) pushShots(tl, ["v1a", "v1b", "v1c"], [1.07, 1.07, 1.10]);   // the held portrait pushes further, so the read has motion
+          tl.fromTo(["#scrim1", "#scrim1b"], { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "power2.out", immediateRender: true }, 0);
+          Look.enter(tl, "#kick1", 0.1, { from: "blur", dur: 0.6, blur: 10 });
+          // the first count drops in, then the words' letters fall into their lines
+          roll(tl, RN, RN.start, RN.land, 0.16, 0.55, "expo.out");
+          tl.fromTo(s1.inners, { yPercent: -112 }, { yPercent: 0, duration: 0.55, ease: "expo.out", stagger: 0.035, immediateRender: false }, 0.26);
+          tl.fromTo(s2.inners, { yPercent: -112 }, { yPercent: 0, duration: 0.55, ease: "expo.out", stagger: 0.035, immediateRender: false }, 0.34);
+          // count down on the cuts; the last step is the payoff
+          let cur = RN.land;
+          V.cuts.forEach((at, i) => {
+            const pay = i === V.cuts.length - 1, next = count[i + 1];
+            roll(tl, RN, cur, cur - 1, at, pay ? 0.55 : 0.34, pay ? "expo.out" : "power3.inOut"); cur--;
+            tl.fromTo(words, { x: wordsX(count[i]) }, { x: wordsX(next), duration: pay ? 0.55 : 0.34, ease: pay ? "expo.out" : "power3.inOut", immediateRender: false }, at);
+            if (pay) {
+              if (hasS && Number(next) === 1) {
+                // DAYS -> DAY: the "S" drops out of its line and is gone before it reaches the line's bottom feather
+                tl.fromTo(sInner, { yPercent: 0 }, { yPercent: 115, duration: 0.2, ease: "power3.in", immediateRender: false }, at);
+                tl.fromTo(sInner, { opacity: 1 }, { opacity: 0, duration: 0.08, ease: "none", immediateRender: false }, at);
+              }
+              if (plate) {
+                Look.impact(tl, at, { shake: "#shake1", amp: 12, flash: 0.5, zoom: 1.045 });
+                // the leak crosses the warm sky and fence above her, not her dark shirt (r05: a magenta smudge on the fabric)
+                Look.leak(tl, at + 0.04, 1.3, { colors: ["#FEB747", "#FE8E4E"], y: 0.30, opacity: 0.28, from: -0.35, to: 1.3 });
+              }
+              Look.chroma(tl, "#blk1", at, 0.42, { px: 16 });
+              // light on the hit: the 1 blooms in the golden-hour light (sceneLight below) and, once the flash has cleared, one
+              // sheen crosses it
+              tl.fromTo(nw, { "--shx": (1.6 * slot) + "px" }, { "--shx": (-3.2 * slot) + "px", duration: 0.6, ease: "power2.inOut", immediateRender: false }, at + 0.3);
+              sceneLight(tl, { pay: at, keys: [{ at: at, color: V.light }], num: nw, peak: 1.1, rest: 0.6, type: [words, clock], typeRest: 0.55, tint: [words] });
+            } else if (plate) {
+              Look.impact(tl, at, { flash: 0.16 });
+            }
+          });
+          // after the 1 lands: the live clock drops in reel by reel (left to right, motion-blurred), its label and the platforms follow
+          creels.forEach((R, i) => roll(tl, R, R.start, R.land, V.clockIn + 0.035 * i, 0.5, "expo.out"));
+          // each colon arrives with the digit after it, so no colon ever floats ahead of the digits
+          ccol.forEach((c, k) => tl.fromTo(c, { opacity: 0 }, { opacity: 1, duration: 0.2, ease: "power2.out", immediateRender: true }, V.clockIn + 0.035 * (2 * k + 2) + 0.06));
+          Look.enter(tl, "#lab1", V.clockIn + 0.2, { from: "blur", dur: 0.5, blur: 8 });
+          Look.enter(tl, "#plat1", V.clockIn + 0.3, { from: "up", dist: 16, dur: 0.6, blur: 6 });
+          const cidx = creels.map((R) => R.land);
+          for (let t = 1; t <= nT; t++) {
+            const at = V.firstTick + (t - 1) * V.tick; let order = 0;
+            for (let i = creels.length - 1; i >= 0; i--) {
+              if (frames[t][i] === frames[t - 1][i]) continue;
+              roll(tl, creels[i], cidx[i], cidx[i] - 1, at + order * 0.04, 0.28, "power3.inOut"); cidx[i]--; order++;
+            }
+          }
+          // a slow second light across the hero numeral during the hold
+          tl.fromTo(nw, { "--shx": (1.6 * slot) + "px" }, { "--shx": (-3.2 * slot) + "px", duration: 1.0, ease: "power2.inOut", immediateRender: false }, 5.1);
+
+          // exit: the 1 and the clock reels roll away, the words' letters drop out of their lines, the small lines blur out. The
+          // letters fade as they drop, so their top bars never sit on the line's bottom edge as underscores (r05: ~6.75 s)
+          const X = T.out;
+          Look.exit(tl, ["#plat1", "#lab1", "#kick1"], X, { to: "blur", dur: 0.34, stagger: 0.04 });
+          creels.forEach((R, i) => roll(tl, R, 1, 0, X + 0.02 + 0.025 * i, 0.32, "power3.in"));
+          ccol.forEach((c, k) => tl.fromTo(c, { opacity: 1 }, { opacity: 0, duration: 0.15, ease: "power2.in", immediateRender: false }, X + 0.02 + 0.025 * (2 * k + 1)));
+          [[s2.inners, X + 0.06], [hasS ? s1.inners.slice(0, -1) : s1.inners, X + 0.1]].forEach(([els, at]) => {
+            tl.fromTo(els, { yPercent: 0 }, { yPercent: 112, duration: 0.3, ease: "power3.in", stagger: 0.025, immediateRender: false }, at);
+            tl.fromTo(els, { opacity: 1 }, { opacity: 0, duration: 0.2, ease: "power1.in", stagger: 0.025, immediateRender: false }, at);
+          });
+          roll(tl, RN, 1, 0, X + 0.12, 0.34, "power3.in");
+          tl.fromTo(["#scrim1", "#scrim1b"], { opacity: 1 }, { opacity: 0, duration: 0.42, ease: "power2.in", immediateRender: false }, X + 0.12);
+        }
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,430 @@
+<!doctype html>
+<!-- GTA 6 component #15 "Magnifier zoom" (Detail callouts), craft v2. 1080x1920, 30 fps, 5.0 s.
+     The detail LIFTS OFF the footage: a lens (v0) or a lifted print (v1) grows out of the tracked spot as an exact
+     1:1 copy of the footage under it, flies to its seat while the magnification climbs to 2.5x (and the detail develops:
+     crisper, richer), and lands on a hit (exposure pulse + shake on the footage, a short RGB split on the inset, glass sheen).
+     The world stays sharp and alive: a light 2.5 px focus fall-off and a soft darkening around the inset, so the lens is the
+     brightest, sharpest object in frame. The hero type rises in the bottom band; at the end the inset flies home and lands.
+     The zoom reads a native-pixel master cut from Rockstar's 2160p Trailer 2 (assets/zoom), frame-matched to the shot.
+     Full-frame component: it ALWAYS shows footage. Safe zone for text and key objects: x 72–936, y 230–1480. -->
+<html lang="en" data-composition-variables='[
+  {"id":"variant","type":"enum","label":"Variant","default":"0","options":[{"value":"0","label":"Round lens"},{"value":"1","label":"Inset card"}]},
+  {"id":"bg","type":"enum","label":"Background","default":"plate","options":[{"value":"plate","label":"Footage + finishing"},{"value":"none","label":"Footage, no finishing (full-frame)"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link rel="stylesheet" href="assets/fonts/fonts.css" />
+    <link rel="stylesheet" href="assets/kit/look/look.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="assets/kit/look/look.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: transparent; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; background: #08080B; font-family: "Inter", sans-serif; color: #fff;
+        -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; }
+      #shake, #push { position: absolute; inset: 0; }
+      .shot { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+
+      /* the world stays sharp: a light focus fall-off + darken outside the spot (hole at the spot), and a soft pool of shade
+         around the inset's seat so the lens / print separates by light, not by killing the image */
+      #defocus { position: absolute; inset: 0; pointer-events: none; }
+      #pool { position: absolute; inset: 0; pointer-events: none; opacity: 0; }
+      #fx { position: absolute; inset: 0; width: 1080px; height: 1920px; overflow: visible; }
+      #fx .w { fill: none; stroke: #fff; stroke-linecap: round; stroke-linejoin: round; }
+      #fx .k { fill: none; stroke: rgba(8,8,12,.55); stroke-linecap: round; stroke-linejoin: round; }
+      #fxLift { filter: drop-shadow(0 0 1.5px rgba(0,0,0,.55)) drop-shadow(0 2px 8px rgba(0,0,0,.35)); }
+
+      /* bottom legibility scrim for the type band (part of the light, not a box) */
+      #scrim { position: absolute; left: 0; right: 0; top: 1080px; bottom: 0; pointer-events: none;
+        background: linear-gradient(180deg, rgba(5,5,9,0) 0%, rgba(5,5,9,.30) 22%, rgba(5,5,9,.60) 40%, rgba(5,5,9,.70) 60%, rgba(5,5,9,.74) 100%); }
+
+      /* ---- the inset: lens (v0) or lifted print (v1). #insetMove carries the lift / flight home, #inset the hit ---- */
+      #insetMove { position: absolute; transform-origin: 50% 50%; }
+      #inset { position: absolute; inset: 0; overflow: hidden; }
+      .zin { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; transform-origin: 0 0; }
+      .zin video { position: absolute; object-fit: fill; }
+      .glass, .sheen, .fringe { position: absolute; inset: 0; pointer-events: none; }
+      .sheen { background-image: linear-gradient(112deg, rgba(255,255,255,0) 41%, rgba(255,255,255,.5) 50%, rgba(255,255,255,0) 59%);
+        background-repeat: no-repeat; background-size: 300% 100%; background-position: 140% 0; mix-blend-mode: screen; }
+      #rim { position: absolute; inset: 0; pointer-events: none; }
+      #deco { position: absolute; overflow: visible; pointer-events: none; }
+
+      /* v0: a precise optical loupe. 3 px white rim with bloom, inner hairline, light edge falloff, a faint specular, chromatic edge */
+      .lens #inset, .lens #rim { border-radius: 50%; }
+      .lens .glass { border-radius: 50%;
+        background: radial-gradient(ellipse 64% 42% at 31% 15%, rgba(255,255,255,.06) 0%, rgba(255,255,255,.02) 45%, rgba(255,255,255,0) 72%),
+                    radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 62%, rgba(0,0,0,.09) 84%, rgba(0,0,0,.24) 100%); }
+      .lens .fringe { border-radius: 50%; box-shadow: inset 4px 2px 7px rgba(255,70,170,.22), inset -4px -2px 7px rgba(70,200,255,.22); }
+      .lens #rim { box-shadow: 0 0 0 3px #fff, 0 0 0 4.5px rgba(8,8,12,.35), 0 0 22px 2px rgba(255,255,255,.30), 0 0 60px rgba(255,255,255,.10),
+                    inset 0 0 0 1px rgba(8,8,12,.30); }
+
+      /* v1: a lifted print. Square corners, one crisp 3 px white print edge + ink keyline, contact shadow; tilts as it lifts */
+      .plate .glass { background: linear-gradient(180deg, rgba(255,255,255,.07) 0%, rgba(255,255,255,0) 18%),
+                                  radial-gradient(ellipse 95% 85% at 50% 45%, rgba(0,0,0,0) 70%, rgba(0,0,0,.10) 100%); }
+      .plate #rim { box-shadow: 0 0 0 3px #fff, 0 0 0 4px rgba(8,8,12,.30); }
+      #shadow { position: absolute; inset: 0; pointer-events: none; }
+      .lens #shadow { border-radius: 50%; }
+      #cap { position: absolute; left: 0; right: 0; display: none; justify-content: space-between; align-items: baseline;
+        font-family: "JetBrains Mono", monospace; font-weight: 600; font-size: 26px; line-height: 1; letter-spacing: .08em; text-transform: uppercase;
+        font-feature-settings: "zero" 1; color: rgba(255,255,255,.94); white-space: nowrap;
+        text-shadow: 0 1px 2px rgba(0,0,0,.45), 0 3px 12px rgba(0,0,0,.4); }
+      .plate #cap { display: flex; }
+
+      /* ---- type: the bottom band, below the spot ---- */
+      #ov { position: absolute; inset: 0; pointer-events: none; }
+      #type { position: absolute; left: 96px; }
+      #h1, #h2 { display: block; width: max-content; white-space: nowrap; }
+      #h2 { filter: drop-shadow(0 4px 16px rgba(0,0,0,.42)) drop-shadow(0 1px 2px rgba(0,0,0,.32)); }
+      .v0 #type { bottom: 428px; }
+      .v0 #h1 { font-size: 48px; font-weight: 700; letter-spacing: .32em; line-height: 1.2; }
+      .v0 #h2 { font-size: 190px; margin-top: -9px; }
+      .v1 #type { bottom: 426px; }
+      .v1 #h1 { font-family: "Inter", sans-serif; font-weight: 700; font-size: 72px; letter-spacing: -0.025em; line-height: 1; }
+      .v1 #h2 { font-size: 280px; line-height: .9; margin-top: -2px; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="5" data-width="1080" data-height="1920">
+      <div id="shake">
+        <div id="push">
+          <video id="plate" class="clip shot" src="assets/shots/s004-palm-shirt-truck-v.mp4" muted playsinline data-start="0" data-duration="5" data-track-index="0"></video>
+        </div>
+        <div id="defocus"></div>
+        <div id="pool"></div>
+        <svg id="fx" viewBox="0 0 1080 1920" data-layout-allow-overflow>
+          <defs>
+            <linearGradient id="coneGrad" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#fff" stop-opacity=".16" />
+              <stop offset="1" stop-color="#fff" stop-opacity=".04" />
+            </linearGradient>
+          </defs>
+          <path id="cone" d="M0 0" fill="url(#coneGrad)" opacity="0" />
+          <g id="fxLift">
+            <path id="legsK" class="k" d="M0 0" stroke-width="5.5" opacity="0" />
+            <path id="legs" class="w" d="M0 0" stroke-width="2.5" opacity="0" />
+            <path id="markK" class="k" d="M0 0" stroke-width="6" />
+            <path id="mark" class="w" d="M0 0" stroke-width="3" />
+            <path id="ticksK" class="k" d="M0 0" stroke-width="5.5" opacity="0" />
+            <path id="ticks" class="w" d="M0 0" stroke-width="2.5" opacity="0" />
+          </g>
+        </svg>
+      </div>
+
+      <div id="scrim"></div>
+
+      <div id="insetMove" data-layout-allow-overflow>
+        <div id="shadow"></div>
+        <div id="inset" data-layout-allow-overflow>
+          <div class="zin" id="zin" data-layout-allow-overflow>
+            <video id="zoom" class="clip" src="assets/zoom/s004-shirt-zoom.mp4" muted playsinline data-start="0" data-duration="5" data-track-index="1" data-layout-allow-overflow></video>
+          </div>
+          <div class="glass"></div>
+          <div class="fringe"></div>
+          <div class="sheen" id="sheen"></div>
+        </div>
+        <div id="rim"></div>
+        <svg id="deco" data-layout-allow-overflow><path id="decoP" fill="none" stroke="#fff" stroke-linecap="square" d="M0 0" /></svg>
+        <div id="cap" data-layout-allow-overflow><span id="capL"></span><span id="capR"></span></div>
+      </div>
+
+      <div id="ov" class="clip" data-start="0" data-duration="5" data-track-index="2">
+        <div id="type" data-layout-allow-occlusion>
+          <div id="h1" data-layout-allow-overflow data-layout-allow-occlusion></div>
+          <div id="h2" data-layout-allow-overflow data-layout-allow-occlusion></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const CONFIG = {
+        // the shot (swap the static src of #plate too). s004: 4K-sourced, graded, 5.0 s, one continuous camera shot.
+        clip: "assets/shots/s004-palm-shirt-truck-v.mp4",
+        // the clip the zoom reads, and the rectangle of the 1080x1920 frame its picture covers (px).
+        // Sample: a native-pixel master of the SAME shot cut from Rockstar's 2160p Trailer 2 (tools/make-zoom-master.sh),
+        // frame region x 240–880, y 800–1400 upscaled once to 1600x1500 = exactly 1:1 on screen at 2.5x, then sharpened.
+        // No sharper source? Use the shot itself: { src: clip, x: 0, y: 0, w: 1080, h: 1920 }. Swap the static src of #zoom too.
+        zoomClip: { src: "assets/zoom/s004-shirt-zoom.mp4", x: 240, y: 800, w: 640, h: 600 },
+        zoom: 2.5,
+        push: { from: 1.0, to: 1.05 },                 // slow camera push on the held shot (origin 50% 45%)
+        // the world outside the spot while the inset is up: a light focus fall-off, not a blackout (the image stays alive)
+        defocus: { blur: 2.5, dim: 0.14, contrast: 1.0, saturate: 1.0 },
+        pool: 0.5,                                     // the soft shade pooled around the inset's seat (0 = off)
+        // the seated detail's grade: it "develops" as it magnifies (none at 1:1, so the lift and landing stay exact copies)
+        grade: { brightness: 0.95, contrast: 1.3, saturate: 1.3 },
+        // the spot: x,y pairs in frame px at track.fps from t = 0 (OpenCV template matching on the shot, tools/track.py:
+        // the palm + two beach umbrellas on the left of the shirt print). Each variant adds its own nudge.
+        track: { fps: 15, pts: [398,1003,404,1002,419,1000,441,1001,469,1003,495,1007,518,1012,537,1018,554,1024,568,1033,578,1042,580,1049,581,1054,583,1053,586,1052,590,1054,594,1060,598,1070,598,1081,596,1094,594,1106,595,1116,601,1121,610,1121,624,1117,640,1111,657,1106,673,1101,685,1099,694,1103,699,1112,700,1123,700,1132,697,1139,694,1142,691,1143,686,1145,680,1147,673,1150,665,1152,659,1151,653,1150,644,1149,631,1152,615,1157,599,1161,586,1160,577,1155,574,1149,574,1147,579,1149,585,1152,591,1156,594,1163,595,1176,592,1193,588,1211,581,1225,571,1233,556,1236,539,1237,520,1237,504,1236,489,1236,478,1236,471,1236,466,1237,464,1240,465,1247,468,1256,470,1266,468,1275,461,1282,450,1287,436,1290,424,1290] },
+        variants: {
+          "0": {
+            style: "lens",
+            hero: ["Tiny", "beach"],                    // the joke is typographic: a tiny tracked "TINY" over a huge sunset "BEACH"
+            lens: { x: 378, y: 556, r: 280 },          // seat (centre) and radius: a 560 px loupe over the dark windshield, clear of the face
+            nudge: [0, -35],                           // palm crown, trunk and both umbrellas in one ring
+            typeTop: 1316                              // the ring (and its ticks) stays above BEACH's cap line
+          },
+          "1": {
+            style: "plate",
+            caption: ["Trailer 2 · 0:14", "2.5×"],     // printed above the print: real source + timestamp (the shot starts at 0:13.7), magnification
+            hero: ["A whole", "beach"],                // "A whole" over a 280 px sunset "beach"
+            plate: { x: 88, y: 300, w: 588, h: 544 },  // the print's box at rest (right edge clear of the face, which lives at x >= ~690)
+            tilt: -2,                                  // degrees: the print settles at a slight angle as it lifts off (flat again when it lands home)
+            nudge: [-6, -30],                          // bush, palm and both umbrellas, the placket kept to the right edge
+            typeTop: 1244                              // the focus box stays above the ascenders of "beach"
+          }
+        },
+        // seconds. spot = the mark draws; lift = the inset leaves the spot; land = the hit; typeOut = the type leaves;
+        // back = the inset flies home (backDur); clear = everything gone; end = composition end
+        timing: { spot: 0.15, lift: 0.50, land: 1.00, settle: 0.30, typeOut: 3.90, back: 4.10, backDur: 0.32, clear: 4.66, end: 5.0 }
+      };
+
+      (function () {
+        const VARS = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+        const vKey = CONFIG.variants[String(VARS.variant)] ? String(VARS.variant) : "0";
+        const V = CONFIG.variants[vKey], T = CONFIG.timing, Z = CONFIG.zoom, D = T.end;
+        const plateBg = VARS.bg !== "none";
+        const isLens = V.style === "lens";
+        const $ = (s) => document.querySelector(s);
+        const root = $("#root");
+        root.classList.add(isLens ? "lens" : "plate", "v" + vKey);
+        gsap.config({ force3D: false });
+
+        // ---- footage + zoom master from CONFIG ----
+        if ($("#plate").getAttribute("src") !== CONFIG.clip) $("#plate").setAttribute("src", CONFIG.clip);
+        const ZC = CONFIG.zoomClip || { src: CONFIG.clip, x: 0, y: 0, w: 1080, h: 1920 };
+        const zv = $("#zoom");
+        if (zv.getAttribute("src") !== ZC.src) zv.setAttribute("src", ZC.src);
+        Object.assign(zv.style, { left: ZC.x + "px", top: ZC.y + "px", width: ZC.w + "px", height: ZC.h + "px" });
+
+        // ---- maths helpers ----
+        const clamp01 = (x) => Math.min(1, Math.max(0, x));
+        const E = (n) => gsap.parseEase(n);
+        const p3io = E("power3.inOut"), p3i = E("power3.in"), p2o = E("power2.out"), p2io = E("power2.inOut"), xo = E("expo.out");
+        const f2 = (x) => x.toFixed(2);
+        const PF = CONFIG.push.from, PT = CONFIG.push.to, O = [540, 0.45 * 1920];
+        const kAt = (t) => PF + (PT - PF) * clamp01(t / D);                 // = the linear Look.push tween on #push
+        const toScreen = (x, y, k) => [O[0] + (x - O[0]) * k, O[1] + (y - O[1]) * k];
+
+        const TR = V.track || CONFIG.track, P = TR.pts, N = P.length / 2, [NX, NY] = V.nudge || [0, 0];
+        function spotFrame(t) {           // the spot in FRAME px (what the zoom reads)
+          if (N <= 1) return [P[0] + NX, P[1] + NY];
+          const f = Math.min(Math.max(t * TR.fps, 0), N - 1), i = Math.min(Math.floor(f), N - 2), u = f - i;
+          return [P[2 * i] + (P[2 * i + 2] - P[2 * i]) * u + NX, P[2 * i + 1] + (P[2 * i + 3] - P[2 * i + 1]) * u + NY];
+        }
+
+        // ---- inset geometry ----
+        const W = isLens ? 2 * V.lens.r : V.plate.w, H = isLens ? 2 * V.lens.r : V.plate.h;
+        const C = isLens ? [V.lens.x, V.lens.y] : [V.plate.x + W / 2, V.plate.y + H / 2];
+        const TILT = isLens ? 0 : (V.tilt || 0), ROV = 1.35;   // the print over-rotates a touch on landing, then settles
+        const im = $("#insetMove");
+        Object.assign(im.style, { left: (C[0] - W / 2) + "px", top: (C[1] - H / 2) + "px", width: W + "px", height: H + "px" });
+        const deco = $("#deco"), decoP = $("#decoP");
+        if (isLens) {
+          // a fine tick ring just outside the rim (a lens barrel scale): ticks every 6 deg, longer every 30 deg
+          const rr = W / 2 + 12, cx = W / 2, cy = H / 2; let d = "";
+          for (let a = 0; a < 360; a += 6) {
+            const L = a % 30 === 0 ? 10 : 6, th = (a - 90) * Math.PI / 180;
+            d += `M${f2(cx + rr * Math.cos(th))} ${f2(cy + rr * Math.sin(th))}L${f2(cx + (rr + L) * Math.cos(th))} ${f2(cy + (rr + L) * Math.sin(th))}`;
+          }
+          decoP.setAttribute("d", d); decoP.setAttribute("stroke-width", "2"); decoP.setAttribute("stroke-opacity", ".55");
+          Object.assign(deco.style, { left: "0px", top: "0px", width: W + "px", height: H + "px", transformOrigin: "50% 50%" });
+        } else {
+          deco.style.display = "none";   // one frame only: the print edge (no viewfinder brackets)
+          $("#capL").textContent = V.caption[0]; $("#capR").textContent = V.caption[1];
+          $("#cap").style.top = "-44px";  // the caption line sits 18 px above the print's top edge
+        }
+
+        if (!isLens) { $("#ticks").setAttribute("stroke-width", "1.5"); $("#ticksK").setAttribute("stroke-width", "4"); }
+        const zin = $("#zin"), defocus = $("#defocus"), pool = $("#pool"), shadow = $("#shadow");
+        const setD = (id, d) => $(id).setAttribute("d", d);
+        const DF = CONFIG.defocus, GR = CONFIG.grade;
+        const OV = 1.035;   // the inset overshoots to 103.5% on landing, then settles
+
+        // the shade pooled around the seat (static gradient, opacity follows the defocus)
+        const PR = Math.max(W, H) / 2;
+        pool.style.background = `radial-gradient(circle at ${C[0]}px ${C[1]}px, rgba(5,5,9,${CONFIG.pool}) 0px, rgba(5,5,9,${(CONFIG.pool * 0.9).toFixed(3)}) ${Math.round(PR * 0.95)}px, rgba(5,5,9,${(CONFIG.pool * 0.4).toFixed(3)}) ${Math.round(PR * 1.4)}px, rgba(5,5,9,0) ${Math.round(PR * 2.0)}px)`;
+
+        // the world's defocus amount 0..1
+        const defAt = (t) => p2io(clamp01((t - 0.32) / 0.62)) * (1 - p2io(clamp01((t - (T.back + 0.08)) / 0.46)));
+        // the spot mark draws (0..1) and leaves
+        const markAt = (t) => xo(clamp01((t - T.spot) / 0.42));
+        const markOut = (t) => 1 - clamp01((t - (T.back + T.backDur)) / (T.clear - T.back - T.backDur));
+
+        // soft hold: passes values through, then eases into the limit m instead of crossing it (no snap)
+        const softMax = (x, m, kk = 34) => (x < m - kk ? x : m - kk * Math.exp(-(x - (m - kk)) / kk));
+        const rot = (x, y, a) => [x * Math.cos(a) - y * Math.sin(a), x * Math.sin(a) + y * Math.cos(a)];
+        function apply(t) {
+          const k = kAt(t), sf = spotFrame(t), fx = sf[0];
+          // the mark's lowest point (ring + its bottom tick, or the box's bottom edge) stays above the variant's typeTop
+          const ext = isLens ? (W / 2 / Z) * k + 22 : (H / Z) * k / 2;
+          const sy = softMax(toScreen(fx, sf[1], k)[1], V.typeTop - ext), sx = toScreen(fx, sf[1], k)[0];
+          const fy = O[1] + (sy - O[1]) / k;       // the frame point actually under the mark (what the zoom shows)
+          const s0 = k / Z;
+          // lift (spot -> seat) and flight home (seat -> spot); the inner zoom always shows the frame at Z, so the on-screen
+          // magnification is Z * scale: k at the spot (an exact copy of the footage under the mark), 2.5x at the seat
+          const pL = p3io(clamp01((t - T.lift) / (T.land - T.lift)));
+          const q = p3i(clamp01((t - T.back) / T.backDur));
+          let sc, cx, cy, ang;
+          if (t < T.land) { sc = s0 + (OV - s0) * pL; cx = sx + (C[0] - sx) * pL; cy = sy + (C[1] - sy) * pL; ang = TILT * ROV * pL; }
+          else {
+            const st = p2o(clamp01((t - T.land) / T.settle));
+            const s1 = OV + (1 - OV) * st, a1 = TILT * (ROV + (1 - ROV) * st);
+            sc = s1 + (s0 - s1) * q; cx = C[0] + (sx - C[0]) * q; cy = C[1] + (sy - C[1]) * q; ang = a1 * (1 - q);
+          }
+          im.style.transform = `translate(${f2(cx - C[0])}px, ${f2(cy - C[1])}px) rotate(${ang.toFixed(3)}deg) scale(${sc.toFixed(4)})`;
+          zin.style.transform = `translate(${f2(W / 2 - Z * fx)}px, ${f2(H / 2 - Z * fy)}px) scale(${Z})`;
+
+          // the detail develops as it magnifies (and un-develops on the way home): exact copy at 1:1, crisp + rich at the seat
+          const lift = (t < T.land ? pL : 1) * (1 - q);
+          zv.style.filter = lift > 0.002 ? `brightness(${(1 + (GR.brightness - 1) * lift).toFixed(3)}) contrast(${(1 + (GR.contrast - 1) * lift).toFixed(3)}) saturate(${(1 + (GR.saturate - 1) * lift).toFixed(3)})` : "none";
+          // the shadow grows as the inset lifts off the footage (contact first, then the long soft fall)
+          shadow.style.boxShadow = lift > 0.002 ? `0 ${f2(2 + 2 * lift)}px ${f2(3 + 4 * lift)}px rgba(0,0,0,${(0.22 + 0.2 * lift).toFixed(3)}), 0 ${f2(36 * lift)}px ${f2(90 * lift)}px ${f2(-18 * lift)}px rgba(0,0,0,${(0.62 * lift).toFixed(3)})` : "none";
+
+          // the mark on the footage + the defocus hole
+          const m = markAt(t) * markOut(t), a = defAt(t);
+          defocus.style.backdropFilter = defocus.style.webkitBackdropFilter =
+            a > 0.001 ? `blur(${f2(DF.blur * a)}px) brightness(${(1 - DF.dim * a).toFixed(3)}) contrast(${(1 + (DF.contrast - 1) * a).toFixed(3)}) saturate(${(1 + (DF.saturate - 1) * a).toFixed(3)})` : "none";
+          pool.style.opacity = a.toFixed(3);
+          let hole, markD = "", ticksD = "", legsD = "", coneD = "", legOp = 0;
+          if (isLens) {
+            const r = (W / 2 / Z) * k, Rl = (W / 2) * sc;
+            hole = `M${f2(sx - r + 1)} ${f2(sy)}A${f2(r - 1)} ${f2(r - 1)} 0 1 0 ${f2(sx + r - 1)} ${f2(sy)}A${f2(r - 1)} ${f2(r - 1)} 0 1 0 ${f2(sx - r + 1)} ${f2(sy)}Z`;
+            // the ring draws as an arc from 12 o'clock (m = 0..1), ticks at N/E/S/W grow out with it
+            if (m > 0.002) {
+              const sweep = Math.min(359.9, 360 * m) * Math.PI / 180, a0 = -Math.PI / 2, a1 = a0 + sweep;
+              markD = `M${f2(sx + r * Math.cos(a0))} ${f2(sy + r * Math.sin(a0))}A${f2(r)} ${f2(r)} 0 ${sweep > Math.PI ? 1 : 0} 1 ${f2(sx + r * Math.cos(a1))} ${f2(sy + r * Math.sin(a1))}`;
+              const t0 = r + 8, t1 = r + 8 + 14 * m;
+              [[0, -1], [1, 0], [0, 1], [-1, 0]].forEach(([ux, uy]) => { ticksD += `M${f2(sx + ux * t0)} ${f2(sy + uy * t0)}L${f2(sx + ux * t1)} ${f2(sy + uy * t1)}`; });
+            }
+            // external tangents between the spot circle (r) and the lens circle (Rl)
+            const dx = cx - sx, dy = cy - sy, d = Math.hypot(dx, dy);
+            legOp = clamp01((d - Math.abs(Rl - r) - 20) / 140) * m;
+            if (d > Math.abs(Rl - r) + 2) {
+              const th = Math.atan2(dy, dx), al = Math.acos(Math.max(-1, Math.min(1, (r - Rl) / d)));
+              const pts = [th + al, th - al].map((ang) => { const nx = Math.cos(ang), ny = Math.sin(ang); return [sx + r * nx, sy + r * ny, cx + Rl * nx, cy + Rl * ny]; });
+              legsD = pts.map((p) => `M${f2(p[0])} ${f2(p[1])}L${f2(p[2])} ${f2(p[3])}`).join("");
+              coneD = `M${f2(pts[0][0])} ${f2(pts[0][1])}L${f2(pts[0][2])} ${f2(pts[0][3])}L${f2(pts[1][2])} ${f2(pts[1][3])}L${f2(pts[1][0])} ${f2(pts[1][1])}Z`;
+            }
+          } else {
+            const bw = (W / Z) * k, bh = (H / Z) * k, x0 = sx - bw / 2, y0 = sy - bh / 2, x1 = sx + bw / 2, y1 = sy + bh / 2;
+            hole = `M${f2(x0 + 1)} ${f2(y0 + 1)}H${f2(x1 - 1)}V${f2(y1 - 1)}H${f2(x0 + 1)}Z`;
+            if (m > 0.002) {
+              // focus box: a 1.5 px hairline (drawn as part of the mark at 50 %) + corner brackets that close in from 1.5x
+              const g = 1 + 0.5 * (1 - m), hx = bw / 2 * g, hy = bh / 2 * g, A = 26;
+              const X0 = sx - hx, X1 = sx + hx, Y0 = sy - hy, Y1 = sy + hy;
+              markD = `M${f2(X0)} ${f2(Y0 + A)}V${f2(Y0)}H${f2(X0 + A)}M${f2(X1 - A)} ${f2(Y0)}H${f2(X1)}V${f2(Y0 + A)}M${f2(X1)} ${f2(Y1 - A)}V${f2(Y1)}H${f2(X1 - A)}M${f2(X0 + A)} ${f2(Y1)}H${f2(X0)}V${f2(Y1 - A)}`;
+              ticksD = `M${f2(x0)} ${f2(y0)}H${f2(x1)}V${f2(y1)}H${f2(x0)}Z`;
+            }
+            // projection: the box's top corners to the print's (rotated) bottom corners (the light rises into the print)
+            const pw = W * sc, ph = H * sc, ar = ang * Math.PI / 180;
+            const bl = rot(-pw / 2, ph / 2, ar), br = rot(pw / 2, ph / 2, ar);
+            const blx = cx + bl[0], bly = cy + bl[1], brx = cx + br[0], bry = cy + br[1], pb = Math.max(bly, bry);
+            legOp = clamp01((y0 - pb - 12) / 90) * m;
+            if (pb < y0 - 2) {
+              legsD = `M${f2(x0)} ${f2(y0)}L${f2(blx)} ${f2(bly)}M${f2(x1)} ${f2(y0)}L${f2(brx)} ${f2(bry)}`;
+              coneD = `M${f2(x0)} ${f2(y0)}L${f2(blx)} ${f2(bly)}L${f2(brx)} ${f2(bry)}L${f2(x1)} ${f2(y0)}Z`;
+            }
+          }
+          defocus.style.clipPath = a > 0.001 ? `path(evenodd, "M0 0H1080V1920H0Z${hole}")` : "none";
+          setD("#mark", markD || "M0 0"); setD("#markK", markD || "M0 0");
+          setD("#ticks", ticksD || "M0 0"); setD("#ticksK", ticksD || "M0 0");
+          const tOp = isLens ? m : 0.5 * m;
+          $("#ticks").setAttribute("opacity", tOp.toFixed(3)); $("#ticksK").setAttribute("opacity", (tOp * 0.8).toFixed(3));
+          setD("#legs", legsD || "M0 0"); setD("#legsK", legsD || "M0 0"); setD("#cone", coneD || "M0 0");
+          $("#legs").setAttribute("opacity", (0.9 * legOp).toFixed(3)); $("#legsK").setAttribute("opacity", (0.8 * legOp).toFixed(3));
+          $("#cone").setAttribute("opacity", legOp.toFixed(3));
+          const g = $("#coneGrad"); g.setAttribute("x1", f2(sx)); g.setAttribute("y1", f2(sy)); g.setAttribute("x2", f2(cx)); g.setAttribute("y2", f2(cy));
+        }
+
+        // ---- type ----
+        $("#h1").textContent = V.hero[0]; $("#h2").textContent = V.hero[1];
+        $("#h1").className = isLens ? "t-label-wide" : "";
+        $("#h2").className = isLens ? "t-wide" : "t-display";
+
+        document.fonts.ready.then(() => {
+          // keep the hero word inside 88 % of the safe width (760 px), measured on the real face (the sample needs no step)
+          const h2 = $("#h2"), maxW = 760;
+          let fs = parseFloat(getComputedStyle(h2).fontSize);
+          for (let i = 0; i < 40 && h2.scrollWidth > maxW; i++) { fs -= 2; h2.style.fontSize = fs + "px"; }
+
+          const tl = gsap.timeline({ paused: true });
+          if (true) Look.push(tl, "#push", 0, D, { from: PF, to: PT });   // footage always shows (full-frame component)
+
+          // one driver places every tracked element from the timeline time (seek-safe; no onUpdate)
+          Look.drive(tl, 0, D, (p) => apply(p * D));
+
+          // the inset appears on the mark as an exact copy of the footage under it (opacity snaps on a frame boundary)
+          const snap = Math.max(0.001, Math.ceil(T.lift * 30 - 1e-6) / 30 - T.lift + 1 / 30);
+          gsap.set("#insetMove", { opacity: 0 });
+          tl.fromTo("#insetMove", { opacity: 0 }, { opacity: 1, duration: snap, ease: "none", immediateRender: false }, T.lift);
+          // motion blur along the flight (up-left on the way out, down-right on the way home)
+          const dirx = C[0] - spotFrame(T.land)[0], diry = C[1] - spotFrame(T.land)[1], dl = Math.hypot(dirx, diry);
+          const bx = Math.abs(dirx / dl) * 10, by = Math.abs(diry / dl) * 10;
+          const blurPeak = (t0, dur) => {
+            const id = "mbIn" + Math.round(t0 * 100), NS = "http://www.w3.org/2000/svg";
+            const svg = document.querySelector("#fx defs"), f = document.createElementNS(NS, "filter");
+            f.setAttribute("id", id); f.setAttribute("x", "-30%"); f.setAttribute("y", "-30%"); f.setAttribute("width", "160%"); f.setAttribute("height", "160%");
+            const gb = document.createElementNS(NS, "feGaussianBlur"); gb.setAttribute("stdDeviation", "0 0"); f.appendChild(gb); svg.appendChild(f);
+            Look.drive(tl, t0, dur, (p) => {
+              const w = Math.sin(Math.PI * p);
+              if (p <= 0 || p >= 1 || w < 0.04) { im.style.filter = "none"; return; }
+              gb.setAttribute("stdDeviation", f2(bx * w) + " " + f2(by * w)); im.style.filter = `url(#${id})`;
+            });
+          };
+          blurPeak(T.lift + 0.08, T.land - T.lift - 0.12);
+          blurPeak(T.back + 0.04, T.backDur - 0.04);
+          tl.to("#insetMove", { opacity: 0, duration: 0.1, ease: "none" }, T.back + T.backDur);
+
+          // deco (the lens's tick ring) lands with the inset
+          if (isLens) {
+            gsap.set("#deco", { opacity: 0, rotation: -24 });
+            tl.fromTo("#deco", { opacity: 0, rotation: -24 }, { opacity: 1, rotation: 0, duration: 0.7, ease: "expo.out", immediateRender: false }, T.land - 0.06);
+            tl.to("#deco", { opacity: 0, duration: 0.16, ease: "power2.in" }, T.back);
+          }
+
+          // scrim for the type band
+          gsap.set("#scrim", { opacity: 0 });
+          tl.fromTo("#scrim", { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "power2.out", immediateRender: false }, T.land - 0.4);
+          tl.to("#scrim", { opacity: 0, duration: 0.5, ease: "power2.inOut" }, T.typeOut + 0.2);
+
+          // ---- THE HIT (land): exposure pulse + shake on the footage (no white flash), a short RGB split on the inset, glass sheen ----
+          if (plateBg) {
+            Look.impact(tl, T.land, { shake: "#shake", amp: 7, flash: 0, zoom: 1.02 });
+            Look.expose(tl, T.land, { target: "#shake", peak: 1.6 });
+          }
+          Look.chroma(tl, "#inset", T.land, 0.16, { px: 5 });
+          Look.drive(tl, T.land + 0.02, 0.62, (p) => { $("#sheen").style.backgroundPosition = f2(140 - 180 * p2io(p)) + "% 0"; });
+
+          // the type rises behind its masks; BEACH / beach completes at ~1.3 s and takes the specular sheen there
+          Look.bloom("#h1", { color: "#FFFFFF", strength: 0.3 });
+          Look.reveal(tl, "#h1", T.land - 0.06, { by: isLens ? "chars" : "words", stagger: isLens ? 0.03 : 0.07, dur: 0.55 });
+          Look.reveal(tl, "#h2", T.land + 0.04, { by: "chars", stagger: 0.03, dur: 0.55 });
+          Look.fill("#h2", "linear-gradient(100deg, #F84FA4 0%, #FE78A6 24%, #FE8E4E 62%, #FEB747 100%)", { sheen: true });
+          Look.sheen(tl, "#h2", T.land + 0.32, { dur: 0.9 });
+          // the film grain + vignette sit over the type on purpose (finishing layer), so the split glyphs allow that layering
+          document.querySelectorAll("#type span, #cap span").forEach((n) => n.setAttribute("data-layout-allow-occlusion", ""));
+          if (!isLens) {
+            Look.enter(tl, "#cap", T.land + 0.08, { from: "blur", dur: 0.55, blur: 10, scale: 1.02 });
+            Look.exit(tl, "#cap", T.typeOut, { to: "blur", dur: 0.3 });
+          }
+
+          // the type block only exists while it is on screen (keeps the masked lines out of contrast checks when hidden)
+          gsap.set("#type", { autoAlpha: 0 });
+          tl.set("#type", { autoAlpha: 1 }, T.land - 0.08);
+          tl.set("#type", { autoAlpha: 0 }, T.typeOut + 0.5);
+
+          // exit: the type drops back behind its masks; then the inset flies home (apply)
+          const outs = (sel) => { const c = document.querySelectorAll(sel + " .lk-c"); return c.length ? c : document.querySelectorAll(sel + " .lk-in"); };
+          tl.to(outs("#h2"), { yPercent: 115, duration: 0.4, ease: "power3.in", stagger: 0.02 }, T.typeOut);
+          tl.to(outs("#h1"), { yPercent: 115, duration: 0.36, ease: "power3.in", stagger: 0.02 }, T.typeOut + 0.04);
+
+          Look.install(tl, { duration: D, grain: 0.12, vignette: 0.62, enabled: plateBg });
+          tl.set({}, {}, D);
+          window.__timelines = window.__timelines || {};
+          window.__timelines["main"] = tl;
+          tl.seek(0);
+        });
+      })();
+    </script>
+  </body>
+</html>

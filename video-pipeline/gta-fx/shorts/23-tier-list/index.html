@@ -1,0 +1,339 @@
+<!doctype html>
+<!-- GTA 6 component #23 — Tier list. 1080x1920 (9:16), 30 fps, 7.6 s.
+     Variables: variant "0" Tier rows / "1" Tier reveal; bg "plate" (sample GTA VI footage) / "none" (transparent overlay).
+     Look: the GTA game-menu panel — one dark board, hairline rows, and ONE opaque white "selected" bar
+     that always marks the item that just landed. "Comment yours" is the board's own footer row.
+     Safe zones: everything sits inside x 72–936, y 230–1480. -->
+<html lang="en" data-composition-variables='[
+  {"id":"variant","type":"enum","label":"Variant","default":"0","options":[{"value":"0","label":"Tier rows"},{"value":"1","label":"Tier reveal"}]},
+  {"id":"bg","type":"enum","label":"Background","default":"plate","options":[{"value":"plate","label":"Sample footage"},{"value":"none","label":"Transparent"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link rel="stylesheet" href="assets/fonts/fonts.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: transparent; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; font-family: "Inter", sans-serif;
+        -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; font-feature-settings: "tnum" 1, "ss01" 1; }
+      .plate { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      #ov { position: absolute; inset: 0; }
+      :root {
+        --ink: #0B0B0E; --paper: #FFFFFF; --navy: #1F202B;
+        --sunset: linear-gradient(135deg, #F84FA4 0%, #FE8E4E 55%, #FEB747 100%);
+        --hair: rgba(255,255,255,.10);
+        --shadow-type: 0 2px 2px rgba(0,0,0,.35), 0 6px 24px rgba(0,0,0,.45);
+        --shadow-card: 0 1px 2px rgba(0,0,0,.25), 0 30px 80px -24px rgba(0,0,0,.65);
+        --shadow-chip: 0 1px 2px rgba(0,0,0,.28), 0 16px 34px -14px rgba(0,0,0,.6);
+        /* the reference menu's "selected" bar, kept fully opaque: white that cools to light grey at the right */
+        --selected: linear-gradient(90deg, #FFFFFF 0%, #FFFFFF 70%, #D6D6DC 100%);
+      }
+
+      /* dim behind the list, so it reads on any clip */
+      #scrim { position: absolute; inset: 0; pointer-events: none; }
+
+      /* header — 3 sizes in the frame: 92 (title, tier letters) / 44 (names, CTA, "?") / 24 (labels) */
+      .kicker { position: absolute; left: 72px; width: 864px; top: 250px; color: rgba(255,255,255,.9);
+        font: 600 24px/1 "Inter", sans-serif; letter-spacing: .35em; text-transform: uppercase; text-shadow: var(--shadow-type); white-space: nowrap; }
+      .title { position: absolute; left: 72px; width: 864px; top: 288px; color: #fff; white-space: nowrap;
+        font: 800 92px/1 "Barlow Condensed", sans-serif; letter-spacing: .02em; text-transform: uppercase; text-shadow: var(--shadow-type); }
+
+      /* one board, rows split by hairlines (both variants) */
+      #board { position: absolute; left: 72px; width: 864px; border-radius: 28px; overflow: hidden; }
+      .v0 #board { background: rgba(14,14,20,.80); backdrop-filter: blur(20px) saturate(1.4); -webkit-backdrop-filter: blur(20px) saturate(1.4);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.14), inset 0 0 0 1px rgba(255,255,255,.08), var(--shadow-card); }
+      .v1 #board { background: rgba(31,32,43,.95);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.12), inset 0 0 0 1px rgba(255,255,255,.06), var(--shadow-card); }
+      .row { position: absolute; left: 0; width: 864px; }
+      .row + .row::before { content: ""; position: absolute; left: 24px; right: 24px; top: 0; height: 1px; background: var(--hair); }
+      .row .hl { position: absolute; inset: 0; opacity: 0;
+        background: linear-gradient(90deg, rgba(255,255,255,.16) 0%, rgba(255,255,255,.06) 45%, rgba(255,255,255,0) 100%); }
+      .row .letter { position: absolute; left: 0; top: 0; width: 150px; height: 100%; display: flex; align-items: center; justify-content: center;
+        font: 900 92px/1 "Barlow Condensed", sans-serif; color: #fff; padding-top: 4px; }
+      .row .letter span { display: inline-block; }
+      .row .letter.s span { background: var(--sunset); -webkit-background-clip: text; background-clip: text; color: transparent; }
+      .row .rule { position: absolute; left: 150px; top: 24px; bottom: 24px; width: 1px; background: var(--hair); }
+
+      /* empty slots: a hairline outline with a quiet "?" — the board reads as a full template, and the "?" backs up the CTA */
+      .ghost { position: absolute; border-radius: 20px; background: transparent; box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.10);
+        display: flex; align-items: center; justify-content: center; }
+      .ghost .q { font: 800 44px/1 "Barlow Condensed", sans-serif; color: #fff; opacity: .25; padding-top: 2px; }
+
+      /* board footer = the call to action, a menu row of its own (no web pill, no icon) */
+      .foot { position: absolute; left: 0; width: 864px; height: 96px; display: flex; align-items: center; justify-content: center;
+        background: rgba(255,255,255,.035); }
+      .foot::before { content: ""; position: absolute; left: 24px; right: 24px; top: 0; height: 1px; background: rgba(255,255,255,.16); }
+      .foot .tx { display: inline-block; color: #fff; font: 800 44px/1 "Barlow Condensed", sans-serif; letter-spacing: .04em;
+        text-transform: uppercase; white-space: nowrap; padding-top: 2px; }
+
+      /* item chips: quiet menu rows at rest; only the newest carries the selected bar */
+      .chip { position: absolute; border-radius: 20px; background: rgba(255,255,255,.07); box-shadow: inset 0 0 0 1px rgba(255,255,255,.12);
+        display: flex; flex-direction: column; justify-content: center; padding: 0 24px; transform-origin: 50% 50%;
+        backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+      .v1 .chip { background: rgb(47,48,58); }              /* = .07 white over the navy board, opaque so the stage card reads on any clip */
+      .chip .sel { position: absolute; inset: 0; border-radius: inherit; background: var(--selected); box-shadow: var(--shadow-chip); }
+      .chip .ring { position: absolute; inset: 0; border-radius: inherit; box-shadow: 0 0 0 2px rgba(255,255,255,.85); opacity: 0; }
+      .chip .nm { position: relative; font: 800 44px/1.02 "Barlow Condensed", sans-serif; letter-spacing: .02em; text-transform: uppercase;
+        color: var(--ink); white-space: nowrap; }
+      .chip .sb { position: relative; margin-top: 8px; font: 600 24px/1 "Inter", sans-serif; letter-spacing: .14em; text-transform: uppercase;
+        color: rgba(11,11,14,.55); white-space: nowrap; font-variant-numeric: tabular-nums; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="7.6" data-width="1080" data-height="1920">
+      <video id="plateA" class="clip plate" src="assets/plates/p06-lucia-gate-v.mp4" muted playsinline data-start="0" data-duration="7.6" data-track-index="0"></video>
+      <video id="plateB" class="clip plate" src="assets/plates/p03-jason-door-v.mp4" muted playsinline data-start="0" data-duration="7.6" data-track-index="0"></video>
+
+      <div id="ov" class="clip" data-start="0" data-duration="7.6" data-track-index="1">
+        <div id="scrim"></div>
+        <div id="stage"></div>
+      </div>
+    </div>
+
+    <script>
+      const CONFIG = {
+        tiers: ["S", "A", "B", "C"],            // top tier carries the Leonida sunset accent
+        dim: 0.42,                               // darkening behind the list (also kept in the transparent overlay)
+        cta: "Comment yours",                    // the board's footer row
+        variants: {
+          "0": {                                 // Tier rows: items drop straight into the board, oldest game first
+            style: "rows",
+            plate: "assets/plates/p06-lucia-gate-v.mp4",
+            kicker: "My tier list",
+            title: "Every main GTA, ranked",
+            items: [                             // in drop order; tier = row letter. Any number per tier (2–4 columns, then rows wrap)
+              { name: "GTA",         sub: "1997", tier: "C" },
+              { name: "GTA 2",       sub: "1999", tier: "C" },
+              { name: "GTA III",     sub: "2001", tier: "B" },
+              { name: "Vice City",   sub: "2002", tier: "A" },
+              { name: "San Andreas", sub: "2004", tier: "S" },
+              { name: "GTA IV",      sub: "2008", tier: "A" },
+              { name: "GTA V",       sub: "2013", tier: "S" }
+            ],
+            timing: { in: 0.15, first: 0.8, step: 0.52, cta: 4.55, out: 7.12, end: 7.6 }
+          },
+          "1": {                                 // Tier reveal: each name lands big on the stage under the board, its tier lights, then it files into the row
+            style: "reveal",
+            plate: "assets/plates/p03-jason-door-v.mp4",
+            kicker: "Tier list · from the trailers",
+            title: "GTA 6 cast, ranked",
+            items: [
+              { name: "Cal",        sub: "Hampton",         tier: "B" },
+              { name: "Jason",      sub: "Duval",           tier: "S" },
+              { name: "Real Dimez", sub: "Bae-Luxe & Roxy", tier: "A" },
+              { name: "Brian",      sub: "Heder",           tier: "C" },
+              { name: "Boobie",     sub: "Ike",             tier: "A" },
+              { name: "Lucia",      sub: "Caminos",         tier: "S" }
+            ],
+            timing: { in: 0.15, first: 0.62, step: 0.74, cta: 5.57, out: 7.12, end: 7.6 }
+          }
+        }
+      };
+
+      (function () {
+        const VARS = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+        const vKey = CONFIG.variants[String(VARS.variant)] ? String(VARS.variant) : "0";
+        const showPlate = VARS.bg !== "none";
+        const V = CONFIG.variants[vKey], T = V.timing;
+        const REVEAL = V.style === "reveal";
+        const $ = (s) => document.querySelector(s);
+        const stage = $("#stage");
+        stage.className = REVEAL ? "v1" : "v0";
+
+        document.querySelectorAll("video.plate").forEach((v) => {
+          if (!showPlate || v.getAttribute("src") !== V.plate) v.style.display = "none";
+        });
+
+        // ---------- layout (frame-space pixels) ----------
+        // Order on screen is always title → board (+ footer CTA) → stage, so the closing prompt sits on the ranked board.
+        const X = 72, W = 864, LETTER = 150, PAD = 16, FOOT = 96, SAFE_BOTTOM = 1480;
+        const L = REVEAL ? { boardTop: 430, rowH: 150, chipH: 112 } : { boardTop: 430, rowH: 180, chipH: 128 };
+        const lastTier = CONFIG.tiers[CONFIG.tiers.length - 1];
+        const tierOf = (it) => (CONFIG.tiers.indexOf(it.tier) >= 0 ? it.tier : lastTier);
+
+        // columns = the fullest tier (2–4); above 4 a tier wraps onto extra lines and its row grows
+        const counts = {}; CONFIG.tiers.forEach((t) => (counts[t] = 0));
+        V.items.forEach((it) => counts[tierOf(it)]++);
+        const cols = Math.min(4, Math.max(2, ...Object.values(counts)));
+        const lines = {}; CONFIG.tiers.forEach((t) => (lines[t] = Math.max(1, Math.ceil(counts[t] / cols))));
+        // keep the board (plus its footer) above the caption zone: shrink rows a little if a long list needs it
+        const need = CONFIG.tiers.reduce((s, t) => s + L.rowH + (lines[t] - 1) * (L.chipH + PAD), 0);
+        const k = Math.max(0.7, Math.min(1, (SAFE_BOTTOM - L.boardTop - FOOT) / need));
+        if (k < 1) { L.rowH = Math.floor(L.rowH * k); L.chipH = Math.floor(L.chipH * k); }
+        const chipW = Math.floor((W - LETTER - PAD * (cols + 1)) / cols);
+        const chipPadX = cols === 2 ? 24 : cols === 3 ? 20 : 16;
+        const chipOff = (L.rowH - L.chipH) / 2;
+
+        const scrim = $("#scrim");
+        scrim.style.background = `linear-gradient(180deg, rgba(8,8,12,${CONFIG.dim}) 0%, rgba(8,8,12,${CONFIG.dim * 0.8}) 55%, rgba(8,8,12,${CONFIG.dim * 0.55}) 76%, rgba(8,8,12,0) 92%)`;
+
+        const el = (tag, cls, parent, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; parent.appendChild(e); return e; };
+        const kicker = el("div", "kicker", stage, V.kicker);
+        const title = el("div", "title", stage, V.title);
+
+        const board = el("div", "", stage); board.id = "board";
+        const rows = {};
+        let yAcc = 0;
+        CONFIG.tiers.forEach((t, i) => {
+          const h = L.rowH + (lines[t] - 1) * (L.chipH + PAD);
+          const r = el("div", "row", board);
+          r.style.top = yAcc + "px"; r.style.height = h + "px";
+          const hl = el("div", "hl", r);
+          const lt = el("div", "letter" + (i === 0 ? " s" : ""), r); const sp = el("span", "", lt, t);
+          el("div", "rule", r);
+          rows[t] = { el: r, letter: sp, hl, rel: yAcc, top: L.boardTop + yAcc, count: 0, ghosts: [] };
+          yAcc += h;
+        });
+        const rowsH = yAcc, boardBottom = L.boardTop + rowsH;
+        board.style.top = L.boardTop + "px"; board.style.height = rowsH + "px";
+        const STAGE = { cx: 504, cy: Math.min(boardBottom + 150, SAFE_BOTTOM - 110), s: 1.9 };   // reveal stage, under the board
+
+        const slotPos = (row, slot) => {
+          const col = slot % cols, line = Math.floor(slot / cols);
+          return { x: LETTER + PAD + col * (chipW + PAD), y: row.rel + chipOff + line * (L.chipH + PAD) };   // board-relative
+        };
+
+        // ghost slots: every slot of every row starts as an empty "?" outline; a chip landing clears its ghost
+        CONFIG.tiers.forEach((t) => {
+          const row = rows[t];
+          for (let s = 0; s < lines[t] * cols; s++) {
+            const p = slotPos(row, s);
+            const g = el("div", "ghost", board); const q = el("div", "q", g, "?");
+            g.setAttribute("data-layout-allow-occlusion", "");       // intentional: a landing chip covers its ghost while the ghost fades
+            Object.assign(g.style, { left: p.x + "px", top: p.y + "px", width: chipW + "px", height: L.chipH + "px" });
+            row.ghosts.push({ el: g, q });
+          }
+        });
+
+        // footer row = the CTA, revealed by growing the board at the end
+        const foot = el("div", "foot", board); foot.style.top = rowsH + "px";
+        foot.setAttribute("data-layout-allow-overflow", "");      // intentional: hidden below the board until it grows at the CTA
+        const ctaTx = el("span", "tx", foot, CONFIG.cta);
+
+        // chips, placed at their final slot (frame space; they live outside the board so v1 can fly them in)
+        const chips = V.items.map((it, i) => {
+          const row = rows[tierOf(it)];
+          const slot = row.count++;
+          const p = slotPos(row, slot);
+          const c = el("div", "chip", stage);
+          const sel = el("div", "sel", c);
+          const ring = el("div", "ring", c);
+          const nm = el("div", "nm", c, it.name); const sb = it.sub ? el("div", "sb", c, it.sub) : null;
+          const left = X + p.x, top = L.boardTop + p.y;
+          Object.assign(c.style, { left: left + "px", top: top + "px", width: chipW + "px", height: L.chipH + "px", zIndex: 10 + i,
+            paddingLeft: chipPadX + "px", paddingRight: chipPadX + "px" });
+          return { el: c, sel, ring, nm, sb, row, ghost: row.ghosts[slot], left, top };
+        });
+
+        // shrink-to-fit so creator text never overflows
+        function fit(node, maxW, floor) {
+          let fs = parseFloat(getComputedStyle(node).fontSize), guard = 0;
+          while (node.scrollWidth > maxW && fs > floor && guard++ < 60) { fs -= 1; node.style.fontSize = fs + "px"; }
+        }
+        function fitName(node, maxW) {
+          fit(node, maxW, 30);
+          if (node.scrollWidth > maxW) { node.style.whiteSpace = "normal"; node.style.lineHeight = "0.98"; }   // last resort: 2 lines
+        }
+        function fitSub(node, maxW) {          // labels never go under 24 px: tighten tracking first, then ellipsis
+          const steps = [0.1, 0.06, 0.02];
+          for (let i = 0; i < steps.length && node.scrollWidth > maxW; i++) node.style.letterSpacing = steps[i] + "em";
+          if (node.scrollWidth > maxW) Object.assign(node.style, { overflow: "hidden", textOverflow: "ellipsis", maxWidth: maxW + "px" });
+        }
+
+        document.fonts.ready.then(() => {
+          fit(title, W, 24); fit(kicker, W, 24); fit(ctaTx, W - 96, 30);
+          chips.forEach((c) => { fitName(c.nm, chipW - chipPadX * 2); if (c.sb) fitSub(c.sb, chipW - chipPadX * 2); });
+
+          const tl = gsap.timeline({ paused: true });
+          const letters = CONFIG.tiers.map((t) => rows[t].el.querySelector(".letter"));
+          const ghostEls = CONFIG.tiers.flatMap((t) => rows[t].ghosts.map((g) => g.el));
+
+          // ---- entrance ----
+          tl.fromTo(scrim, { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out", immediateRender: true }, 0);
+          tl.fromTo(kicker, { y: 18, opacity: 0 }, { y: 0, opacity: 1, duration: 0.36, ease: "power3.out" }, T.in);
+          tl.fromTo(title, { y: 34, opacity: 0 }, { y: 0, opacity: 1, duration: 0.42, ease: "expo.out" }, T.in + 0.05);
+          tl.fromTo(board, { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: 0.45, ease: "expo.out" }, T.in + 0.1);
+          tl.fromTo(letters, { x: -24, opacity: 0 }, { x: 0, opacity: 1, duration: 0.32, ease: "power3.out", stagger: 0.05 }, T.in + 0.2);
+          tl.fromTo(ghostEls, { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power2.out", stagger: 0.02 }, T.in + 0.28);
+
+          // the selected bar passes from the previous chip to the newest one: a fast fade on an opaque bar, text snaps to white
+          // (0.1 s power4.out: one in-between frame at ~20 %, never a half-grey chip; the menu highlight jumps, it doesn't dissolve)
+          const deselect = (c, at) => {
+            at = Math.ceil(at * 30 - 1e-6) / 30;     // frame-aligned, so the only in-between frame is the ~20 % one
+            tl.to(c.sel, { opacity: 0, duration: 0.1, ease: "power4.out" }, at);
+            tl.set(c.nm, { color: "#FFFFFF" }, at + 0.02);
+            if (c.sb) tl.set(c.sb, { color: "rgba(255,255,255,0.55)" }, at + 0.02);
+          };
+
+          // payoff on the final pick: a 1 → 1.05 → 1 punch, a lock-in ring, the tier letter kicks, and its row stays lit
+          const HOLD_HL = 0.5;
+          const payoff = (c, at) => {
+            tl.to(c.el, { scale: 1.05, duration: 0.09, ease: "power2.out", force3D: false }, at);
+            tl.to(c.el, { scale: 1, duration: 0.19, ease: "power3.out", force3D: false }, at + 0.09);
+            tl.fromTo(c.ring, { opacity: 0.9, scaleX: 1, scaleY: 1 },
+              { opacity: 0, scaleX: 1 + 28 / chipW, scaleY: 1 + 28 / L.chipH, duration: 0.46, ease: "power2.out", immediateRender: false }, at);
+            tl.fromTo(c.row.letter, { scale: 1 }, { scale: 1.2, duration: 0.09, ease: "power2.out", immediateRender: false }, at);
+            tl.to(c.row.letter, { scale: 1, duration: 0.3, ease: "power3.out" }, at + 0.09);
+            tl.set(c.el, { clearProps: "transform" }, at + 0.3);
+          };
+
+          // ---- items ----
+          const LAND = REVEAL ? 0.80 : 0.18;        // when a chip sits in its slot, relative to its start
+          const last = chips.length - 1;
+          const fr = (t) => Math.round(t * 30) / 30;          // item beats on the 30 fps frame grid, so each entrance starts on a clean frame
+          chips.forEach((c, i) => {
+            const t0 = fr(T.first + i * T.step);
+            const ce = c.el, letter = c.row.letter, hl = c.row.hl, isLast = i === last;
+            if (i > 0) deselect(chips[i - 1], Math.max(t0, fr(T.first + (i - 1) * T.step) + LAND));
+            if (!REVEAL) {
+              tl.fromTo(ce, { y: -64, opacity: 0, scale: 0.94 }, { y: 0, scale: 1, duration: 0.36, ease: "expo.out", force3D: false, immediateRender: true }, t0);
+              tl.to(ce, { opacity: 1, duration: 0.08, ease: "power2.out" }, t0);        // near-instant fade: no half-grey chip, and it never reads as sitting in the row above
+              tl.to(c.ghost.el, { opacity: 0, duration: 0.12, ease: "power2.out" }, t0 + 0.04);
+              tl.fromTo(hl, { opacity: 0 }, { opacity: 1, duration: 0.1, ease: "none", immediateRender: false }, t0 + 0.08);
+              tl.to(hl, { opacity: isLast ? HOLD_HL : 0, duration: 0.26, ease: "power2.out" }, t0 + 0.2);   // ends before a same-row drop's flash
+              if (isLast) payoff(c, t0 + 0.36);
+              else {
+                tl.fromTo(letter, { scale: 1.12 }, { scale: 1, duration: 0.3, ease: "power3.out", immediateRender: false }, t0 + 0.1);
+                tl.set(ce, { clearProps: "transform" }, t0 + 0.4);
+              }
+            } else {
+              const sx = STAGE.cx - (c.left + chipW / 2), sy = STAGE.cy - (c.top + L.chipH / 2);
+              tl.fromTo(ce, { x: sx, y: sy + 34, scale: STAGE.s * 0.9, opacity: 0 }, { y: sy, scale: STAGE.s, duration: 0.3, ease: "power3.out", force3D: false, immediateRender: true }, t0);
+              tl.to(ce, { opacity: 1, duration: 0.06, ease: "power3.out" }, t0);          // fast fade so the white stage card never sits half-grey
+              tl.fromTo(hl, { opacity: 0 }, { opacity: 1, duration: 0.14, ease: "power2.out", immediateRender: false }, t0 + 0.3);
+              tl.fromTo(letter, { scale: 1.14 }, { scale: 1, duration: 0.32, ease: "power3.out", immediateRender: false }, t0 + 0.3);
+              // two-segment flight: straight up to the lit row first (so it never reads as landing in a lower tier), then across into the slot
+              tl.to(ce, { y: 0, scale: 1.4, duration: 0.22, ease: "power3.out", force3D: false }, t0 + 0.4);
+              tl.to(ce, { x: 0, scale: 1, duration: 0.18, ease: "power3.inOut", force3D: false }, t0 + 0.62);
+              tl.to(c.ghost.el, { opacity: 0, duration: 0.12, ease: "power2.out" }, t0 + 0.66);
+              tl.to(hl, { opacity: isLast ? HOLD_HL : 0, duration: 0.26, ease: "power2.out" }, t0 + 0.72);
+              if (isLast) payoff(c, t0 + LAND + 0.12);
+              else tl.set(ce, { clearProps: "transform" }, t0 + 0.82);
+            }
+          });
+
+          // ---- CTA: the board grows a footer row under the finished ranking ----
+          tl.to(board, { height: rowsH + FOOT, duration: 0.4, ease: "power3.out" }, T.cta);
+          tl.fromTo(ctaTx, { y: 22, opacity: 0 }, { y: 0, opacity: 1, duration: 0.34, ease: "power3.out", immediateRender: true }, T.cta + 0.08);
+
+          // hold: the slots nobody filled breathe, pointing at the prompt
+          const qs = CONFIG.tiers.flatMap((t) => rows[t].ghosts.slice(counts[t]).map((g) => g.q));
+          const pulseAt = T.cta + 0.45; let cycles = Math.floor((T.out - pulseAt) / 0.5); if (cycles % 2) cycles -= 1;
+          if (qs.length && cycles >= 2) tl.to(qs, { opacity: 0.55, duration: 0.5, ease: "sine.inOut", yoyo: true, repeat: cycles - 1, stagger: Math.min(0.12, 0.36 / qs.length) }, pulseAt);
+
+          // ---- exit (loops cleanly) ----
+          const all = [kicker, title, board, chips.map((c) => c.el)].flat();
+          tl.fromTo(all, { opacity: 1, y: 0 }, { opacity: 0, y: -14, duration: 0.34, ease: "power2.in", stagger: 0.01, immediateRender: false }, T.out);
+          tl.to(scrim, { opacity: 0, duration: 0.4, ease: "power2.in" }, T.out + 0.05);
+          tl.set({}, {}, T.end);
+
+          window.__timelines = window.__timelines || {};
+          window.__timelines["main"] = tl;
+          tl.seek(0);
+        });
+      })();
+    </script>
+</body>
+</html>

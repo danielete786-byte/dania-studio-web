@@ -1,0 +1,350 @@
+<!doctype html>
+<!-- GTA 6 component #18: Slow-mo replay (craft v2). 1080x1920, 30 fps, 5.4 s.
+     The moment plays at real speed, the footage runs backwards to the in-point, then replays at an honest 0.5x
+     (motion-compensated in-betweens baked by bake.py, so no frame repeats and nothing ghosts).
+     Variant 0 "Replay scrubber": Lucia's skydive over Vice City (s135). A precision scrub timeline (frame ticks, a white
+       playhead flag with a live timecode) runs along the bottom; the playhead is grabbed and dragged back and the footage
+       follows it, then it crawls at half speed. A giant 0.5x numeral in the sunset gradient lands in the sky on the cut.
+     Variant 1 "Rewind": the Sea-Shark jetski launch (s064). The footage spins backwards with a sideways smear while
+       REWIND builds in wide caps; on the cut RE stays and WIND flips letter by letter to PLAY, 0.5x lands under it, then
+       the type gets out of the way before the riders rise into it. A tape counter stays docked top-left.
+     bg "none" hides the footage and the finishing stack and renders the graphics alone on transparent.
+     Safe zone: all text sits inside x 72-936, y 230-1480. -->
+<html lang="en" data-composition-variables='[
+  {"id":"variant","type":"enum","label":"Variant","default":"0","options":[{"value":"0","label":"Replay scrubber"},{"value":"1","label":"Rewind"}]},
+  {"id":"bg","type":"enum","label":"Background","default":"plate","options":[{"value":"plate","label":"Sample footage"},{"value":"none","label":"Transparent"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link rel="stylesheet" href="assets/fonts/fonts.css" />
+    <link rel="stylesheet" href="assets/kit/look/look.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="assets/kit/look/look.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: transparent; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; font-family: "Inter", sans-serif; color: #fff;
+        -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; }
+      #fx { position: absolute; width: 0; height: 0; overflow: hidden; }
+      /* footage: #shake takes Look.impact + Look.expose, #push takes Look.push, #grade takes the rewind smear. The timed <video>s never move. */
+      #shake, #push, #grade { position: absolute; inset: 0; }
+      .shot { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      #ov { position: absolute; inset: 0; z-index: 10; }
+      .scrim { position: absolute; left: 0; right: 0; pointer-events: none; opacity: 0; }
+      .v0, .v1 { display: none; }
+      [data-variant="0"] .v0, [data-variant="1"] .v1 { display: block; }
+
+      /* ================= variant 0: Replay scrubber ================= */
+      #scrimTop0 { top: 0; height: 780px; }
+      #scrimBot0 { top: 1060px; height: 860px; }
+      #top0 { position: absolute; left: 72px; top: 252px; width: 864px; }
+      #label0 { font-family: "Archivo", "Inter", sans-serif; font-stretch: 125%; font-weight: 700; font-size: 30px; letter-spacing: .32em;
+        text-transform: uppercase; line-height: 36px; white-space: nowrap; }
+      #hero0 { margin-top: 6px; }
+      #num0 { font-family: "Inter", sans-serif; font-weight: 800; font-size: 336px; letter-spacing: -0.05em; line-height: .86;
+        white-space: nowrap; font-feature-settings: "tnum" 0, "ss01" 1, "cv11" 1;
+        filter: drop-shadow(0 4px 10px rgba(0,0,0,.30)) drop-shadow(0 18px 44px rgba(0,0,0,.34)); }
+      /* the scrub timeline: frame ticks, a rail, the played fill and a playhead with a live timecode flag */
+      #scrub0 { position: absolute; left: 72px; top: 1326px; width: 864px; height: 140px; }
+      #track0 { position: absolute; left: 0; top: 0; width: 864px; height: 140px; }
+      #ticks0 i { position: absolute; top: 96px; width: 2px; height: 12px; margin-left: -1px; background: rgba(255,255,255,.46); border-radius: 1px; }
+      #ticks0 i.mj { top: 82px; height: 26px; background: rgba(255,255,255,.92); }
+      #rail0 { position: absolute; left: 0; top: 112px; width: 864px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.28); }
+      #fill0 { position: absolute; left: 0; top: 112px; width: 0; height: 6px; border-radius: 3px; background: #fff; }
+      #ph0, #phin0 { position: absolute; left: 0; top: 0; width: 864px; height: 140px; }
+      #flag0 { position: absolute; top: 0; height: 46px; padding: 0 16px; border-radius: 10px; background: #fff; color: #0B0B0E;
+        font-family: "Inter", sans-serif; font-weight: 700; font-size: 26px; line-height: 46px; letter-spacing: .01em; white-space: nowrap;
+        font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1, "lnum" 1;
+        box-shadow: 0 1px 2px rgba(0,0,0,.28), 0 10px 26px rgba(0,0,0,.34); }
+      #notch0 { position: absolute; top: 45px; width: 0; height: 0; margin-left: -9px; border-left: 9px solid transparent; border-right: 9px solid transparent;
+        border-top: 10px solid #fff; }
+      #line0 { position: absolute; top: 52px; width: 4px; height: 82px; margin-left: -2px; border-radius: 2px; background: #fff;
+        box-shadow: 0 0 0 1px rgba(0,0,0,.08), 0 4px 14px rgba(0,0,0,.4); }
+
+      /* ================= variant 1: Rewind ================= */
+      #scrimTop1 { top: 0; height: 820px; }
+      #top1 { position: absolute; left: 72px; top: 250px; width: 864px; }
+      #count1 { display: flex; align-items: center; gap: 16px; height: 34px; font-family: "Inter", sans-serif; font-weight: 600; font-size: 28px;
+        letter-spacing: .04em; white-space: nowrap; font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1, "lnum" 1; }
+      #count1 .ic { position: relative; width: 40px; height: 28px; overflow: hidden; }
+      #count1 .ic svg { position: absolute; left: 0; top: 0; width: 40px; height: 28px; }
+      #lines1 { margin-top: 18px; }
+      .w1 { font-family: "Archivo", "Inter", sans-serif; font-stretch: 125%; font-weight: 900; font-size: 136px; line-height: 124px; letter-spacing: .01em;
+        text-transform: uppercase; white-space: nowrap; height: 124px; }
+      /* one mask slot per letter: the old letter and the new one are stacked; the slot width follows the visible letter */
+      #word1 { display: flex; }
+      #word1 .slot { position: relative; height: 124px; overflow: hidden; padding: 0; }
+      #word1 .slot span { position: absolute; left: 0; top: 0; display: block; }
+      #row2 { position: relative; height: 124px; margin-top: 8px; overflow: hidden; }
+      #rw1 { position: absolute; left: 4px; top: 14px; width: 190px; height: 98px; }
+      #spd1 { position: absolute; left: 0; top: 0; filter: drop-shadow(0 4px 10px rgba(0,0,0,.28)) drop-shadow(0 14px 36px rgba(0,0,0,.3)); }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="5.4" data-width="1080" data-height="1920">
+      <!-- sideways smear for the reverse segments (edgeMode duplicate keeps the frame edges from going soft/transparent) -->
+      <svg id="fx" aria-hidden="true"><filter id="smear" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+        <feGaussianBlur id="smearK" stdDeviation="0 0" edgeMode="duplicate" /></filter></svg>
+
+      <div id="shake"><div id="push"><div id="grade">
+        <!-- variant 0: s135 real speed, the baked drag-back, the baked 0.5x replay -->
+        <video id="v0a" class="clip shot" data-v="0" src="assets/shots/s135-skydive-city-v.mp4" muted playsinline
+          data-start="0" data-duration="1.6" data-media-start="0" data-track-index="0"></video>
+        <video id="v0b" class="clip shot" data-v="0" src="assets/clips/s135-rev.mp4" muted playsinline
+          data-start="1.6" data-duration="0.7" data-media-start="0" data-track-index="0"></video>
+        <video id="v0c" class="clip shot" data-v="0" src="assets/clips/s135-slow.mp4" muted playsinline
+          data-start="2.3" data-duration="3.1" data-media-start="0.1" data-track-index="0"></video>
+        <!-- variant 1: s064 real speed, the baked tape rewind, the baked 0.5x replay -->
+        <video id="v1a" class="clip shot" data-v="1" src="assets/shots/s064-jetski-v.mp4" muted playsinline
+          data-start="0" data-duration="1.4" data-media-start="0" data-track-index="2"></video>
+        <video id="v1b" class="clip shot" data-v="1" src="assets/clips/s064-rev.mp4" muted playsinline
+          data-start="1.4" data-duration="0.73333" data-media-start="0" data-track-index="2"></video>
+        <video id="v1c" class="clip shot" data-v="1" src="assets/clips/s064-slow.mp4" muted playsinline
+          data-start="2.13333" data-duration="3.26667" data-media-start="0" data-track-index="2"></video>
+      </div></div></div>
+
+      <div id="ov" class="clip" data-start="0" data-duration="5.4" data-track-index="1">
+        <!-- variant 0 -->
+        <div id="scrimTop0" class="scrim lk-scrim-top v0"></div>
+        <div id="scrimBot0" class="scrim lk-scrim-bottom v0"></div>
+        <div id="top0" class="v0">
+          <div id="label0">Replay</div>
+          <div id="hero0"><div id="num0">0.5×</div></div>
+        </div>
+        <div id="scrub0" class="v0">
+          <div id="track0"><div id="ticks0"></div><div id="rail0"></div><div id="fill0"></div></div>
+          <div id="ph0"><div id="phin0"><div id="flag0" data-layout-allow-overlap>00:00.00</div><div id="notch0"></div><div id="line0" data-layout-allow-overlap></div></div></div>
+        </div>
+
+        <!-- variant 1 -->
+        <div id="scrimTop1" class="scrim lk-scrim-top v1"></div>
+        <div id="top1" class="v1">
+          <div id="count1">
+            <div class="ic">
+              <svg id="icR1" viewBox="0 0 40 28" data-layout-allow-overlap><path d="M18 3.6v20.8c0 1.2-1.4 1.9-2.3 1.1L2.4 15.2c-.7-.6-.7-1.8 0-2.4L15.7 2.5c.9-.8 2.3-.1 2.3 1.1z" fill="#fff"/><path d="M37 3.6v20.8c0 1.2-1.4 1.9-2.3 1.1L21.4 15.2c-.7-.6-.7-1.8 0-2.4L34.7 2.5c.9-.8 2.3-.1 2.3 1.1z" fill="#fff"/></svg>
+              <svg id="icP1" viewBox="0 0 40 28" data-layout-allow-overlap><path d="M10 3.4v21.2c0 1.2 1.4 1.9 2.3 1.2l15.4-10.6c.8-.6.8-1.8 0-2.4L12.3 2.2c-.9-.7-2.3 0-2.3 1.2z" fill="#fff"/></svg>
+            </div>
+            <div id="tc1">00:00.00</div>
+          </div>
+          <div id="lines1">
+            <div id="word1" class="w1"></div>
+            <div id="row2">
+              <svg id="rw1" viewBox="0 0 190 98" data-layout-allow-overlap><path d="M88 8.5v81c0 4.6-5.2 7.2-8.9 4.4L4.3 53.4c-2.9-2.2-2.9-6.6 0-8.8L79.1 4.1C82.8 1.3 88 3.9 88 8.5z" fill="#fff"/><path d="M186 8.5v81c0 4.6-5.2 7.2-8.9 4.4l-74.8-40.5c-2.9-2.2-2.9-6.6 0-8.8l74.8-40.5c3.7-2.8 8.9-.2 8.9 4.4z" fill="#fff"/></svg>
+              <div id="spd1" class="w1" data-layout-allow-overlap>0.5×</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const CONFIG = {
+        duration: 5.4,                                // also data-duration on #root and #ov
+        sunset: "linear-gradient(100deg, #F84FA4 0%, #FE78A6 22%, #FE8E4E 60%, #FEB747 100%)",
+        variants: {
+          // Replay scrubber: Lucia's skydive over Vice City. Real speed, the playhead is dragged back, then 0.5x.
+          "0": {
+            shot: { src: "assets/shots/s135-skydive-city-v.mp4", mediaIn: 0, length: 1.6333 },   // length = the rail (source seconds)
+            real: 1.6,                                 // seconds of real speed (48 frames, source 0 -> 1.567)
+            rev: { src: "assets/clips/s135-rev.mp4", frames: 21, from: 1.5667, to: 0.05, curve: "drag" },  // bake.py reverse
+            slow: { src: "assets/clips/s135-slow.mp4", in: 3 },     // bake.py slow; the replay starts on slow frame 3 (source 3/60 = 0.05)
+            rate: 0.5,
+            label: "Replay",
+            exitAt: 4.86
+          },
+          // Rewind: the Sea-Shark jetski launch. Real speed, a tape rewind, then 0.5x. RE stays, WIND flips to PLAY.
+          "1": {
+            shot: { src: "assets/shots/s064-jetski-v.mp4", mediaIn: 0, length: 1.6667 },
+            real: 1.4,                                 // 42 frames, source 0 -> 1.367
+            rev: { src: "assets/clips/s064-rev.mp4", frames: 22, from: 1.3667, to: 0.0, curve: "tape" },
+            slow: { src: "assets/clips/s064-slow.mp4", in: 0 },
+            rate: 0.5,
+            words: ["Rewind", "Replay"],               // same length: the letters that differ flip one by one
+            heroOut: 3.0,                              // the big type clears before the riders rise into it
+            exitAt: 4.98
+          }
+        }
+      };
+
+      (function () {
+        const VARS = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+        const vKey = CONFIG.variants[String(VARS.variant)] ? String(VARS.variant) : "0";
+        const plate = VARS.bg !== "none";
+        const V = CONFIG.variants[vKey], D = CONFIG.duration, FPS = 30;
+        const T1 = V.real, NR = V.rev.frames, T2 = T1 + NR / FPS;
+        const $ = (s) => document.querySelector(s);
+        const root = $("#root"); root.setAttribute("data-variant", vKey);
+
+        // ---- footage: this variant's three segments, timed from CONFIG ----
+        document.querySelectorAll("video.shot").forEach((v) => {
+          if (!plate || v.dataset.v !== vKey) { v.style.display = "none"; return; }
+          const seg = v.id.slice(-1);
+          if (seg === "a") { v.setAttribute("src", V.shot.src); v.setAttribute("data-start", "0"); v.setAttribute("data-duration", String(T1)); v.setAttribute("data-media-start", String(V.shot.mediaIn)); }
+          if (seg === "b") { v.setAttribute("src", V.rev.src); v.setAttribute("data-start", String(T1)); v.setAttribute("data-duration", (NR / FPS).toFixed(5)); v.setAttribute("data-media-start", "0"); }
+          if (seg === "c") { v.setAttribute("src", V.slow.src); v.setAttribute("data-start", T2.toFixed(5)); v.setAttribute("data-duration", (D - T2).toFixed(5)); v.setAttribute("data-media-start", (V.slow.in / FPS).toFixed(5)); }
+        });
+
+        // ---- the source clock: which source second is on screen at time t (mirrors bake.py exactly) ----
+        const CURVES = { drag: (u) => 1.5 * u - 0.5 * u * u, tape: (u) => u - 0.45 * Math.sin(2 * Math.PI * u) / (2 * Math.PI) };
+        const crv = CURVES[V.rev.curve];
+        const frameAt = (t) => Math.floor(t * FPS + 1e-4);
+        const srcAt = (t) => {
+          const n = frameAt(t), n1 = Math.round(T1 * FPS), n2 = n1 + NR;
+          if (n < n1) return V.shot.mediaIn + n / FPS;
+          if (n < n2) { const u = (n - n1 + 1) / (NR + 1); return V.rev.from + (V.rev.to - V.rev.from) * crv(u); }
+          return (V.slow.in + (n - n2)) * V.rate / FPS;
+        };
+        const fmt = (s) => { const cs = Math.round(Math.max(0, s) * 100);
+          return String(Math.floor(cs / 6000)).padStart(2, "0") + ":" + String(Math.floor(cs / 100) % 60).padStart(2, "0") + "." + String(cs % 100).padStart(2, "0"); };
+        const spd = (r) => String(r).replace(/^0?\./, "0.") + "×";
+
+        document.fonts.ready.then(() => {
+          const tl = gsap.timeline({ paused: true });
+          const smearK = $("#smearK"), grade = $("#grade");
+          // sideways smear on the reverse segment: k rises and falls across it
+          const smear = (px, over) => Look.drive(tl, T1, T2 - T1, (p) => {
+            if (!plate) return;
+            const k = p > 0 && p < 1 ? Math.sin(Math.PI * p) : 0;
+            smearK.setAttribute("stdDeviation", (px * k).toFixed(2) + " 0");
+            grade.style.filter = k > 0.01 ? "url(#smear) saturate(" + (1 + 0.08 * k).toFixed(3) + ")" : "";
+            grade.style.transform = k > 0.01 ? "scale(" + (1 + over * k).toFixed(4) + ")" : "";
+          });
+
+          if (vKey === "0") {
+            // ---------- content ----------
+            $("#label0").textContent = V.label;
+            $("#num0").textContent = spd(V.rate);
+            const ticks = $("#ticks0"), nT = Math.round(V.shot.length * FPS);
+            for (let i = 0; i <= nT; i++) { const e = document.createElement("i"); if (i % 15 === 0) e.className = "mj"; e.style.left = (i / nT * 864).toFixed(2) + "px"; ticks.appendChild(e); }
+            const xAt = (s) => Math.max(0, Math.min(1, s / V.shot.length)) * 864;
+            const flag = $("#flag0"), notch = $("#notch0"), line = $("#line0"), fill = $("#fill0");
+
+            // ---------- entrance: scrims, the timeline draws on, the playhead drops in ----------
+            if (plate) tl.fromTo(["#scrimTop0", "#scrimBot0"], { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "none", immediateRender: false }, 0.05);
+            else gsap.set(["#scrimBot0"], { opacity: 0.8 });
+            const track = $("#track0"), Ein = gsap.parseEase("expo.out"), Eout = gsap.parseEase("power3.in");
+            const DRAW = [0.18, 0.9], WIPE = [V.exitAt + 0.04, 0.36];     // the rail draws on left -> right, and wipes off the same way
+            Look.drive(tl, 0, D, (p) => {
+              const t = p * D, a = Math.min(1, Math.max(0, (t - DRAW[0]) / DRAW[1])), b = Math.min(1, Math.max(0, (t - WIPE[0]) / WIPE[1]));
+              track.style.clipPath = "inset(-40px " + ((1 - Ein(a)) * 100).toFixed(3) + "% -10px " + (Eout(b) * 100).toFixed(3) + "%)";
+            });
+            Look.enter(tl, "#ph0", 0.32, { from: "up", dist: 26, dur: 0.55, blur: 8 });
+
+            // ---------- the grab (T1): flag punches, playhead drags back with motion blur, REPLAY label rises ----------
+            tl.fromTo("#flag0", { scale: 1 }, { scale: 1.12, duration: 0.07, ease: "power2.out", immediateRender: false }, T1);
+            tl.fromTo("#flag0", { scale: 1.12 }, { scale: 1, duration: 0.3, ease: "power3.out", immediateRender: false }, T1 + 0.07);
+            gsap.set("#flag0", { transformOrigin: "50% 100%" });
+            Look.reveal(tl, "#label0", T1 + 0.08, { by: "chars", stagger: 0.03, dur: 0.6 });
+            smear(5, 0.012);
+
+            // ---------- the cut (T2): 0.5x is complete as the replay starts; the hit lands on it ----------
+            Look.reveal(tl, "#num0", T2 - 0.46, { by: "chars", stagger: 0.04, dur: 0.46 });
+            Look.fill("#num0", CONFIG.sunset, { sheen: true });
+            if (plate) {
+              Look.impact(tl, T2, { shake: "#shake", amp: 8, flash: 0, zoom: 1.035, dur: 0.34 });
+              Look.expose(tl, T2, { target: "#shake", peak: 1.55, dur: 0.36, saturate: 1.14 });
+            }
+            Look.chroma(tl, "#hero0", T2, 0.18, { px: 4 });
+            Look.sheen(tl, "#num0", T2 + 0.62, { dur: 1.1 });
+
+            // ---------- the clock: playhead, flag and fill follow the picture; horizontal blur while dragging ----------
+            const phMb = document.createElementNS("http://www.w3.org/2000/svg", "filter");
+            phMb.id = "phmb"; phMb.setAttribute("x", "-20%"); phMb.setAttribute("y", "-20%"); phMb.setAttribute("width", "140%"); phMb.setAttribute("height", "140%");
+            phMb.innerHTML = '<feGaussianBlur id="phmbK" stdDeviation="0 0" />'; $("#fx").appendChild(phMb);
+            const phK = $("#phmbK"), ph = $("#phin0"), FW = flag.offsetWidth;
+            Look.drive(tl, 0, D, (p) => {
+              const t = p * D, s = srcAt(t), x = xAt(s);
+              line.style.left = x.toFixed(2) + "px"; notch.style.left = x.toFixed(2) + "px"; fill.style.width = x.toFixed(2) + "px";
+              flag.style.left = Math.max(0, Math.min(864 - FW, x - FW / 2)).toFixed(2) + "px";
+              flag.textContent = fmt(s);
+              const n = frameAt(t), dragging = n >= Math.round(T1 * FPS) && n < Math.round(T2 * FPS);
+              const v = dragging ? Math.abs(x - xAt(srcAt(t - 1 / FPS))) : 0;
+              phK.setAttribute("stdDeviation", Math.min(12, v * 0.2).toFixed(2) + " 0");
+              ph.style.filter = v > 1 ? "url(#phmb)" : "";
+            });
+
+            // ---------- exit ----------
+            Look.exit(tl, ["#hero0", "#label0"], V.exitAt, { to: "blur", dur: 0.36, stagger: 0.05, blur: 14 });
+            Look.exit(tl, "#ph0", V.exitAt + 0.08, { to: "blur", dur: 0.3, blur: 10 });
+            if (plate) tl.fromTo(["#scrimTop0", "#scrimBot0"], { opacity: 1 }, { opacity: 0, duration: 0.4, ease: "power2.in", immediateRender: false }, V.exitAt + 0.04);
+            if (plate) Look.push(tl, "#push", 0, D, { from: 1.0, to: 1.06 });
+          } else {
+            // ---------- content: one slot per letter (old letter over new letter) ----------
+            const [w0, w1] = V.words.map((w) => w.toUpperCase());
+            const word = $("#word1"), slots = [];
+            for (let i = 0; i < w0.length; i++) {
+              const sl = document.createElement("div"); sl.className = "slot";
+              const a = document.createElement("span"); a.textContent = w0[i]; sl.appendChild(a);
+              const b = document.createElement("span"); b.textContent = w1[i] || ""; sl.appendChild(b);
+              a.setAttribute("data-layout-allow-overlap", ""); b.setAttribute("data-layout-allow-overlap", "");
+              word.appendChild(sl); slots.push({ sl, a, b, wa: 0, wb: 0, flips: w0[i] !== w1[i] });
+            }
+            // measure each glyph (with tracking) and size the slots to the old letters
+            slots.forEach((o) => {
+              o.a.style.position = "static"; o.wa = o.a.getBoundingClientRect().width; o.a.style.position = "";
+              o.b.style.position = "static"; o.b.style.display = "inline-block"; o.wb = o.b.getBoundingClientRect().width; o.b.style.position = ""; o.b.style.display = "";
+              o.sl.style.width = o.wa + "px";
+            });
+            $("#spd1").textContent = spd(V.rate);
+
+            // ---------- REWIND builds while the tape spins back (letters rise in reverse order) ----------
+            if (plate) tl.fromTo("#scrimTop1", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "none", immediateRender: false }, T1 - 0.05);
+            else gsap.set("#scrimTop1", { opacity: 0 });
+            Look.enter(tl, "#count1", T1 - 0.02, { from: "blur", dur: 0.5, blur: 10 });
+            const A = slots.map((o) => o.a), B = slots.map((o) => o.b);
+            gsap.set(A, { yPercent: 112 }); gsap.set(B, { yPercent: 112 });
+            tl.fromTo(A.slice().reverse(), { yPercent: 112 }, { yPercent: 0, duration: 0.5, ease: "expo.out", stagger: 0.035, immediateRender: false }, T1 + 0.06);
+            gsap.set("#rw1", { yPercent: 112 }); gsap.set("#icP1", { yPercent: 110 });
+            tl.fromTo("#rw1", { yPercent: 112 }, { yPercent: 0, duration: 0.5, ease: "expo.out", immediateRender: false }, T1 + 0.16);
+            Look.bloom(A, { color: "#FFFFFF", strength: 0.42 }); Look.bloom(B, { color: "#FFFFFF", strength: 0.42 });
+            smear(11, 0.02);
+
+            // ---------- the flip: RE stays, WIND -> PLAY letter by letter, the rewind glyph gives way to 0.5x ----------
+            const F0 = T2 - 0.34;
+            let k = 0;
+            slots.forEach((o) => {
+              if (!o.flips) { gsap.set(o.b, { opacity: 0 }); return; }
+              const at = F0 + 0.045 * k++;
+              tl.fromTo(o.a, { yPercent: 0 }, { yPercent: -112, duration: 0.3, ease: "power3.inOut", immediateRender: false }, at);
+              tl.fromTo(o.b, { yPercent: 112 }, { yPercent: 0, duration: 0.34, ease: "expo.out", immediateRender: false }, at + 0.04);
+              tl.fromTo(o.sl, { width: o.wa }, { width: o.wb, duration: 0.34, ease: "power3.inOut", immediateRender: false }, at);
+            });
+            tl.fromTo("#rw1", { yPercent: 0 }, { yPercent: -112, duration: 0.26, ease: "power3.in", immediateRender: false }, F0 - 0.02);
+            Look.reveal(tl, "#spd1", F0 + 0.1, { by: "chars", stagger: 0.04, dur: 0.42 });
+            Look.fill("#spd1", CONFIG.sunset, { sheen: true });
+            tl.fromTo("#icR1", { yPercent: 0 }, { yPercent: -110, duration: 0.2, ease: "power3.in", immediateRender: false }, T2 - 0.1);
+            tl.fromTo("#icP1", { yPercent: 110 }, { yPercent: 0, duration: 0.3, ease: "expo.out", immediateRender: false }, T2 + 0.04);
+            if (plate) {
+              Look.impact(tl, T2, { shake: "#shake", amp: 8, flash: 0, zoom: 1.035, dur: 0.34 });
+              Look.expose(tl, T2, { target: "#shake", peak: 1.4, dur: 0.36, saturate: 1.16 });
+            }
+            Look.chroma(tl, "#lines1", T2, 0.18, { px: 4 });
+            Look.sheen(tl, "#spd1", T2 + 0.3, { dur: 0.8 });
+
+            // ---------- the type clears for the money shot (masked roll up); the counter stays docked ----------
+            const HO = V.heroOut;
+            const shown = slots.map((o) => o.flips ? o.b : o.a);
+            tl.fromTo(shown, { yPercent: 0 }, { yPercent: -112, duration: 0.34, ease: "power3.in", stagger: 0.03, immediateRender: false }, HO);
+            tl.fromTo("#spd1 .lk-in", { yPercent: 0 }, { yPercent: -112, duration: 0.32, ease: "power3.in", immediateRender: false }, HO + 0.1);
+            if (plate) tl.fromTo("#scrimTop1", { opacity: 1 }, { opacity: 0.5, duration: 0.5, ease: "power2.inOut", immediateRender: false }, HO + 0.1);
+
+            // ---------- the clock: the tape counter runs back, then crawls ----------
+            const tc = $("#tc1");
+            Look.drive(tl, 0, D, (p) => { tc.textContent = fmt(srcAt(p * D)); });
+
+            Look.exit(tl, "#count1", V.exitAt, { to: "blur", dur: 0.34, blur: 12 });
+            if (plate) tl.fromTo("#scrimTop1", { opacity: 0.5 }, { opacity: 0, duration: 0.36, ease: "power2.in", immediateRender: false }, V.exitAt);
+            if (plate) Look.push(tl, "#push", 0, D, { from: 1.0, to: 1.05 });
+          }
+
+          Look.install(tl, { duration: D, grain: 0.15, vignette: 0.45, enabled: plate });
+          tl.set({}, {}, D);
+          window.__timelines = window.__timelines || {};
+          window.__timelines["main"] = tl;
+          tl.seek(0);
+        });
+      })();
+    </script>
+  </body>
+</html>

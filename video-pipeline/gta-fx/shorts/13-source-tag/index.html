@@ -1,0 +1,479 @@
+<!doctype html>
+<!-- GTA 6 component #13 — Source tag (craft v2, round 6). 1080x1920 (9:16), 30 fps, 6.8 s.
+     A per-clip credit that ARRIVES as a cinematic credit and then DOCKS into a safe corner, where it holds for the rest of
+     the clip and re-credits on every cut.
+     "0" Footage chip: Rockstar end-card credit style (wide Archivo caps with the magenta offset, an outlined FOOTAGE chip,
+         a running source timecode). Announced on the x 72 column over the Vice City sky, it folds up into the top-left
+         corner on the cut, then re-credits each cut with a masked rise: Trailer 2 → Trailer 2 → PlayStation Features
+         Trailer → Launch Trailer (a sunset glint sweeps the Launch Trailer credit).
+     "1" Handle tag: creator credit in tight Inter display. A 300 px sunset "@" hangs above the handle; on the cut it shrinks
+         into the corner and becomes the mark of a bottom-left lockup ("@" | CLIP VIA / everestchris6).
+     Variables: variant "0"/"1"; bg "plate" (4K sample shots + Look finishing) / "none" (transparent overlay). -->
+<html lang="en" data-composition-variables='[
+  {"id":"variant","type":"enum","label":"Variant","default":"0","options":[{"value":"0","label":"Footage chip"},{"value":"1","label":"Handle tag"}]},
+  {"id":"bg","type":"enum","label":"Background","default":"plate","options":[{"value":"plate","label":"Sample footage"},{"value":"none","label":"Transparent"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link rel="stylesheet" href="assets/fonts/fonts.css" />
+    <link rel="stylesheet" href="assets/kit/look/look.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="assets/kit/look/look.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: transparent; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; font-family: "Inter", sans-serif; color: #fff;
+        -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; }
+      #shake, #push { position: absolute; inset: 0; }
+      .shot { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      #ov { position: absolute; inset: 0; z-index: 10; }
+      .scrim { position: absolute; inset: 0; opacity: 0; pointer-events: none; }
+
+      /* ---------- shared layout: the announce lockup (#big) and the docked tag (#dock) ---------- */
+      #big { position: absolute; left: 72px; width: 864px; display: flex; flex-direction: column; }
+      #big.al-center { align-items: center; }
+      #big.al-left { align-items: flex-start; }
+      #big.al-right { align-items: flex-end; }
+      .row { position: relative; display: block; white-space: nowrap; }   /* FLIP wrapper: travels to its docked twin */
+      .ri { display: flex; align-items: center; white-space: nowrap; }      /* entrance target inside the wrapper */
+      #dock { position: absolute; display: flex; align-items: center; visibility: hidden; }
+      #dock.al-right { flex-direction: row-reverse; }
+      .dcol { display: flex; flex-direction: column; align-items: flex-start; }
+      #dock.al-right .dcol { align-items: flex-end; }
+      .drow { position: relative; display: flex; align-items: center; white-space: nowrap; }
+      /* per-clip values stack in one grid cell; the cut hides the old value and the new one rises out of its mask */
+      .stack { display: grid; }
+      .stack > .in { grid-area: 1 / 1; justify-self: start; display: block; position: relative; }
+      #dock.al-right .stack > .in { justify-self: end; }
+
+      /* ---------- Variant 0: Footage chip — Rockstar end-card credit style ---------- */
+      .f-wide { font-family: "Archivo", "Inter", sans-serif; font-stretch: 125%; text-transform: uppercase; }
+      .chip { display: inline-block; font-weight: 700; letter-spacing: .22em; line-height: 1; color: #fff;
+        padding: .36em .4em .32em .62em; border: .08em solid rgba(255,255,255,.94); border-radius: .14em; margin-right: .72em;
+        box-shadow: 0 .06em .5em rgba(0,0,0,.28), inset 0 0 .5em rgba(0,0,0,.12); }
+      .src { font-weight: 700; letter-spacing: .22em; line-height: 1; color: #fff; }
+      /* the hero: wide caps, white, with Rockstar's magenta offset (EE08F2, right/down) and a soft warm bloom */
+      .hero0 { font-family: "Archivo", "Inter", sans-serif; font-stretch: 125%; text-transform: uppercase; font-weight: 700;
+        letter-spacing: .05em; line-height: .96; color: #fff; position: relative;
+        text-shadow: .03em .014em 0 #EE08F2, 0 0 .09em rgba(255,228,200,.42), 0 0 .34em rgba(255,200,160,.16), 0 .05em .2em rgba(0,0,0,.45); }
+      .tc { font-family: "JetBrains Mono", monospace; font-weight: 500; letter-spacing: .08em; line-height: 1; color: #fff;
+        font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1, "zero" 1; }
+      .tc .k { color: rgba(255,255,255,.88); margin-right: .55em; }
+      .lift { text-shadow: 0 1px 1px rgba(0,0,0,.32), 0 3px 12px rgba(0,0,0,.42), 0 10px 32px rgba(0,0,0,.3); }
+
+      /* ---------- Variant 1: Handle tag — creator credit, tight Inter display, one sunset "@" mark ---------- */
+      .ri.lab1, .drow.lab1 { display: block; }   /* block (not flex) so the baseline probe sits on the text line */
+      .lab1 { font-family: "Inter", sans-serif; font-weight: 600; text-transform: uppercase; letter-spacing: .34em; line-height: 1;
+        color: rgba(255,255,255,.92); }
+      .handle { display: inline-block; position: relative; font-family: "Inter", sans-serif; font-weight: 800; letter-spacing: -.055em;
+        line-height: 1; color: #fff; font-feature-settings: "ss01" 1, "cv11" 1; font-optical-sizing: auto;
+        text-shadow: 0 .015em .02em rgba(0,0,0,.3), 0 .05em .2em rgba(0,0,0,.42); }
+      .mark { display: inline-block; position: relative; font-family: "Inter", sans-serif; font-weight: 800; letter-spacing: 0;
+        line-height: 1; color: #fff; font-optical-sizing: auto; }
+      #dmw { position: relative; flex: none; align-self: stretch; }
+      #dmw .mark { position: absolute; left: 0; top: 0; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6.8" data-width="1080" data-height="1920">
+      <div id="shake"><div id="push">
+        <!-- Footage chip (v0): one shot per credited clip; the tag re-credits on each cut (see CONFIG.variants["0"].clips).
+             a1 Trailer 2 (0:34) Vice City highway · a2 Trailer 2 (2:22) biker and seaplane · a3 PlayStation Features
+             Trailer (0:43) skydive · a4 Launch Trailer (0:02) The Keys sign -->
+        <video id="a1" class="clip shot" src="assets/shots/s011-vice-highway-v.mp4" muted playsinline data-start="0" data-duration="1.75" data-media-start="0.2" data-track-index="0"></video>
+        <video id="a2" class="clip shot" src="assets/shots/s065-biker-plane-v.mp4" muted playsinline data-start="1.75" data-duration="1.6" data-media-start="0.1" data-track-index="0"></video>
+        <video id="a3" class="clip shot" src="assets/shots/s135-skydive-city-v.mp4" muted playsinline data-start="3.35" data-duration="1.6" data-media-start="0.02" data-track-index="0"></video>
+        <video id="a4" class="clip shot" src="assets/shots/s074-keys-sign-v.mp4" muted playsinline data-start="4.95" data-duration="1.85" data-media-start="0.36" data-track-index="0"></video>
+        <!-- Handle tag (v1): a creator's clip, cut on rhythm; the tag docks on the first cut (b1 → b2) -->
+        <video id="b1" class="clip shot" src="assets/shots/s076-jason-boat-v.mp4" muted playsinline data-start="0" data-duration="1.75" data-media-start="0" data-track-index="1"></video>
+        <video id="b2" class="clip shot" src="assets/shots/s064-jetski-v.mp4" muted playsinline data-start="1.75" data-duration="1.25" data-media-start="0" data-track-index="1"></video>
+        <video id="b3" class="clip shot" src="assets/shots/s108-balcony-sunset-v.mp4" muted playsinline data-start="3" data-duration="1.3" data-media-start="0.02" data-track-index="1"></video>
+        <video id="b4" class="clip shot" src="assets/shots/s026-sunset-pier-v.mp4" muted playsinline data-start="4.3" data-duration="1.55" data-media-start="0" data-track-index="1"></video>
+        <video id="b5" class="clip shot" src="assets/shots/s036-beach-bar-v.mp4" muted playsinline data-start="5.85" data-duration="0.95" data-media-start="0.2" data-track-index="1"></video>
+      </div></div>
+
+      <div id="ov" class="clip" data-start="0" data-duration="6.8" data-track-index="2">
+        <div class="scrim" id="scrimBig"></div>
+        <div class="scrim" id="scrimDock"></div>
+        <div id="big"></div>
+        <div id="dock"></div>
+      </div>
+    </div>
+
+    <script>
+      const CONFIG = {
+        variants: {
+          // Footage chip: credit the source of every clip. One `clips` entry per clip, in order. `video` is the id of the
+          // <video> above that plays it (its data-start is the cut time). `srcIn` is where that shot starts in the source
+          // video, in seconds (gta6/_shared/shots/shots.json): the timecode row shows the real source time and runs with it.
+          "0": {
+            style: "footage", corner: "tl",
+            chip: "Footage",
+            timecode: true, tcLabel: "TC",
+            announce: { align: "left", top: 252 },   // the big credit over the first clip; set announce: null for a corner tag only
+            clips: [
+              { video: "a1", source: "Rockstar Games", detail: "Trailer 2",        srcIn: 34.67 },  // Trailer 2, 0:34
+              { video: "a2", source: "Rockstar Games", detail: "Trailer 2",        srcIn: 141.90 }, // Trailer 2, 2:21
+              { video: "a3", source: "PlayStation",    detail: "Features Trailer", srcIn: 43.78 },  // PS5 Features Trailer, 0:43
+              { video: "a4", source: "Rockstar Games", detail: "Launch Trailer",   srcIn: 2.07 }    // Launch Trailer, 0:02
+            ],
+            glint: "Launch Trailer",   // the one re-credit that gets a sunset glint (Look.sheen); "" for none
+            size: { bigRow: 26, bigHeroMax: 150, bigHeroWidth: 820, bigTc: 30, dockRow: 22, dockHeroMax: 44, dockHeroWidth: 720, dockTc: 22,
+                    gapRowHero: 22, gapHeroTc: 24 }
+          },
+          // Handle tag: credit the creator who made / posted the clip. A leading "@" becomes the sunset mark.
+          "1": {
+            style: "handle", corner: "bl",
+            label: "Clip via", handle: "@everestchris6",
+            clips: [ { video: "b1" }, { video: "b2" }, { video: "b3" }, { video: "b4" }, { video: "b5" } ],
+            announce: { align: "left", top: 548 },
+            // bigHero is a floor-safe fixed size (DESIGN.md display floor 140 px): no fit loop. Handles up to ~13 characters fit.
+            size: { bigRow: 26, bigMark: 300, bigHero: 140, dockRow: 22, dockHero: 52, gapLabelMark: 30, gapMarkHero: 30, dockMarkGap: 18 }
+          }
+        },
+        // 9:16 safe zone (DESIGN.md): x 72–936, y 230–1480. The tag docks inside these insets.
+        safe: { left: 72, right: 936, top: 252, bottom: 1460 },
+        timing: {
+          in: 0.1,          // announce starts
+          dockClip: 1,      // the tag docks on the cut INTO this clip (the payoff hit)
+          travel: 0.5,      // dock flight time, centred a little before the cut
+          rise: 0.28,       // re-credit mask-rise on later cuts
+          out: 6.15,        // exit starts
+          end: 6.8
+        },
+        light: { expose: 1.6, chromaPx: 4, chromaDur: 0.15 },
+        colors: {
+          magenta: "#EE08F2",
+          sunset: "linear-gradient(100deg, #F84FA4 0%, #FE78A6 22%, #FE8E4E 60%, #FEB747 100%)",
+          glint: "linear-gradient(105deg, rgba(255,255,255,0) 43%, rgba(254,183,71,.96) 47.5%, rgba(248,79,164,.96) 52.5%, rgba(255,255,255,0) 57%)"
+        }
+      };
+
+      (function () {
+        const VARS = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+        const vKey = CONFIG.variants[String(VARS.variant)] ? String(VARS.variant) : "0";
+        const plate = VARS.bg !== "none";
+        const V = CONFIG.variants[vKey], T = CONFIG.timing, S = CONFIG.safe, C = CONFIG.colors, L = CONFIG.light, D = T.end;
+        const $ = (s, r) => (r || document).querySelector(s);
+        const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+        const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+
+        // Media sync from CONFIG order (the <video> tags hold src / data-start / data-media-start; CONFIG names them by id).
+        const ids = V.clips.map((c) => c.video);
+        $$("video.shot").forEach((v) => { if (!plate || ids.indexOf(v.id) < 0) v.style.display = "none"; });
+        const clips = V.clips.map((c) => {
+          const v = document.getElementById(c.video);
+          return Object.assign({}, c, { at: parseFloat(v.dataset.start) || 0, dur: parseFloat(v.dataset.duration) || 0, media: parseFloat(v.dataset.mediaStart) || 0 });
+        });
+        const isFootage = V.style === "footage";
+        const right = /r/.test(V.corner), top = /t/.test(V.corner);
+        const big = $("#big"), dock = $("#dock"), scrimBig = $("#scrimBig"), scrimDock = $("#scrimDock");
+        const A = V.announce;
+        const markCh = !isFootage && /^@/.test(V.handle) ? "@" : "";
+        const name = !isFootage ? V.handle.replace(/^@/, "") : "";
+
+        // ---------- build DOM ----------
+        dock.classList.add(right ? "al-right" : "al-left");
+        if (top) dock.style.top = S.top + "px"; else dock.style.bottom = (1920 - S.bottom) + "px";
+        if (right) dock.style.right = (1080 - S.right) + "px"; else dock.style.left = S.left + "px";
+        if (A) { big.classList.add("al-" + A.align); big.style.top = A.top + "px"; } else big.style.display = "none";
+
+        const uniq = (arr) => arr.filter((x, i) => arr.indexOf(x) === i);
+        let srcList = [], detList = [];
+        if (isFootage) {
+          srcList = uniq(clips.map((c) => c.source)); detList = uniq(clips.map((c) => c.detail));
+          big.innerHTML =
+            '<div class="row" id="br1"><div class="ri f-wide lift"><span class="chip">' + esc(V.chip) + '</span><span class="src">' + esc(clips[0].source) + '</span></div></div>' +
+            '<div class="row" id="br2"><div class="hero0" id="bhero">' + esc(clips[0].detail) + '</div></div>' +
+            (V.timecode ? '<div class="row" id="br3"><div class="ri tc lift"><span class="k">' + esc(V.tcLabel) + '</span><span id="btc"></span></div></div>' : "");
+          dock.innerHTML = '<div class="dcol">' +
+            '<div class="drow f-wide lift" id="dr1"><span class="chip">' + esc(V.chip) + '</span><span class="stack" id="dsrc">' +
+              srcList.map((s) => '<span class="in src">' + esc(s) + "</span>").join("") + "</span></div>" +
+            '<div class="drow" id="dr2"><span class="stack" id="dhero">' + detList.map((s) => '<span class="in hero0">' + esc(s) + "</span>").join("") + "</span></div>" +
+            (V.timecode ? '<div class="drow tc lift" id="dr3"><span class="k">' + esc(V.tcLabel) + '</span><span id="dtc"></span></div>' : "") + "</div>";
+        } else {
+          big.innerHTML =
+            '<div class="row" id="br1"><div class="ri lab1 lift">' + esc(V.label) + "</div></div>" +
+            (markCh ? '<div class="row" id="br0"><span class="mark" id="bmark">' + markCh + "</span></div>" : "") +
+            '<div class="row" id="br2"><span class="handle" id="bhero">' + esc(name) + "</span></div>";
+          dock.innerHTML =
+            (markCh ? '<div id="dmw"><span class="mark" id="dmark">' + markCh + "</span></div>" : "") +
+            '<div class="dcol"><div class="drow lab1 lift" id="dr1">' + esc(V.label) + '</div>' +
+            '<div class="drow" id="dr2"><span class="handle" id="dhero">' + esc(name) + "</span></div></div>";
+        }
+
+        document.fonts.ready.then(() => {
+          const Z = V.size;
+          const px = (n) => n.toFixed(2) + "px";
+          // ---------- measuring helpers ----------
+          // width of a detached copy at a fixed size (a flex item would clamp to its container and hide the overflow)
+          const widthAt = (el, size) => {
+            const c = el.cloneNode(true);
+            c.style.cssText += ";position:absolute;left:0;top:0;display:inline-block;width:auto;max-width:none;white-space:nowrap;visibility:hidden;font-size:" + size + "px";
+            $("#root").appendChild(c); const w = c.getBoundingClientRect().width; c.remove(); return w;
+          };
+          const fit = (els, max, width) => Math.floor(Math.min(max, width / Math.max.apply(null, els.map((e) => widthAt(e, 100) / 100))));
+          // glyph ink (canvas metrics): left side bearing of the first glyph, ink ascent / descent / width of the run
+          const cvx = document.createElement("canvas").getContext("2d");
+          const ink = (el) => {
+            const cs = getComputedStyle(el);
+            let t = el.textContent.trim(); if (cs.textTransform === "uppercase") t = t.toUpperCase();
+            cvx.font = cs.fontWeight + " " + cs.fontSize + " " + cs.fontFamily;
+            try { cvx.fontStretch = /125/.test(cs.fontStretch) ? "expanded" : "normal"; } catch (e) {}
+            try { cvx.letterSpacing = cs.letterSpacing === "normal" ? "0px" : cs.letterSpacing; } catch (e) {}
+            const m = cvx.measureText(t), m1 = cvx.measureText(t.charAt(0));
+            return { lsb: -m1.actualBoundingBoxLeft, asc: m.actualBoundingBoxAscent, desc: m.actualBoundingBoxDescent,
+                     w: m1.actualBoundingBoxLeft + (m.actualBoundingBoxRight) };
+          };
+          // the y of an element's text baseline (a zero-size inline-block sits on it)
+          const baseY = (el) => {
+            const p = document.createElement("span"); p.style.cssText = "display:inline-block;width:0;height:0;vertical-align:baseline";
+            el.appendChild(p); const y = p.getBoundingClientRect().top; p.remove(); return y;
+          };
+          // optical alignment: shift an element left by its first glyph's side bearing, so the INK sits on the x 72 column
+          const alignInk = (el) => { if (right) return; const b = ink(el).lsb; el.style.left = px(-b); };
+
+          // ---------- running source timecode (MM:SS:FF), true to the source video ----------
+          const pad = (n) => (n < 10 ? "0" : "") + n;
+          const tcText = (t) => {
+            let c = clips[0]; clips.forEach((k) => { if (k.at <= t + 1e-6) c = k; });
+            const sf = Math.round((c.srcIn + c.media + (t - c.at)) * 30);
+            return pad(Math.floor(sf / 1800)) + ":" + pad(Math.floor(sf / 30) % 60) + ":" + pad(sf % 30);
+          };
+          const tcEls = isFootage && V.timecode ? [$("#btc"), $("#dtc")].filter(Boolean) : [];
+          tcEls.forEach((el) => (el.textContent = tcText(0)));   // filled BEFORE the FLIP pairs are measured (r05 hand-off bug)
+
+          // ---------- size + layout ----------
+          if (isFootage) {
+            $("#br1").style.fontSize = Z.bigRow + "px";
+            if ($("#br3")) $("#br3").style.fontSize = Z.bigTc + "px";
+            $("#br2").style.fontSize = fit([$("#bhero")], Z.bigHeroMax, Z.bigHeroWidth) + "px";
+            $("#dr1").style.fontSize = Z.dockRow + "px";
+            if ($("#dr3")) $("#dr3").style.fontSize = Z.dockTc + "px";
+            $("#dr2").style.fontSize = fit($$("#dhero .in"), Z.dockHeroMax, Z.dockHeroWidth) + "px";
+            $("#br1").style.marginBottom = Z.gapRowHero + "px"; $("#br2").style.marginBottom = Z.gapHeroTc + "px";
+            $("#dr1").style.marginBottom = "12px"; $("#dr2").style.marginBottom = "12px";
+            alignInk($("#bhero")); $$("#dhero .in").forEach(alignInk);
+          } else {
+            $("#br1").style.fontSize = Z.bigRow + "px";
+            $("#br2").style.fontSize = Z.bigHero + "px";
+            $("#dr1").style.fontSize = Z.dockRow + "px";
+            $("#dr2").style.fontSize = Z.dockHero + "px";
+            $("#dr1").style.marginBottom = "10px";
+            alignInk($("#bhero")); alignInk($("#dhero"));
+            const capTop = (row) => baseY(row) - ink(row).asc;          // top of the caps of a label row
+            if (markCh) {
+              // announce: the "@" hangs on x 72, its ink a fixed gap under the label and above the handle
+              const bm = $("#bmark"); $("#br0").style.fontSize = Z.bigMark + "px"; alignInk(bm);
+              const mi = ink(bm);
+              const lb = baseY($("#br1 .ri"));
+              $("#br0").style.marginTop = px((lb + Z.gapLabelMark) - (baseY(bm) - mi.asc));
+              const mBottom = baseY(bm) + mi.desc, hi = ink($("#bhero"));
+              $("#br2").style.marginTop = px((mBottom + Z.gapMarkHero) - (baseY($("#bhero")) - hi.asc));
+              // dock: the "@" becomes the lockup's mark, its ink spanning CLIP VIA cap-top to the handle baseline
+              const dm = $("#dmark"), H = baseY($("#dhero")) - capTop($("#dr1"));
+              const k = (mi.asc + mi.desc) / Z.bigMark;            // ink height per px of font size
+              const F = H / k; dm.style.fontSize = px(F);
+              const di = ink(dm);
+              $("#dmw").style.width = px(di.w + Z.dockMarkGap);
+              dm.style.left = px(-di.lsb);
+              dm.style.top = px(capTop($("#dr1")) - (baseY(dm) - di.asc));
+            }
+          }
+
+          // ---------- scrims: placement first, then a soft shade where the type sits ----------
+          const rgba = "rgba(5,5,9,";
+          if (isFootage) {
+            // announce: a graduated sky (deep-blue multiply on footage, like an ND grad) behind the credit on the top column
+            scrimBig.style.background = plate
+              ? "linear-gradient(180deg, rgba(14,30,84,.78) 0%, rgba(14,30,84,.66) 20%, rgba(14,30,84,.42) 30%, rgba(14,30,84,0) 44%)"
+              : "linear-gradient(180deg, " + rgba + ".6) 0%, " + rgba + ".46) 20%, " + rgba + ".22) 30%, " + rgba + "0) 44%)";
+            if (plate) scrimBig.style.mixBlendMode = "multiply";
+            scrimDock.style.background = top
+              ? "radial-gradient(ellipse 760px 420px at " + (right ? 860 : 220) + "px 250px, " + rgba + ".66) 0%, " + rgba + ".36) 50%, " + rgba + "0) 100%)"
+              : "radial-gradient(ellipse 760px 420px at " + (right ? 860 : 220) + "px 1420px, " + rgba + ".66) 0%, " + rgba + ".36) 50%, " + rgba + "0) 100%)";
+          } else {
+            scrimBig.style.background = "radial-gradient(ellipse 860px 700px at 400px " + (A ? A.top + 300 : 900) + "px, " + rgba + ".44) 0%, " + rgba + ".22) 54%, " + rgba + "0) 100%)";
+            scrimDock.style.background = top
+              ? "radial-gradient(ellipse 700px 380px at " + (right ? 820 : 260) + "px 300px, " + rgba + ".6) 0%, " + rgba + ".3) 52%, " + rgba + "0) 100%)"
+              : "radial-gradient(ellipse 700px 380px at " + (right ? 820 : 260) + "px 1420px, " + rgba + ".6) 0%, " + rgba + ".3) 52%, " + rgba + "0) 100%)";
+          }
+
+          // ---------- measure the FLIP pairs (layout final, no transforms yet) ----------
+          // anchor "box": the rows' top-left (or top-right) corners; everything inside is em-based, so it scales exactly.
+          // anchor "base": the "@" mark, whose docked twin is absolutely placed: pair the glyphs' baseline-left points.
+          const pairs = [];
+          if (A) {
+            const fs = (el) => parseFloat(getComputedStyle(el).fontSize);
+            const pair = (bigRow, twin, s, mode, bAnchorEl, tAnchorEl) => {
+              const rb = bigRow.getBoundingClientRect(), rt = twin.getBoundingClientRect();
+              let ab, at, origin;
+              if (mode === "base") {
+                ab = { x: rb.left, y: baseY(bAnchorEl) }; at = { x: rt.left, y: baseY(tAnchorEl) };
+                origin = "0px " + px(ab.y - rb.top);
+              } else {
+                ab = { x: right ? rb.right : rb.left, y: rb.top }; at = { x: right ? rt.right : rt.left, y: rt.top };
+                origin = right ? "100% 0%" : "0% 0%";
+              }
+              pairs.push({ el: bigRow, s: s, dx: at.x - ab.x, dy: at.y - ab.y, origin: origin });
+            };
+            if (isFootage) {
+              pair($("#br1"), $("#dr1"), fs($("#dr1")) / fs($("#br1")));
+              pair($("#br2"), $("#dr2"), fs($("#dr2")) / fs($("#br2")));
+              if ($("#br3")) pair($("#br3"), $("#dr3"), fs($("#dr3")) / fs($("#br3")));
+            } else {
+              if (markCh) pair($("#br0"), $("#dmw"), fs($("#dmark")) / fs($("#bmark")), "base", $("#bmark"), $("#dmark"));
+              pair($("#br1"), $("#dr1"), fs($("#dr1")) / fs($("#br1")));
+              pair($("#br2"), $("#dr2"), fs($("#dr2")) / fs($("#br2")));
+            }
+          }
+
+          const tl = gsap.timeline({ paused: true });
+          const dockAt = clips[Math.min(T.dockClip, clips.length - 1)].at || 1.6;
+
+          // ---------- footage: a slow push on every shot ----------
+          if (plate) clips.forEach((c, i) => Look.push(tl, "#push", c.at, c.dur, { from: 1.0, to: i === clips.length - 1 ? 1.06 : 1.045 }));
+
+          // ---------- split the hero type (big and docked) the same way, so the docked twin matches glyph for glyph ----------
+          let bigChars = [];
+          if (A) {
+            const r = Look.reveal(tl, "#bhero", T.in + (isFootage ? 0.08 : 0.2), { by: "chars", stagger: isFootage ? 0.03 : 0.022, dur: 0.7, from: 118 });
+            bigChars = $$("#bhero .lk-c");
+            // unmask once risen, so the magenta offset and bloom are never clipped; drop will-change so the dock scale stays crisp
+            tl.set($$("#bhero .lk-mask"), { overflow: "visible" }, r + 0.02);
+            tl.set(bigChars, { willChange: "auto" }, r + 0.02);
+            if (markCh) {
+              const rm = Look.reveal(tl, "#bmark", T.in + 0.04, { by: "chars", dur: 0.8, from: 112 });
+              tl.set($$("#bmark .lk-mask"), { overflow: "visible" }, rm + 0.02);
+              tl.set($$("#bmark .lk-c"), { willChange: "auto" }, rm + 0.02);
+            }
+          }
+          const dockHeroEls = isFootage ? $$("#dhero .in") : [$("#dhero")];
+          dockHeroEls.forEach((el) => Look.split(el, { by: "chars", mask: true }));
+          if (isFootage) $$("#dsrc .in").forEach((el) => Look.split(el, { by: "words", mask: true }));
+          $$("#dock .lk-mask").forEach((m) => (m.style.overflow = "visible"));
+          $$("#dock .lk-c, #dock .lk-in").forEach((c) => (c.style.willChange = "auto"));
+
+          // the "@" is the one sunset accent (big and docked); it gets a soft sunset glow and a contact lift
+          if (markCh) {
+            Look.fill($("#bmark"), C.sunset);
+            Look.fill($("#dmark"), C.sunset, { sheen: true });
+            $("#bmark").style.filter = "drop-shadow(0 0 22px rgba(248,79,164,.32)) drop-shadow(0 8px 22px rgba(0,0,0,.34))";
+            $("#dmark").style.filter = "drop-shadow(0 0 8px rgba(248,79,164,.34)) drop-shadow(0 3px 8px rgba(0,0,0,.4))";
+          }
+          // the glint credit (v0): white fill + a thin sunset band that Look.sheen sweeps across; the magenta offset moves to
+          // a drop-shadow on its container (a text-shadow under a clipped background would muddy the fill)
+          let glintEl = null;
+          if (isFootage && V.glint) {
+            glintEl = $$("#dhero .in").find((el) => el.textContent.trim().toLowerCase() === V.glint.toLowerCase()) || null;
+            if (glintEl) {
+              const f = parseFloat(getComputedStyle($("#dr2")).fontSize);
+              const leaves = Look.fill(glintEl, "linear-gradient(#ffffff, #ffffff)", { sheen: true });
+              leaves.forEach((n) => (n.style.backgroundImage = C.glint + ", linear-gradient(#ffffff, #ffffff)"));
+              glintEl.style.filter = "drop-shadow(" + px(f * 0.03) + " " + px(f * 0.014) + " 0 " + C.magenta + ") drop-shadow(0 0 " + px(f * 0.09) + " rgba(255,228,200,.42)) drop-shadow(0 " + px(f * 0.05) + " " + px(f * 0.2) + " rgba(0,0,0,.45))";
+            }
+          }
+
+          // ---------- per-clip state of the docked stacks ----------
+          const srcIns = $$("#dsrc .in"), detIns = $$("#dhero .in");
+          const show = (list, k) => list.forEach((el, i) => gsap.set(el, { autoAlpha: i === k ? 1 : 0 }));
+          // the docked twins land showing clip 0's credit (glyph-for-glyph with the flight); later clips re-credit on their cuts
+          if (isFootage) { show(srcIns, srcList.indexOf(clips[0].source)); show(detIns, detList.indexOf(clips[0].detail)); }
+
+          // ---------- running timecode ----------
+          if (tcEls.length) {
+            let lastF = -1;
+            Look.drive(tl, 0, D, (p) => {
+              const f = Math.round(p * D * 30); if (f === lastF) return; lastF = f;
+              const txt = tcText(f / 30); tcEls.forEach((el) => (el.textContent = txt));
+            });
+          }
+
+          // ---------- 1. ANNOUNCE ----------
+          let arrive = T.in;
+          if (A) {
+            gsap.set(scrimBig, { opacity: 0 });
+            tl.fromTo(scrimBig, { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "power2.out", immediateRender: false }, Math.max(0, T.in - 0.1));
+            Look.enter(tl, "#br1 .ri", T.in, { from: "blur", dur: 0.6, blur: 10, scale: 1.06 });
+            if ($("#br3")) Look.enter(tl, "#br3 .ri", T.in + 0.34, { from: "up", dist: 22, dur: 0.6, blur: 6 });
+
+            // ---------- 2. DOCK (the payoff, on the cut into clips[dockClip]) ----------
+            const t0 = dockAt - 0.22, TR = T.travel, st = 0.03;
+            pairs.forEach((p, i) => {
+              gsap.set(p.el, { transformOrigin: p.origin });
+              tl.fromTo(p.el, { x: 0, y: 0, scale: 1 }, { x: p.dx, y: p.dy, scale: p.s, duration: TR, ease: "expo.inOut", immediateRender: false }, t0 + i * st);
+              // travel smear that peaks mid-flight and resolves to sharp
+              Look.drive(tl, t0 + i * st, TR, (q) => { p.el.style.filter = q > 0 && q < 1 ? "blur(" + (3.2 * Math.pow(Math.sin(Math.PI * q), 2)).toFixed(2) + "px)" : "none"; });
+            });
+            arrive = t0 + TR + (pairs.length - 1) * st;
+            // seasoning only: a 4 px RGB split on the incoming hero for 0.15 s (DESIGN.md lesson 2)
+            Look.chroma(tl, "#bhero", dockAt, L.chromaDur, { px: L.chromaPx });
+            tl.fromTo(scrimBig, { opacity: 1 }, { opacity: 0, duration: 0.45, ease: "power2.inOut", immediateRender: false }, t0 + 0.05);
+            tl.fromTo(scrimDock, { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "power2.out", immediateRender: false }, t0 + 0.1);
+            // hand-off: the flying rows land exactly on their docked twins, then the twins take over
+            tl.set(big, { visibility: "hidden" }, arrive);
+            tl.set(dock, { visibility: "visible" }, arrive);
+            // the hit: shake + punch from impact (no white overlay), light from an exposure pulse held 2 frames at peak
+            if (plate) {
+              Look.impact(tl, dockAt, { shake: "#shake", amp: isFootage ? 8 : 6, flash: 0, zoom: 1.035 });
+              Look.expose(tl, dockAt, { target: "#shake", peak: L.expose, hold: 2 / 30, dur: 0.34 });
+            }
+            // the docked "@" catches the light once as it lands
+            if (markCh) Look.sheen(tl, "#dmark", arrive + 0.02, { dur: 0.75 });
+          } else {
+            // corner tag only: rows rise in from their masks
+            gsap.set(scrimDock, { opacity: 0 });
+            tl.fromTo(scrimDock, { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "power2.out", immediateRender: false }, T.in);
+            tl.set(dock, { visibility: "visible" }, T.in);
+            Look.enter(tl, $$("#dock .drow" + (markCh ? ", #dmw" : "")), T.in, { from: "blur", dur: 0.55, blur: 8, stagger: 0.07 });
+            arrive = T.in + 0.3;
+          }
+
+          // ---------- 3. RE-CREDIT ON LATER CUTS (footage chip) ----------
+          // On the cut frame the old value goes; the new one rises out of its mask (0.28 s expo.out, chars staggered 12 ms).
+          // The masks clip only during the rise, then open so the magenta offset and the lift shadow are never cut.
+          const rise = (el, at) => {
+            const masks = $$(".lk-mask", el), parts = $$(".lk-c", el).length ? $$(".lk-c", el) : $$(".lk-in", el);
+            const stg = parts.length > 1 ? Math.min(0.012, 0.1 / parts.length) : 0;
+            tl.set(masks, { overflow: "hidden" }, at);
+            tl.fromTo(parts, { yPercent: 112 }, { yPercent: 0, duration: T.rise, ease: "expo.out", stagger: stg, immediateRender: false }, at);
+            tl.set(masks, { overflow: "visible" }, at + T.rise + stg * (parts.length - 1) + 0.02);
+          };
+          if (isFootage) {
+            let curS = srcList.indexOf(clips[0].source), curD = detList.indexOf(clips[0].detail);
+            clips.forEach((c, i) => {
+              if (i === 0 || c.at >= T.out - 0.3) return;
+              const s = srcList.indexOf(c.source), d = detList.indexOf(c.detail);
+              if (s === curS && d === curD) return;
+              const at = Math.max(c.at, arrive + 0.12);
+              const swap = (list, from, to) => {
+                tl.set(list[from], { autoAlpha: 0 }, at);
+                tl.set(list[to], { autoAlpha: 1 }, at);
+                rise(list[to], at);
+              };
+              if (s !== curS) swap(srcIns, curS, s);
+              if (d !== curD) {
+                swap(detIns, curD, d);
+                if (glintEl && detIns[d] === glintEl) Look.sheen(tl, glintEl, at + 0.14, { dur: 0.85 });
+              }
+              curS = s; curD = d;
+            });
+          }
+
+          // ---------- 4. EXIT: blur out, last row first ----------
+          const outEls = isFootage ? $$("#dock .drow").reverse() : [$("#dr2"), $("#dr1")].concat(markCh ? [$("#dmw")] : []);
+          Look.exit(tl, outEls, T.out, { to: "blur", dur: 0.42, stagger: 0.05, blur: 12 });
+          tl.fromTo(scrimDock, { opacity: 1 }, { opacity: 0, duration: 0.5, ease: "power2.in", immediateRender: false }, T.out + 0.05);
+
+          // ---------- finishing: grain + vignette on plate renders only (installed last) ----------
+          Look.install(tl, { duration: D, grain: 0.15, vignette: 0.5, enabled: plate });
+          tl.set({}, {}, D);
+          window.__timelines = window.__timelines || {};
+          window.__timelines["main"] = tl;
+          tl.seek(0);
+        });
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,419 @@
+<!doctype html>
+<!-- GTA 6 component #26: Stat count-up — 1080x1920 (9:16), 30 fps, 7 s.
+     Variables: variant "0" Count-up (odometer roll to 305,372,086) / "1" Record badge (90M+ in 24 hours),
+     bg "plate" (sample GTA VI footage underneath) / "none" (transparent overlay).
+     Safe zones: all text inside x 72–936, y 230–1480. -->
+<html lang="en" data-composition-variables='[
+  {"id":"variant","type":"enum","label":"Variant","default":"0","options":[{"value":"0","label":"Count-up"},{"value":"1","label":"Record badge"}]},
+  {"id":"bg","type":"enum","label":"Background","default":"plate","options":[{"value":"plate","label":"Sample footage"},{"value":"none","label":"Transparent"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link rel="stylesheet" href="assets/fonts/fonts.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: transparent; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; font-family: "Inter", sans-serif;
+        -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; font-feature-settings: normal; }
+      .plate { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      #ov { position: absolute; inset: 0; }
+      :root {
+        --ink: #0B0B0E; --paper: #FFFFFF; --navy: #1F202B; --magenta: #EE08F2;
+        --sunset: linear-gradient(90deg, #F84FA4 0%, #FE8E4E 55%, #FEB747 100%);
+        --shadow-type: 0 2px 2px rgba(0,0,0,.35), 0 6px 24px rgba(0,0,0,.45);
+      }
+
+      /* ---------- shared odometer ---------- */
+      /* tabular figures only on the numeral; every digit cell is a fixed-width window anyway */
+      .odo { position: relative; display: flex; align-items: flex-start; white-space: nowrap; font-family: "Barlow Condensed", sans-serif;
+        font-weight: 900; color: #fff; transform-origin: 0% 50%; font-feature-settings: "tnum" 1; }
+      /* the window is clipped to the numeral's cap box (+ a few px for antialiasing), so a rolling digit can never
+         poke above or below the number line; the soft edge mask is applied per frame only while the column moves */
+      .odo .win { position: relative; display: block; overflow: hidden; flex: none; }
+      .odo .strip { position: absolute; left: 0; top: 0; width: 100%; will-change: transform; }
+      .odo .strip > i { display: block; font-style: normal; text-align: center; }
+      .odo .sep { position: relative; display: block; flex: none; text-align: center; }
+      .odo .sep > i { display: block; font-style: normal; }
+      .odo svg.fx { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+      /* ---------- variant 0: count-up ---------- */
+      /* left-anchored smoke behind the type block only (on by default, so the transparent export carries its own
+         contrast); it thins to the right but keeps ~.3 under the last digits, soft top/bottom so it never reads as a box */
+      #scrim { position: absolute; left: 0; top: 500px; width: 100%; height: 600px; opacity: 0;
+        background: linear-gradient(90deg, rgba(10,10,16,.62) 0%, rgba(10,10,16,.52) 45%, rgba(10,10,16,.38) 80%, rgba(10,10,16,.16) 100%);
+        -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 15%, #000 85%, transparent 100%);
+                mask-image: linear-gradient(180deg, transparent 0%, #000 15%, #000 85%, transparent 100%); }
+      #count { position: absolute; left: 80px; top: 590px; width: 856px; color: #fff; display: none; }
+      #count .kicker { font-weight: 600; font-size: 28px; line-height: 1; letter-spacing: .35em; text-transform: uppercase;
+        text-shadow: var(--shadow-type); margin-left: 6px; }
+      #count .odo { margin-top: 30px; filter: drop-shadow(0 2px 2px rgba(0,0,0,.35)) drop-shadow(0 8px 26px rgba(0,0,0,.5)); }
+      #count .rulewrap { position: relative; height: 6px; margin: 24px 0 0 6px; }
+      #count .bloom { position: absolute; left: -4px; right: -4px; top: -5px; bottom: -5px; border-radius: 8px; background: var(--sunset);
+        filter: blur(9px); opacity: 0; }
+      #count .rule { position: absolute; inset: 0; border-radius: 3px; background: rgba(255,255,255,.2); overflow: hidden;
+        box-shadow: 0 2px 10px rgba(0,0,0,.25); }
+      #count .rule .fill { position: absolute; inset: 0; border-radius: 3px; background: var(--sunset); transform-origin: 0 50%; }
+      #count .rule .glint { position: absolute; top: 0; bottom: 0; left: 0; width: 160px;
+        background: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,.95), rgba(255,255,255,0)); opacity: 0; }
+      #count .sub { margin: 30px 0 0 4px; font-weight: 800; font-size: 68px; line-height: 1.04; letter-spacing: -0.03em; text-shadow: var(--shadow-type); }
+      #count .meta { margin: 18px 0 0 6px; font-weight: 500; font-size: 28px; line-height: 1.2; letter-spacing: -0.005em; color: rgba(255,255,255,.8);
+        text-shadow: var(--shadow-type); font-feature-settings: normal; }
+
+      /* ---------- variant 1: record badge ---------- */
+      #badge { position: absolute; left: 96px; top: 560px; width: 840px; display: none; transform-origin: 50% 50%; }
+      #badge .card { position: relative; border-radius: 36px; padding: 54px 56px 46px;
+        background: linear-gradient(180deg, #252634 0%, #1A1B25 100%);
+        box-shadow: 0 1px 2px rgba(0,0,0,.3), 0 36px 90px -24px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.10), inset 0 0 0 1px rgba(255,255,255,.06); }
+      /* Rockstar date style: white wide-tracked caps, 2 px magenta offset on the right, soft bloom */
+      #badge .chip { text-align: center; color: #fff; font-weight: 600; font-size: 28px; line-height: 1; letter-spacing: .35em; text-transform: uppercase;
+        text-shadow: 2px 0 0 var(--magenta), 0 0 16px rgba(238,8,242,.28); font-feature-settings: normal; }
+      #badge .chip span { display: inline-block; margin-right: -.35em; }
+      #badge .odo { margin: 44px auto 0; justify-content: center; }
+      #badge .sub { margin-top: 40px; text-align: center; color: #fff; font-weight: 800; font-size: 64px; line-height: 1.04; letter-spacing: -0.03em;
+        font-feature-settings: normal; }
+      #badge .hair { height: 1px; margin: 40px 0 0; background: rgba(255,255,255,.14); transform-origin: 50% 50%; }
+      #badge .foot { display: flex; justify-content: center; align-items: center; gap: 22px; margin-top: 28px; font-weight: 600; font-size: 28px; line-height: 1;
+        color: rgba(255,255,255,.62); letter-spacing: -0.005em; font-feature-settings: normal; }
+      #badge .foot b { display: block; width: 1px; height: 26px; background: rgba(255,255,255,.24); }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="7" data-width="1080" data-height="1920">
+      <video id="plateA" class="clip plate" src="assets/plates/p06-lucia-gate-v.mp4" muted playsinline data-start="0" data-duration="7" data-track-index="0"></video>
+      <video id="plateB" class="clip plate" src="assets/plates/p01-keys-sign-v.mp4" muted playsinline data-start="0" data-duration="7" data-track-index="0"></video>
+
+      <div id="ov" class="clip" data-start="0" data-duration="7" data-track-index="1">
+        <div id="scrim"></div>
+
+        <div id="count">
+          <div class="kicker" id="c-kicker"></div>
+          <div class="odo" id="c-odo"></div>
+          <div class="rulewrap" id="c-rule">
+            <div class="bloom" id="c-bloom"></div>
+            <div class="rule"><div class="fill" id="c-fill"></div><div class="glint" id="c-glint" data-layout-allow-overflow></div></div>
+          </div>
+          <div class="sub" id="c-sub"></div>
+          <div class="meta" id="c-meta"></div>
+        </div>
+
+        <div id="badge">
+          <div class="card" id="b-card">
+            <div class="chip" id="b-chip"><span id="b-chiptext"></span></div>
+            <div class="odo" id="b-odo"></div>
+            <div class="sub" id="b-sub"></div>
+            <div class="hair" id="b-hair"></div>
+            <div class="foot" id="b-foot"><span id="b-footL"></span><b></b><span id="b-footR"></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const CONFIG = {
+        variants: {
+          "0": {
+            style: "countup",
+            plate: "assets/plates/p06-lucia-gate-v.mp4",
+            kicker: "GTA 6 · Trailer 1",
+            value: "305,372,086",            // digits roll; commas/dots stay fixed
+            from:  "000,000,000",            // what the counter shows before it rolls (same shape as value)
+            suffix: "",
+            sub: "views on YouTube",
+            meta: "Rockstar Games channel · as of Nov 18, 2026",
+            numSize: 210,                    // px; auto-fits down to maxWidth
+            maxWidth: 800,                   // leaves room for the 1.06 land punch inside the safe zone
+            scrim: "always"                  // "always" (also in the transparent export) | "plate" (only over sample footage) | "off"
+          },
+          "1": {
+            style: "badge",
+            plate: "assets/plates/p01-keys-sign-v.mp4",
+            chip: "YouTube record",           // Rockstar date-style caps with magenta offset
+            value: "90",
+            from:  "60",                      // short roll 60M+ → 90M+, then the stamp
+            suffix: "M+",
+            sub: "views in 24 hours",
+            footL: "GTA 6 · Trailer 1",
+            footR: "Non-music video",
+            numSize: 380,
+            maxWidth: 728,
+            gradient: ["#F84FA4", "#FE8E4E", "#FEB747"],
+            stamp: { scale: 1.12, frames: 3, shake: 6 }   // land: numeral slams 1.12 → 1, footage shakes ≤ 6 px
+          }
+        },
+        // odometer: each digit column rolls from its `from` digit to its `value` digit like a ratchet: the digit rests
+        // crisp in its cell and ticks to the next one (quint-out, ≤ odo.tick s, vertical motion blur while it moves).
+        // ease: "expo" (fast start, long settle) | "out3" (power3.out) | "in" (accelerates into the land, for a stamp).
+        // order "ltr": leftmost column lands first at firstLand, rightmost last at lastLand (slot-reel settle);
+        // order "rtl": rightmost lands first. Columns in the later-landing half take `spinsMax` extra full turns,
+        // the rest `spinsMin`, so the magnitude only ever counts UP and never overshoots the real value.
+        roll: {
+          "0": { start: 0.12, firstLand: 0.56, lastLand: 1.1, spinsMin: 0, spinsMax: 1, minCells: 0, order: "ltr", ease: "expo" },
+          "1": { start: 0.34, firstLand: 0.8, lastLand: 0.8, spinsMin: 0, spinsMax: 0, minCells: 0, order: "ltr", ease: "in", tickFrac: 0.7 }
+        },
+        // pitch: cell spacing × digit height; pad: window bleed beyond the cap box (× digit height);
+        // fade: edge mask while moving (fraction of the window); tick: longest digit tick (s); blur: max motion blur (× digit height)
+        odo: { pitch: 1.22, pad: 0.035, fade: 0.3, tick: 0.1, blur: 0.05 },
+        timing: { in: { "0": 0, "1": 0.1 }, out: 6.42, end: 7.0 }   // in: entrance start per variant (s)
+      };
+
+      (function () {
+        const VARS = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+        const vKey = CONFIG.variants[String(VARS.variant)] ? String(VARS.variant) : "0";
+        const showPlate = VARS.bg !== "none";
+        const V = CONFIG.variants[vKey], R = CONFIG.roll[vKey], T = CONFIG.timing, O = CONFIG.odo;
+        const Tin = typeof T.in === "object" ? T.in[vKey] : T.in;
+        const $ = (s) => document.querySelector(s);
+
+        document.querySelectorAll("video.plate").forEach((v) => {
+          if (!showPlate || v.getAttribute("src") !== V.plate) v.style.display = "none";
+        });
+        const plateEl = [...document.querySelectorAll("video.plate")].find((v) => v.style.display !== "none") || null;
+
+        const FAM = '"Barlow Condensed"';
+        const loads = [
+          document.fonts.load('900 200px ' + FAM, "0123456789,M+"),
+          document.fonts.load('600 28px "Inter"'), document.fonts.load('800 64px "Inter"'), document.fonts.load('500 28px "Inter"')
+        ];
+        const ALLOW = (el) => { el.setAttribute("data-layout-allow-occlusion", ""); el.setAttribute("data-layout-allow-overflow", ""); el.setAttribute("data-layout-allow-overlap", ""); };
+
+        // ---- column travel eases (normalised so E(1) = 1 exactly) with inverse and derivative ----
+        const EASES = {
+          expo: (() => { const a = 6, n = 1 - Math.pow(2, -a);
+            return { E: (u) => (1 - Math.pow(2, -a * u)) / n, inv: (y) => -Math.log2(1 - y * n) / a, d: (u) => a * Math.LN2 * Math.pow(2, -a * u) / n }; })(),
+          out3: { E: (u) => 1 - Math.pow(1 - u, 3), inv: (y) => 1 - Math.pow(Math.max(0, 1 - y), 1 / 3), d: (u) => 3 * Math.pow(1 - u, 2) },
+          in: (() => { const p = 1.6; return { E: (u) => Math.pow(u, p), inv: (y) => Math.pow(y, 1 / p), d: (u) => p * Math.pow(Math.max(u, 1e-4), p - 1) }; })()
+        };
+
+        // ---- odometer builder (canvas-measured so glyphs sit dead-centre in their cells) ----
+        function buildOdo(host, value, from, suffix, size, maxWidth, grad) {
+          const EZ = EASES[R.ease] || EASES.out3;
+          const cv = document.createElement("canvas").getContext("2d");
+          const metrics = (fs) => {
+            cv.font = "900 " + fs + "px " + FAM;
+            const z = cv.measureText("0");
+            let dw = 0, top = 0, bot = 0;
+            for (let d = 0; d < 10; d++) { const mm = cv.measureText(String(d)); dw = Math.max(dw, mm.width);
+              top = Math.max(top, mm.actualBoundingBoxAscent); bot = Math.max(bot, mm.actualBoundingBoxDescent); }
+            return { fs, dw: dw * 0.96, z, top, bot, cw: (ch) => cv.measureText(ch).width };
+          };
+          const chars = (value + (suffix || "")).split("");
+          const sufStart = value.length;
+          const fromDigits = (from || "").replace(/\D/g, "");
+          let m = metrics(size);
+          const widthOf = (mm) => chars.reduce((a, ch, i) => a + (/\d/.test(ch) && i < sufStart ? mm.dw : mm.cw(ch) * (ch === "," || ch === "." ? 0.9 : 1)), 0);
+          let W = widthOf(m);
+          if (W > maxWidth) { m = metrics(Math.floor(size * maxWidth / W)); W = widthOf(m); }
+          const fs = m.fs, h = Math.round(fs * 0.9);                       // layout row height
+          const asc = m.z.actualBoundingBoxAscent, desc = m.z.actualBoundingBoxDescent;
+          const ink = m.top + m.bot;                                         // tallest digit's cap box
+          const pd = Math.max(3, Math.round(ink * O.pad));
+          const Hw = Math.round(ink + 2 * pd);                               // window = cap box + antialias bleed
+          const P = Math.round(ink * O.pitch);                               // cell pitch (gap between digits on the reel)
+          const fA = m.z.fontBoundingBoxAscent, fD = m.z.fontBoundingBoxDescent;
+          // shift that puts the digit ink centre at the centre of a line box of height `box`
+          const inkMid = (m.top - m.bot) / 2;
+          const centre = (box) => { const base = (box - (fA + fD)) / 2 + fA; return box / 2 - (base - inkMid); };
+          const dy = centre(h);
+          const y0 = Hw / 2 - P / 2 + centre(P);                             // strip offset that centres cell 0 in the window
+          const maxBlur = ink * O.blur;
+          host.style.fontSize = fs + "px"; host.style.height = h + "px"; host.style.width = W + "px";
+          const svgNS = "http://www.w3.org/2000/svg";
+          const svg = document.createElementNS(svgNS, "svg"); svg.setAttribute("class", "fx"); svg.setAttribute("aria-hidden", "true");
+          host.appendChild(svg);
+          const cols = [], seps = []; let x = 0, di = 0;
+          const nDigits = value.replace(/\D/g, "").length;
+          const gradCss = grad ? "linear-gradient(90deg," + grad[0] + " 0%," + grad[1] + " 55%," + grad[2] + " 100%)" : null;
+          const paint = (el, x0) => {
+            if (!gradCss) return;
+            el.style.backgroundImage = gradCss; el.style.backgroundSize = W + "px 100%";
+            el.style.backgroundPosition = (-x0) + "px 0"; el.style.backgroundRepeat = "no-repeat";
+            el.style.webkitBackgroundClip = "text"; el.style.backgroundClip = "text"; el.style.color = "transparent";
+          };
+          const uid = host.id || ("odo" + Math.floor(W));
+          chars.forEach((ch, i) => {
+            if (/\d/.test(ch) && i < sufStart) {
+              const win = document.createElement("span"); win.className = "win"; ALLOW(win);
+              win.style.width = m.dw + "px"; win.style.height = Hw + "px";
+              win.style.marginTop = ((h - Hw) / 2) + "px"; win.style.marginBottom = ((h - Hw) / 2) + "px";
+              const strip = document.createElement("span"); strip.className = "strip"; ALLOW(strip);
+              // reel: 0..9 then 0 again so 9 → 0 wraps seamlessly
+              for (let k = 0; k <= 10; k++) {
+                const c = document.createElement("i"); c.textContent = String(k % 10); ALLOW(c);
+                c.style.height = P + "px"; c.style.lineHeight = P + "px"; strip.appendChild(c);
+              }
+              paint(strip, x);
+              // per-column vertical motion blur
+              const f = document.createElementNS(svgNS, "filter"); const fid = uid + "-mb" + di;
+              f.setAttribute("id", fid); f.setAttribute("x", "-5%"); f.setAttribute("y", "-5%"); f.setAttribute("width", "110%"); f.setAttribute("height", "110%");
+              f.setAttribute("color-interpolation-filters", "sRGB");
+              const gb = document.createElementNS(svgNS, "feGaussianBlur"); gb.setAttribute("stdDeviation", "0 0"); f.appendChild(gb); svg.appendChild(f);
+              win.appendChild(strip); host.appendChild(win);
+              const s0 = fromDigits.length === nDigits ? +fromDigits[di] : 0;
+              const f0 = nDigits > 1 ? di / (nDigits - 1) : 1;
+              const fl = R.order === "rtl" ? 1 - f0 : f0;            // 0 = lands first, 1 = lands last
+              let N = ((+ch - s0) % 10 + 10) % 10 + (fl > 0.5 ? R.spinsMax : R.spinsMin) * 10;
+              if (N < (R.minCells || 0)) N += 10;
+              cols.push({ win, strip, gb, fid, s0, N, land: R.firstLand + (R.lastLand - R.firstLand) * fl, sig: -1, mk: -1, fon: false });
+              x += m.dw; di++;
+            } else {
+              const s = document.createElement("span"); s.className = "sep"; ALLOW(s);
+              const w = m.cw(ch) * (ch === "," || ch === "." ? 0.9 : 1);
+              s.style.width = w + "px"; s.style.height = h + "px";
+              const g = document.createElement("i"); g.textContent = ch; ALLOW(g); g.style.lineHeight = h + "px"; g.style.transform = "translateY(" + dy + "px)";
+              paint(g, x);
+              s.appendChild(g); host.appendChild(s); x += w;
+              seps.push({ el: s, suffix: i >= sufStart });
+            }
+          });
+          // seek-safe render of every column at absolute time t.
+          // Travel follows the column ease, but it advances like a ratchet: the digit rests crisp in its cell and
+          // snaps to the next one in a short quint-out tick at the END of that cell's time slot (so the final tick
+          // lands exactly on c.land). While a column moves it gets a vertical motion blur (from the tick speed, or
+          // from the reel's spin rate in the fast phase) and a soft edge mask inside the cap-box window.
+          const FPS = 30, snap = (x) => Math.round(x * FPS) / FPS;
+          const SHUT = 1 / 90;                                                // 120° shutter at 30 fps (crisp but alive)
+          const render = (t) => {
+            for (const c of cols) {
+              let sc = 0, vel = 0, rate = 0;
+              if (c.N > 0) {
+                const D = Math.max(0.05, c.land - R.start);
+                const u = (t - R.start) / D;
+                if (u >= 1) sc = c.N;
+                else if (u > 0) {
+                  const k = c.N * EZ.E(u);
+                  const idx = Math.min(c.N - 1, Math.floor(k));
+                  const ta = R.start + EZ.inv(idx / c.N) * D, tb = R.start + EZ.inv((idx + 1) / c.N) * D;
+                  // ticks are whole frames long and start on the 30 fps grid, so a rendered frame only ever samples a
+                  // tick at q = 0, 1/3, 2/3 (positions 0, .87, .996): the digit is whole, or seating the last 13%
+                  // of its travel. Never a half-and-half slice. Ticks shorter than 2 frames become clean flips.
+                  const nf = Math.round(Math.min(O.tick, (R.tickFrac || 0.38) * (tb - ta)) * FPS);
+                  // a long empty first slot (a column with little to travel) shows its first move as soon as the roll begins
+                  const first = idx === 0 && tb - ta > 0.25;
+                  if (nf < 2) {
+                    sc = idx + (t >= snap(first ? ta : tb) - 1e-6 ? 1 : 0);
+                  } else {
+                    const dt = nf / FPS;
+                    const t0 = snap(first ? ta : tb - dt);
+                    const q = Math.min(1, Math.max(0, (t - t0) / dt));
+                    sc = idx + (1 - Math.pow(1 - q, 5));                        // quint-out tick: snaps, then seats
+                    vel = (q > 0 && q < 1) ? 5 * Math.pow(1 - q, 4) / dt : 0;  // cells / s inside the tick
+                  }
+                  rate = c.N * EZ.d(u) / D;                                  // average reel speed, cells / s
+                }
+              }
+              let p = c.s0 + sc; p = p - 10 * Math.floor(p / 10);           // 0 ≤ p < 10, cell 10 is the wrap "0"
+              c.strip.style.transform = "translate3d(0," + (y0 - p * P).toFixed(2) + "px,0)";
+              // motion blur: actual glyph speed this frame, or the reel's spin rate while it whirs (> 12 cells/s)
+              const spin = Math.min(1, Math.max(0, (rate - 12) / 16));
+              const sig = Math.min(maxBlur, Math.max(vel * P * SHUT, spin * maxBlur));
+              const sr = sig < 0.4 ? 0 : Math.round(sig * 4) / 4;
+              if (sr !== c.sig) {
+                c.sig = sr;
+                if (sr > 0) { c.gb.setAttribute("stdDeviation", "0 " + sr); if (!c.fon) { c.strip.style.filter = "url(#" + c.fid + ")"; c.fon = true; } }
+                else if (c.fon) { c.strip.style.filter = "none"; c.fon = false; }
+              }
+              // edge mask only while moving, so a resting digit is never faded
+              const fr = sc - Math.floor(sc);
+              const mv = Math.max(Math.min(1, Math.min(fr, 1 - fr) * 6), spin, sr > 0 ? sr / maxBlur : 0);
+              const mk = Math.round(mv * 20) / 20;
+              if (mk !== c.mk) {
+                c.mk = mk;
+                const F = O.fade * 100 * mk;
+                const mask = mk > 0 ? "linear-gradient(180deg, transparent 0%, #000 " + F.toFixed(1) + "%, #000 " + (100 - F).toFixed(1) + "%, transparent 100%)" : "none";
+                c.win.style.webkitMaskImage = mask; c.win.style.maskImage = mask;
+              }
+            }
+          };
+          return { render, W, h, fs, cols, seps };
+        }
+
+        Promise.all(loads).then(() => document.fonts.ready).then(() => {
+          const tl = gsap.timeline({ paused: true });
+          const ft = (el, from, to, at) => { to.immediateRender = false; tl.fromTo(el, from, to, at); };
+          let odo;
+
+          if (V.style === "countup") {
+            $("#count").style.display = "block";
+            $("#c-kicker").textContent = V.kicker; $("#c-sub").textContent = V.sub; $("#c-meta").textContent = V.meta;
+            odo = buildOdo($("#c-odo"), V.value, V.from, V.suffix, V.numSize, V.maxWidth, null);
+            $("#c-rule").style.width = (odo.W - 6) + "px";
+            const scrimOn = V.scrim === "always" || (V.scrim === "plate" && showPlate);
+            const L = R.lastLand;
+
+            gsap.set("#count", { opacity: 0 });
+            gsap.set(["#c-sub", "#c-meta"], { opacity: 0 });
+            gsap.set("#c-fill", { scaleX: 0, opacity: 0.55 });
+            if (scrimOn) ft("#scrim", { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power2.out" }, 0);
+            // the whole block (kicker, a fully formed 000,000,000, rule) arrives together: a 2-frame fade, a short rise;
+            // the zeros hold crisp until the roll starts at R.start
+            ft("#count", { opacity: 0 }, { opacity: 1, duration: 0.067, ease: "none" }, Tin);   // 2 frames: full opacity by frame 2
+            ft("#count", { y: 18 }, { y: 0, duration: 0.4, ease: "expo.out" }, Tin);
+            ft("#c-kicker", { letterSpacing: "0.5em" }, { letterSpacing: "0.35em", duration: 0.5, ease: "expo.out" }, Tin);
+            ft("#c-fill", { scaleX: 0 }, { scaleX: 0.93, duration: L - R.start, ease: "expo.out" }, R.start);
+            ft("#c-sub", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.3, ease: "expo.out" }, Tin + 0.1);
+            // landing beat: number punch 1 → 1.06 → 1 (0.28 s), rule snaps to full sunset with a bloom, glint right after
+            ft("#c-odo", { scale: 1 }, { scale: 1.06, duration: 0.09, ease: "power2.out" }, L);
+            ft("#c-odo", { scale: 1.06 }, { scale: 1, duration: 0.19, ease: "power3.out" }, L + 0.09);
+            ft("#c-fill", { scaleX: 0.93, opacity: 0.55 }, { scaleX: 1, opacity: 1, duration: 0.14, ease: "expo.out" }, L);
+            ft("#c-bloom", { opacity: 0 }, { opacity: 0.85, duration: 0.08, ease: "power2.out" }, L);
+            ft("#c-bloom", { opacity: 0.85 }, { opacity: 0, duration: 0.7, ease: "power2.out" }, L + 0.08);
+            ft("#c-glint", { x: -170, opacity: 1 }, { x: odo.W + 10, opacity: 1, duration: 0.5, ease: "power2.inOut" }, L + 0.05);
+            ft("#c-meta", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.4, ease: "expo.out" }, L + 0.12);
+            // exit
+            ft("#count", { opacity: 1, y: 0 }, { opacity: 0, y: -18, duration: 0.34, ease: "power2.in" }, T.out);
+            if (scrimOn) ft("#scrim", { opacity: 1 }, { opacity: 0, duration: 0.42, ease: "power2.in" }, T.out + 0.1);
+          } else {
+            $("#badge").style.display = "block";
+            $("#b-chiptext").textContent = V.chip; $("#b-sub").textContent = V.sub;
+            $("#b-footL").textContent = V.footL; $("#b-footR").textContent = V.footR;
+            odo = buildOdo($("#b-odo"), V.value, V.from, V.suffix, V.numSize, V.maxWidth, V.gradient);
+            const L = R.lastLand, S = V.stamp || { scale: 1.12, frames: 3, shake: 6 }, fr = 1 / 30;
+
+            gsap.set("#badge", { opacity: 0 });
+            gsap.set(["#b-sub", "#b-foot"], { opacity: 0 });
+            gsap.set("#b-hair", { scaleX: 0 });
+            // card entrance: rise + settle, arriving already showing chip + a full-colour "60M+";
+            // label, hairline and footer follow at +0.12 s so the card never shows an empty bottom
+            ft("#badge", { y: 40, scale: 0.94 }, { y: 0, scale: 1, duration: 0.38, ease: "expo.out" }, Tin);
+            ft("#badge", { opacity: 0 }, { opacity: 1, duration: 0.08, ease: "power2.out" }, Tin);
+            ft("#b-chiptext", { letterSpacing: "0.5em", marginRight: "-0.5em" }, { letterSpacing: "0.35em", marginRight: "-0.35em", duration: 0.6, ease: "expo.out" }, Tin);
+            ft("#b-sub", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.3, ease: "expo.out" }, Tin + 0.12);
+            ft("#b-hair", { scaleX: 0 }, { scaleX: 1, duration: 0.45, ease: "expo.out" }, Tin + 0.12);
+            ft("#b-foot", { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.3, ease: "expo.out" }, Tin + 0.14);
+            // the stamp: 60 → 70 → 80 accelerate into 90, which slams 1.12 → 1 over 3 frames with a brightness flash
+            $("#b-odo").style.transformOrigin = "50% 55%";
+            ft("#b-odo", { scale: S.scale }, { scale: 1, duration: S.frames * fr, ease: "power3.out" }, L);
+            ft("#b-odo", { filter: "brightness(1.45)" }, { filter: "brightness(1)", duration: 0.32, ease: "power2.out" }, L);
+            if (plateEl) {
+              // footage impact (≤ S.shake px), scaled 1.6% so no edge ever shows
+              const a = S.shake, z = 1.016;
+              ft(plateEl, { x: 0, y: 0, scale: 1 }, { x: a, y: -a * 0.67, scale: z, duration: fr, ease: "none" }, L);
+              ft(plateEl, { x: a, y: -a * 0.67, scale: z }, { x: -a * 0.83, y: a * 0.5, scale: z, duration: fr, ease: "none" }, L + fr);
+              ft(plateEl, { x: -a * 0.83, y: a * 0.5, scale: z }, { x: a * 0.4, y: -a * 0.25, scale: 1.008, duration: fr, ease: "none" }, L + 2 * fr);
+              ft(plateEl, { x: a * 0.4, y: -a * 0.25, scale: 1.008 }, { x: 0, y: 0, scale: 1, duration: fr, ease: "none" }, L + 3 * fr);
+            } else {
+              // transparent export: no footage to shake, so the card takes a small 3-frame jolt instead
+              ft("#b-card", { y: 0 }, { y: 6, duration: fr, ease: "none" }, L);
+              ft("#b-card", { y: 6 }, { y: -3, duration: fr, ease: "none" }, L + fr);
+              ft("#b-card", { y: -3 }, { y: 0, duration: fr, ease: "none" }, L + 2 * fr);
+            }
+            // exit
+            ft("#badge", { opacity: 1, scale: 1, y: 0 }, { opacity: 0, scale: 0.96, y: 16, duration: 0.34, ease: "power2.in" }, T.out);
+          }
+
+          // one clock drives the odometer (getter/setter proxy: renders on every seek, suppressed or not)
+          let clock = 0;
+          const proxy = { t: function (x) { if (!arguments.length) return clock; clock = x; odo.render(x); } };
+          odo.render(0);
+          tl.fromTo(proxy, { t: 0 }, { t: T.end, duration: T.end, ease: "none", immediateRender: false }, 0);
+          tl.set({}, {}, T.end);
+          window.__timelines = window.__timelines || {};
+          window.__timelines["main"] = tl;
+          tl.seek(0);
+        });
+      })();
+    </script>
+  </body>
+</html>

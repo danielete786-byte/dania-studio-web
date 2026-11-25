@@ -1,0 +1,554 @@
+{
+ "shorts": [
+  {
+   "dir": "shorts/01-clip-counter",
+   "name": "Clip counter",
+   "group": "Compilation scaffolding",
+   "job": "Persistent top tracker for a compilation: which clip you're on ('3 / 10') with a segmented progress bar that advances on each cut. Keeps viewers watching to the end.",
+   "variants": [
+    "Segmented bar",
+    "Numbered dots"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/02-rank-badge",
+   "name": "Rank badge",
+   "group": "Compilation scaffolding",
+   "job": "Top-N ranking moment: a big '#3' numeral with the item's title lands, then docks into a small corner badge that stays while the clip plays.",
+   "variants": [
+    "Hero numeral → dock",
+    "Corner badge"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/03-hook-title",
+   "name": "Hook title",
+   "group": "Hooks & captions",
+   "job": "The opening hook in the top third of the frame ('GTA 6 details nobody noticed'), one keyword accented.",
+   "variants": [
+    "Boxed lines",
+    "Official caps"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/04-word-captions",
+   "name": "Word captions",
+   "group": "Hooks & captions",
+   "job": "Spoken-word captions for voiceover compilations: 1–3 words at a time, the active word in the sunset accent, inside the caption safe zone.",
+   "variants": [
+    "Word pop",
+    "Karaoke line"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/05-labelled-split",
+   "name": "GTA 5 vs GTA 6 split",
+   "group": "Comparisons",
+   "job": "A 9:16-native stacked comparison: GTA V clip on top, GTA VI below, era chips with year, a clean divider. Uses plates g01/g02 (GTA V) and a GTA VI plate.",
+   "variants": [
+    "Stacked",
+    "Diagonal reveal"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/06-blurred-fill",
+   "name": "Blurred fill frame",
+   "group": "Framing",
+   "job": "A 16:9 clip framed in 9:16: the clip centred as a rounded card over a blurred, darkened, enlarged copy of itself, a title above and a source/handle line below.",
+   "variants": [
+    "Title + clip",
+    "Clip + caption"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/07-release-countdown",
+   "name": "Release countdown",
+   "group": "Release",
+   "job": "Countdown to the release on November 19, 2026: days, hours, minutes rolling, with the platforms line.",
+   "variants": [
+    "Rolling digits",
+    "One day left"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/08-wanted-level",
+   "name": "Wanted level",
+   "group": "GTA HUD kit",
+   "job": "Wanted stars that fill one by one (1→5) as a clip escalates. Sparse and thin like Rockstar's real GTA VI HUD (our own star drawing).",
+   "variants": [
+    "HUD corner",
+    "Centre hero"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/09-wasted-stamp",
+   "name": "Wasted stamp",
+   "group": "GTA moments",
+   "job": "The fail sting: footage desaturates and slows, a dark band slides in and the word lands. Our own type (no Pricedown).",
+   "variants": [
+    "Wasted",
+    "Busted"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/10-mission-passed",
+   "name": "Mission passed",
+   "group": "GTA moments",
+   "job": "The win sting: 'MISSION PASSED' lands with a sub-line and a rolling cash reward; the clean counterpart to the fail stamp.",
+   "variants": [
+    "Passed + payout",
+    "Mission failed"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/11-news-chyron",
+   "name": "News chyron",
+   "group": "News & social",
+   "job": "In-world style breaking-news lower third with a LIVE tag and a ticker, for leak/news segments. Our own fictional network name, not Weazel.",
+   "variants": [
+    "Breaking bar",
+    "Live + ticker"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/12-location-card",
+   "name": "Location card",
+   "group": "GTA moments",
+   "job": "Location reveal for a new area of Leonida: name, region, small coordinates.",
+   "variants": [
+    "Official wide caps",
+    "Pin pill"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/13-source-tag",
+   "name": "Source tag",
+   "group": "Compilation scaffolding",
+   "job": "Small credit tag for each clip: 'Footage: Rockstar Games · Trailer 2' or the creator's @handle, sits in a safe corner.",
+   "variants": [
+    "Footage chip",
+    "Handle tag"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/14-circle-callout",
+   "name": "Circle callout",
+   "group": "Detail callouts",
+   "job": "Points out a detail: a clean ring draws around it, a leader line runs to a label pill ('Real-time reflections').",
+   "variants": [
+    "Ring + label",
+    "Bracket + label"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/15-magnifier",
+   "name": "Magnifier zoom",
+   "group": "Detail callouts",
+   "job": "A lens that pulls a 2.5× zoom of one region of the footage into an inset, joined to the spot by a leader, with a label.",
+   "variants": [
+    "Round lens",
+    "Inset card"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/16-arrow-label",
+   "name": "Arrow pointer",
+   "group": "Detail callouts",
+   "job": "A clean drawn arrow that points at something in frame with a short label ('Look at the water').",
+   "variants": [
+    "Curved arrow",
+    "Pointer + dot"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/17-freeze-detail",
+   "name": "Freeze-frame detail",
+   "group": "Detail callouts",
+   "job": "The clip freezes, the surround dims and desaturates, a spotlight isolates the detail and a label explains it, then playback resumes.",
+   "variants": [
+    "Spotlight",
+    "Scan reveal"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/18-slowmo-replay",
+   "name": "Slow-mo replay",
+   "group": "Detail callouts",
+   "job": "Replay moment: 'REPLAY 0.25×' badge, a scrub bar with playhead, footage slows down.",
+   "variants": [
+    "Replay scrubber",
+    "Rewind"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/19-name-tag",
+   "name": "Name tag",
+   "group": "Detail callouts",
+   "job": "Identifies a character on screen: 'JASON DUVAL · Protagonist' attached by a leader line, or as a lower third.",
+   "variants": [
+    "Leader tag",
+    "Lower third"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/20-spec-card",
+   "name": "Spec card",
+   "group": "Comparisons",
+   "job": "A spec block for a vehicle or era in an evolution/detail compilation: name plus 3 stats with bars.",
+   "variants": [
+    "Vehicle",
+    "Era"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/21-before-after",
+   "name": "Before/after slider",
+   "group": "Comparisons",
+   "job": "A slider wipes between GTA V and GTA VI footage of a similar shot, with era labels on each side.",
+   "variants": [
+    "Vertical slider",
+    "Horizontal slider"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/22-evolution-timeline",
+   "name": "Evolution timeline",
+   "group": "Comparisons",
+   "job": "GTA evolution by year: GTA III 2001 → Vice City 2002 → San Andreas 2004 → GTA IV 2008 → GTA V 2013 → GTA VI 2026, advancing card by card.",
+   "variants": [
+    "Year rail",
+    "Year ticker"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/23-tier-list",
+   "name": "Tier list",
+   "group": "Comparisons",
+   "job": "S/A/B/C tier list: items drop into tiers one by one (e.g. GTA games ranked). Ends with 'Comment yours'.",
+   "variants": [
+    "Tier rows",
+    "Tier reveal"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/24-versus-card",
+   "name": "Versus card",
+   "group": "Comparisons",
+   "job": "A head-to-head title: 'JASON vs LUCIA' or 'GTA V vs GTA VI'.",
+   "variants": [
+    "Split",
+    "Centre"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/25-stat-bars",
+   "name": "Trailer views race",
+   "group": "Comparisons",
+   "job": "Bars race to real numbers: Trailer 1 305.4M, Trailer 2 189.6M, Launch Trailer 82.0M YouTube views.",
+   "variants": [
+    "Bars",
+    "Big number vs"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/26-stat-counter",
+   "name": "Stat count-up",
+   "group": "News & social",
+   "job": "A huge number rolls up to a real stat (305,372,086 views on Trailer 1) with its label; or a record badge (90M+ views in 24 hours).",
+   "variants": [
+    "Count-up",
+    "Record badge"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/27-podium-3d",
+   "name": "Top 3 podium",
+   "group": "Compilation scaffolding",
+   "job": "Three.js podium for a top-3 reveal: third, second, first rise with labels, camera settles on the winner.",
+   "variants": [
+    "Podium",
+    "Winner spotlight"
+   ],
+   "three": true
+  },
+  {
+   "dir": "shorts/28-carousel-3d",
+   "name": "Clip carousel",
+   "group": "Compilation scaffolding",
+   "job": "Three.js ring of 5 clip cards (top-5 intro) that rotates and lands on the next item, the chosen card plays.",
+   "variants": [
+    "Ring",
+    "Stack flip"
+   ],
+   "three": true
+  },
+  {
+   "dir": "shorts/29-poll-card",
+   "name": "This or that",
+   "group": "News & social",
+   "job": "A this-or-that poll card ('Jason or Lucia?') with a tap and fill animation, ending on 'Comment A or B'.",
+   "variants": [
+    "Bars",
+    "Split tap"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/30-facecam-split",
+   "name": "Facecam split",
+   "group": "Framing",
+   "job": "Reaction layout: facecam (assets/plates/facecam-sample.mp4, a stand-in talking head) plus gameplay, with a clean seam and label.",
+   "variants": [
+    "Top/bottom",
+    "Corner bubble"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/31-clip-grid",
+   "name": "Clip grid",
+   "group": "Framing",
+   "job": "Several clips at once with numbered labels ('4 details in 4 seconds').",
+   "variants": [
+    "2×2 grid",
+    "3 stacked"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/32-cinematic-bars",
+   "name": "Cinematic bars",
+   "group": "Framing",
+   "job": "Letterbox bars slide in with a place/time stamp, or a CCTV-style stamp, for cinematic or 'caught on camera' moments.",
+   "variants": [
+    "Letterbox + time",
+    "CCTV stamp"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/33-social-frame",
+   "name": "Social video frame",
+   "group": "Framing",
+   "job": "A clip presented as an in-world social video post: avatar, fictional handle, Follow pill, caption, like count.",
+   "variants": [
+    "Reel post",
+    "Live stream"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/34-time-skip",
+   "name": "Time skip card",
+   "group": "GTA moments",
+   "job": "'3 HOURS LATER' or a date card between scenes.",
+   "variants": [
+    "Time skip",
+    "Date card"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/35-sunset-wipe",
+   "name": "Sunset wipe",
+   "group": "Transitions",
+   "job": "Transition between two clips: diagonal bands in the Leonida sunset gradient sweep across.",
+   "variants": [
+    "Diagonal bands",
+    "Iris"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/36-zoom-transition",
+   "name": "Punch zoom transition",
+   "group": "Transitions",
+   "job": "Fast punch-in zoom blur (or whip pan) from one clip into the next, with a light flash.",
+   "variants": [
+    "Punch zoom",
+    "Whip pan"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/37-chapter-card",
+   "name": "Chapter card",
+   "group": "Transitions",
+   "job": "Interstitial between segments: 'DETAIL 04' + title, over a sunset card or the blurred footage.",
+   "variants": [
+    "Sunset card",
+    "Blurred footage"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/38-post-card",
+   "name": "X post card",
+   "group": "News & social",
+   "job": "An X post card (by @everestchris6) with one phrase highlighted and counts rolling.",
+   "variants": [
+    "Light card",
+    "Dark on blur"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/39-headline-card",
+   "name": "Headline card",
+   "group": "News & social",
+   "job": "A news headline card with one phrase highlighted, using real reported headlines (publication-neutral).",
+   "variants": [
+    "Single card",
+    "Stack of three"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/40-leak-stamp",
+   "name": "Rumor stamp",
+   "group": "News & social",
+   "job": "Marks a claim as UNCONFIRMED (rumor/leak) or CONFIRMED (official), with a source chip.",
+   "variants": [
+    "Unconfirmed",
+    "Confirmed"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/41-comment-reply",
+   "name": "Comment reply",
+   "group": "News & social",
+   "job": "Reply-to-comment sticker ('Reply to @user: is the water real?') that opens a video answering it.",
+   "variants": [
+    "Reply sticker",
+    "Comment stack"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/42-preload-bar",
+   "name": "Pre-load progress",
+   "group": "Release",
+   "job": "Diegetic hook: a download bar for 'Grand Theft Auto VI' ticking 98% → 100% → 'Ready to play'. Our own neutral UI, no console or store branding.",
+   "variants": [
+    "Bar",
+    "Ring"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/43-phone-message",
+   "name": "Phone message",
+   "group": "GTA moments",
+   "job": "In-game style phone: a text from Lucia slides in as a notification or a short thread.",
+   "variants": [
+    "Notification",
+    "Thread"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/44-minimap",
+   "name": "Minimap route",
+   "group": "GTA HUD kit",
+   "job": "A rounded translucent minimap (abstract roads) where a GPS route draws to the destination blip.",
+   "variants": [
+    "Corner minimap",
+    "GPS card"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/45-objective-line",
+   "name": "Mission objective",
+   "group": "GTA HUD kit",
+   "job": "Mission objective text ('Go to the Vice City Marina.') with the keyword accented; or a mission title card.",
+   "variants": [
+    "Objective line",
+    "Mission title"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/46-cash-counter",
+   "name": "Cash payout",
+   "group": "GTA HUD kit",
+   "job": "Money rolls up (+$1,250,000) for heist/payout moments.",
+   "variants": [
+    "HUD corner",
+    "Centre card"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/47-race-hud",
+   "name": "Race HUD",
+   "group": "GTA HUD kit",
+   "job": "Racing overlay in Rockstar's sparse style: LAP 1/2, position 3/8, a ticking timer; or a speedometer.",
+   "variants": [
+    "Race stack",
+    "Speedometer"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/48-character-intro",
+   "name": "Character intro",
+   "group": "GTA moments",
+   "job": "Freeze-frame character intro: 'LUCIA CAMINOS' with a role line; or a character switch wheel.",
+   "variants": [
+    "Freeze + name",
+    "Switch wheel"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/49-follow-cta",
+   "name": "Follow CTA",
+   "group": "Calls to action",
+   "job": "End-of-short CTA: 'Follow for Part 2' with a follow button press, or a next-part card.",
+   "variants": [
+    "Follow button",
+    "Next part card"
+   ],
+   "three": false
+  },
+  {
+   "dir": "shorts/50-end-card",
+   "name": "End card",
+   "group": "Calls to action",
+   "job": "Closing card in Rockstar's end-tile language: ink-navy tile, wide-tracked date line, channel name.",
+   "variants": [
+    "Ink tile + date",
+    "Sunset card"
+   ],
+   "three": false
+  }
+ ]
+}

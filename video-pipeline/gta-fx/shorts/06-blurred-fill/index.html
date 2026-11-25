@@ -1,0 +1,679 @@
+<!doctype html>
+<!-- GTA 6 component #6: Blurred fill frame (craft v2). 1080x1920 (9:16), 30 fps.
+     A 16:9 clip framed in 9:16 as a lit "ambient screen": the shot plays sharp in the frame while the SAME shot,
+     blown up and blurred, glows around it like light spilling off a screen into a dark room. Every cut re-colours
+     the whole frame. Variant 0 "Title + clip": an inset screen (900x506, on the safe-zone axis), a Rockstar date-card title above it
+     (white wide caps, #EE08F2 offset) that takes the footage on the payoff cut, and a source line below.
+     Variant 1 "Clip + caption": inset frame with a lit edge, a slate row (source, live timecode, handle) above it and a big caption below.
+     Full-frame component: it always shows footage. Safe zones: all text sits inside x 72-936, y 230-1480. -->
+<html lang="en" data-composition-variables='[
+  {"id":"variant","type":"enum","label":"Variant","default":"0","options":[{"value":"0","label":"Title + clip"},{"value":"1","label":"Clip + caption"}]},
+  {"id":"bg","type":"enum","label":"Background","default":"plate","options":[{"value":"plate","label":"Sample footage + finish"},{"value":"none","label":"Footage, no finish"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link rel="stylesheet" href="assets/fonts/fonts.css" />
+    <link rel="stylesheet" href="assets/kit/look/look.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="assets/kit/look/look.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: transparent; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; background: #050509; color: #fff;
+        font-family: "Inter", sans-serif; -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; }
+
+      #shake, #world { position: absolute; inset: 0; }
+
+      /* ---------- the glow: the same shot, enlarged + blurred (drawn at 1/4 size, scaled x4) ---------- */
+      #fill { position: absolute; inset: 0; overflow: hidden; isolation: isolate; }
+      #fillDrift { position: absolute; inset: 0; transform-origin: 50% 50%; }
+      #fillSmall { position: absolute; left: 0; top: 0; width: 270px; height: 480px; transform-origin: 0 0; transform: scale(4); }
+      .fillvid { position: absolute; top: 0; height: 480px; width: 854px; left: -292px; object-fit: cover; }
+      /* the spill: the shot's own edges, stretched past the frame and blurred, so light bleeds out of the screen */
+      #spill { position: absolute; transform-origin: 50% 50%; }
+      #spillSmall { position: absolute; left: 0; top: 0; transform-origin: 0 0; transform: scale(4); }
+      .spillvid { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; }
+      /* v0 (r08): the screen is inset (960x540), so its spill lights the room on all four sides; it screen-blends
+         above the room falloff, like v1's, so it only ever adds light */
+      .v0 #spill { left: 54px; top: 707px; width: 900px; height: 506px; z-index: 2; mix-blend-mode: screen;
+        -webkit-mask-image: linear-gradient(180deg, rgba(0,0,0,0) 0%, #000 16%, #000 84%, rgba(0,0,0,0) 100%), linear-gradient(90deg, rgba(0,0,0,0) 0%, #000 9%, #000 91%, rgba(0,0,0,0) 100%);
+        -webkit-mask-composite: source-in;
+                mask-image: linear-gradient(180deg, rgba(0,0,0,0) 0%, #000 16%, #000 84%, rgba(0,0,0,0) 100%), linear-gradient(90deg, rgba(0,0,0,0) 0%, #000 9%, #000 91%, rgba(0,0,0,0) 100%);
+                mask-composite: intersect; }
+      .v0 #spillSmall { width: 225px; height: 126.5px; }
+      /* v0 (r08): a soft mirrored reflection of the screen on the floor (blur 40, .22), so the light pools under it */
+      #refl { display: none; position: absolute; left: 54px; top: 1213px; width: 900px; height: 506px; z-index: 4; pointer-events: none;
+        transform-origin: 50% 50%; transform: scaleY(-1); opacity: .22;
+        -webkit-mask-image: linear-gradient(0deg, #000 0%, rgba(0,0,0,.55) 18%, rgba(0,0,0,.18) 38%, rgba(0,0,0,0) 58%);
+                mask-image: linear-gradient(0deg, #000 0%, rgba(0,0,0,.55) 18%, rgba(0,0,0,.18) 38%, rgba(0,0,0,0) 58%); }
+      .v0 #refl { display: block; }
+      #reflSmall { position: absolute; left: 0; top: 0; width: 225px; height: 126.5px; transform-origin: 0 0; transform: scale(4); filter: blur(10px); }
+      .reflvid { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      /* v1 (r06): the frame EMITS light. The spill sits above the room falloff and screen-blends (adds light), and it
+         is anchored high (origin 50% 30%) so most of it falls below the frame, into the caption. */
+      .v1 #spill { left: 72px; top: 532px; width: 864px; height: 486px; z-index: 2; mix-blend-mode: screen; transform-origin: 50% 30%;
+        -webkit-mask-image: linear-gradient(180deg, rgba(0,0,0,0) 0%, #000 12%, #000 80%, rgba(0,0,0,0) 100%), linear-gradient(90deg, rgba(0,0,0,0) 0%, #000 8%, #000 92%, rgba(0,0,0,0) 100%);
+        -webkit-mask-composite: source-in;
+                mask-image: linear-gradient(180deg, rgba(0,0,0,0) 0%, #000 12%, #000 80%, rgba(0,0,0,0) 100%), linear-gradient(90deg, rgba(0,0,0,0) 0%, #000 8%, #000 92%, rgba(0,0,0,0) 100%);
+                mask-composite: intersect; }
+      .v1 #spillSmall { width: 216px; height: 121.5px; }
+      #v0spill, #v1spill { display: none; }
+      .v0 #v0spill, .v1 #v1spill { display: block; }
+      /* light falls off with distance from the screen, like a lit screen in a dark room */
+      #room { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+      /* v0 (r09): the screen sits at y 707-1213 (36.8-63.2 %), centred on the safe-zone axis x 504 (46.7 %);
+         the room falls off above and below it, lightly */
+      .v0 #room { background:
+          radial-gradient(68% 8.5% at 46.7% 29.8%, rgba(5,5,9,.42) 0%, rgba(5,5,9,0) 100%),
+          radial-gradient(58% 3.6% at 46.7% 66.5%, rgba(5,5,9,.42) 0%, rgba(5,5,9,0) 100%),
+          linear-gradient(180deg, rgba(5,5,9,.60) 0%, rgba(5,5,9,.40) 12%, rgba(5,5,9,.22) 22%, rgba(5,5,9,.08) 33%,
+            rgba(5,5,9,.04) 37%, rgba(5,5,9,.04) 63%, rgba(5,5,9,.10) 69%, rgba(5,5,9,.18) 80%, rgba(5,5,9,.26) 100%); }
+      /* r07: the floor is graded as shadow, not left as blur. A soft-light black ramp squares the fill's values
+         (deeper AND more saturated: channel ratios grow), then a deep violet tint settles the very bottom. */
+      #floorDeep, #floorTint, #slateScrim { position: absolute; left: 0; width: 1080px; pointer-events: none; z-index: 3; }
+      #floorDeep { mix-blend-mode: soft-light; bottom: 0; }
+      #floorTint { top: 1360px; bottom: 0; background: linear-gradient(180deg, rgba(12,10,20,0) 0%, rgba(12,10,20,.30) 45%, rgba(12,10,20,.55) 100%); }
+      /* v0 (r08): eased so the floor sits around #2a2c33, coloured, not black mud */
+      .v0 #floorDeep { top: 1233px; background: linear-gradient(180deg, rgba(6,12,34,0) 0%, rgba(6,12,34,.30) 22%, rgba(6,12,34,.55) 55%, rgba(6,12,34,.70) 100%); }
+      .v0 #floorTint { background: linear-gradient(180deg, rgba(12,10,20,0) 0%, rgba(12,10,20,.14) 45%, rgba(12,10,20,.26) 100%); }
+      /* v0 (r09): a bottom scrim (.lk-scrim-bottom at .4, y 1350-1920), so the lower fill reads as falloff, not bright mush */
+      #floorScrim { display: none; position: absolute; left: 0; width: 1080px; top: 1350px; bottom: 0; pointer-events: none; z-index: 5; opacity: .4; }
+      .v0 #floorScrim { display: block; }
+      .v1 #floorDeep { top: 1120px; background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,.40) 22%, rgba(0,0,0,.78) 55%, rgba(0,0,0,.92) 100%); }
+      /* r07: a soft shadow behind the slate row, only on light shots (per-shot "scrim", driven per frame) */
+      #slateScrim { display: none; top: 372px; height: 240px; opacity: 0;
+        background: radial-gradient(70% 50% at 50% 50%, #000 0%, rgba(0,0,0,.7) 40%, rgba(0,0,0,0) 100%); }
+      /* r08: a top scrim on light shots (per-shot "top"), so the glow above the frame never goes milky */
+      #topScrim { display: none; position: absolute; left: 0; width: 1080px; top: 0; height: 520px; pointer-events: none; z-index: 3; opacity: 0;
+        background: linear-gradient(180deg, #000 0%, rgba(0,0,0,.75) 45%, rgba(0,0,0,0) 100%); }
+      /* r08: a multiply grade on the glow (per-shot "tint"): white sky in the glow takes the scene's colour, darks stay dark */
+      #fillTint { position: absolute; inset: 0; pointer-events: none; z-index: 3; opacity: 0; mix-blend-mode: multiply; background: #FFAE6A; }
+      .v1 #slateScrim, .v1 #topScrim { display: block; }
+      /* v1 (r05): the glow runs at full brightness; the only darkening is a light edge falloff (max .35)
+         and one soft scrim behind the caption */
+      .v1 #room { background:
+          radial-gradient(64% 11.5% at 44% 61.8%, rgba(5,5,9,.50) 0%, rgba(5,5,9,.26) 55%, rgba(5,5,9,0) 100%),
+          linear-gradient(180deg, rgba(5,5,9,.35) 0%, rgba(5,5,9,.14) 11%, rgba(5,5,9,0) 20%,
+            rgba(5,5,9,0) 74%, rgba(5,5,9,.16) 86%, rgba(5,5,9,.35) 100%); }
+      /* the hit light: an exposure push on the footage (blacks stay black) + a faint warm additive veil */
+      .hitveil { position: absolute; inset: 0; pointer-events: none; z-index: 80; mix-blend-mode: screen; background: #FFF4E6; opacity: 0; }
+
+      /* ---------- the screen ---------- */
+      #screen { position: absolute; overflow: hidden; background: #050509; }
+      #push { position: absolute; left: 0; top: 50%; width: 100%; }
+      .scrvid { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      .edge { position: absolute; left: 0; right: 0; height: 2px; pointer-events: none; z-index: 3;
+        background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.9) 18%, rgba(255,255,255,.9) 82%, rgba(255,255,255,0) 100%);
+        box-shadow: 0 0 18px rgba(255,255,255,.55), 0 0 60px rgba(255,255,255,.25); }
+      #edgeT { top: 0; } #edgeB { bottom: 0; }
+      /* v0 (r08): an inset screen, radius 6, a 1 px lit top edge and a contact shadow, so the lit room wraps all four
+         sides (r07's full-bleed band left only two murky bars). r09: 900x506 at x 54-954, centred on the safe-zone
+         axis x 504, so its right edge is off the platform's action rail (r08 ran x 60-1020) */
+      .v0 #screen { left: 54px; width: 900px; top: 707px; height: 506px; border-radius: 6px; isolation: isolate;
+        box-shadow: 0 1px 2px rgba(0,0,0,.40), 0 24px 60px rgba(0,0,0,.45); }
+      .v0 #push { height: 506px; margin-top: -253px; }
+      .v0 #screen::after { content: ""; position: absolute; inset: 0; border-radius: 6px; pointer-events: none; z-index: 4;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.18), inset 0 0 0 1px rgba(255,255,255,.06); }
+      /* v1 "framed": inset frame (r07: radius 8, a lit screen rather than an app card), lit top edge, contact + body shadow */
+      /* r06: the frame sits on the text grid (x 72-936), clear of the platform's action rail */
+      .v1 #screen { left: 72px; width: 864px; top: 532px; height: 486px; border-radius: 8px; isolation: isolate;
+        box-shadow: 0 1px 2px rgba(0,0,0,.45), 0 4px 10px rgba(0,0,0,.30), 0 50px 120px -24px rgba(0,0,0,.80); }
+      .v1 #push { height: 486px; margin-top: -243px; }
+      .v1 #screen::after { content: ""; position: absolute; inset: 0; border-radius: 8px; pointer-events: none; z-index: 4;
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,.16), inset 0 1px 0 rgba(255,255,255,.34); }
+      .v1 .edge { display: none; }
+      #v0shots, #v1shots, #v0fill, #v1fill { display: none; }
+      .v0 #v0shots, .v0 #v0fill, .v1 #v1shots, .v1 #v1fill { display: block; }
+
+      #ov { position: absolute; inset: 0; z-index: 10; }
+      #v0, #v1 { display: none; }
+      .v0 #v0, .v1 #v1 { display: block; }
+
+      /* ---------- variant 0: Title + clip ---------- */
+      /* r06: the lockup is centred on the FRAME axis (x 540), the same axis as the band and the fill: left 108 + 864/2.
+         Tracked labels carry a matching padding-left so their trailing tracking doesn't pull them off-axis. */
+      /* r08: the lockup sits 80 px above the inset screen. r09: the screen is centred on the safe-zone axis (x 504),
+         so the lockup is too: left 72 + 864/2 */
+      /* r09: the title is Rockstar's own date-card style (white wide caps, a hard #EE08F2 offset, soft bloom), not the
+         library's sunset gradient, so the footage-in-type hit is the ONLY colour event */
+      #kicker { position: absolute; left: 72px; width: 864px; top: 462px; text-align: center; font-size: 24px; font-weight: 700; letter-spacing: .42em;
+        padding-left: .42em; color: #fff; text-shadow: 1.5px 1px 0 #EE08F2, 0 2px 12px rgba(0,0,0,.55); }
+      #heroWrap { position: absolute; left: 72px; width: 864px; top: 512px; text-align: center;
+        filter: drop-shadow(0 0 16px rgba(255,255,255,.20)) drop-shadow(0 0 46px rgba(238,8,242,.16)) drop-shadow(0 3px 14px rgba(0,0,0,.28)); }
+      #hero { display: inline-block; font-weight: 900; font-size: 134px; letter-spacing: .05em; line-height: 1; white-space: nowrap;
+        color: #fff; text-shadow: 3px 2px 0 #EE08F2; }
+      #credit { position: absolute; left: 72px; width: 864px; top: 1262px; text-align: center; font-size: 24px; letter-spacing: .22em; padding-left: .22em;
+        font-weight: 700; color: rgba(255,255,255,.88); text-shadow: 0 2px 10px rgba(0,0,0,.5); white-space: nowrap; }
+      /* r08 payoff: the title filled with the jetski shot itself (video-in-type) on the cut. The video sits in a
+         box over the title and is clipped by an SVG clipPath built from the measured glyphs of LEONIDA.
+         r09: the shot is re-cropped so the green hull and riders run through the glyphs, graded darker and denser
+         than the white title, with a 1.5 px inner white edge (#vtEdge) */
+      #vtLayer { position: absolute; left: 72px; top: 450px; width: 864px; height: 240px; z-index: 11; pointer-events: none; opacity: 0;
+        filter: drop-shadow(0 0 18px rgba(255,255,255,.18)) drop-shadow(0 3px 14px rgba(0,0,0,.40)); }
+      #vtChroma, #vt, #vtEdge { position: absolute; inset: 0; }
+      #vtEdge { overflow: visible; }
+      #vt { clip-path: url(#vtClip); -webkit-clip-path: url(#vtClip); overflow: hidden; }
+      #vt video { position: absolute; object-fit: cover; }
+      /* r09: a cool multiply inside the knockout, so the jetski's spray reads as sky-blue water, never as a paler
+         white than the title it replaces (darks and the green hull stay dense) */
+      #vtTint { position: absolute; inset: 0; mix-blend-mode: multiply; background: #7FA6FF; opacity: .3; }
+      .v1 #vtLayer { display: none; }
+      #credit .tc { color: #fff; font-variant-numeric: tabular-nums; }
+      #credit .dot { color: rgba(255,255,255,.72); }
+
+      /* ---------- variant 1: Clip + caption ---------- */
+      /* r08: 24 -> 27 px, weight 700, tracking .22em, so the slate survives the phone downscale */
+      #slate { position: absolute; left: 72px; width: 864px; top: 474px; height: 32px; display: flex; align-items: center; justify-content: space-between;
+        font-weight: 700; font-size: 27px; letter-spacing: .22em; text-transform: uppercase; color: rgba(255,255,255,.93);
+        text-shadow: 0 1px 2px rgba(0,0,0,.35), 0 2px 10px rgba(0,0,0,.5); white-space: nowrap; }
+      #slateL { display: flex; align-items: center; gap: 13px; }
+      #slateH { margin-right: -.22em; }
+      #slate .rec { width: 10px; height: 10px; border-radius: 50%; background: #fff; box-shadow: 0 0 10px rgba(255,255,255,.8); }
+      #slate .tc { font-variant-numeric: tabular-nums; color: #fff; }
+      #slate .dot { color: rgba(255,255,255,.55); margin: 0 -6px; }
+      /* r07: 148 -> 140 px at -0.05em, so "Every frame" sits at ~87 % of the column, not 94 % */
+      /* r08: real hierarchy. The setup line is 112 px Inter 700 at 86 % white; the payoff line is 184 px Inter 800 */
+      #caption { position: absolute; left: 72px; width: 864px; top: 1052px; font-weight: 800; font-size: 140px; line-height: .96;
+        letter-spacing: -0.05em; font-feature-settings: "ss01" 1, "cv11" 1; }
+      #caption .ln { display: block; white-space: nowrap; }
+      #caption .ln.setup { font-size: 112px; font-weight: 700; line-height: 1.0; letter-spacing: -0.04em; color: rgba(255,255,255,.86); }
+      #caption .ln.slam { width: max-content; font-size: 184px; font-weight: 800; line-height: .9; letter-spacing: -0.05em; margin-top: -2px; }
+      #capWrap { position: absolute; inset: 0; filter: drop-shadow(0 2px 3px rgba(0,0,0,.30)) drop-shadow(0 8px 26px rgba(0,0,0,.45)); }
+      #caption .hlwrap { display: inline-block; filter: drop-shadow(0 0 24px rgba(248,79,164,.34)); }
+      #caption .hl { display: inline-block; padding-right: .04em; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6.6" data-width="1080" data-height="1920">
+      <div id="shake"><div id="world">
+        <!-- the glow: one blurred copy of every shot (same src + timing as the screen copy, so they stay frame-locked) -->
+        <div id="fill">
+          <div id="fillDrift" data-layout-allow-overflow>
+            <div id="fillSmall" data-layout-allow-overflow>
+              <div id="v0fill">
+                <video id="f0a" class="clip fillvid" data-layout-allow-overflow src="assets/shots/s011-vice-highway-h.mp4" muted playsinline data-start="0" data-duration="2.1" data-media-start="0.5" data-track-index="0"></video>
+                <video id="f0b" class="clip fillvid" data-layout-allow-overflow src="assets/shots/s064-jetski-h.mp4" muted playsinline data-start="2.1" data-duration="1.1" data-media-start="0.5" data-track-index="0"></video>
+                <video id="f0c" class="clip fillvid" data-layout-allow-overflow src="assets/shots/s027-sunset-dock-h.mp4" muted playsinline data-start="3.2" data-duration="0.9" data-media-start="0" data-track-index="0"></video>
+                <video id="f0d" class="clip fillvid" data-layout-allow-overflow src="assets/shots/s026-sunset-pier-h.mp4" muted playsinline data-start="4.1" data-duration="1.5333" data-media-start="0.01" data-track-index="0"></video>
+                <video id="f0e" class="clip fillvid" data-layout-allow-overflow src="assets/shots/s108-balcony-sunset-h.mp4" muted playsinline data-start="5.6333" data-duration="0.9667" data-media-start="0.2" data-track-index="0"></video>
+              </div>
+              <div id="v1fill">
+                <video id="f1a" class="clip fillvid" data-layout-allow-overflow src="assets/shots/s084-swamp-sunset-h.mp4" muted playsinline data-start="0" data-duration="1.4" data-media-start="0" data-track-index="2"></video>
+                <video id="f1b" class="clip fillvid" data-layout-allow-overflow src="assets/shots/s039-blue-club-h.mp4" muted playsinline data-start="1.4" data-duration="1.5333" data-media-start="1.1" data-track-index="2"></video>
+                <video id="f1c" class="clip fillvid" data-layout-allow-overflow src="assets/shots/s036-beach-bar-h.mp4" muted playsinline data-start="2.9333" data-duration="1.3667" data-media-start="0.02" data-track-index="2"></video>
+                <video id="f1d" class="clip fillvid" data-layout-allow-overflow src="assets/shots/s018-lucia-gate-h.mp4" muted playsinline data-start="4.3" data-duration="2.3" data-media-start="0.4" data-track-index="2"></video>
+              </div>
+            </div>
+          </div>
+          <div id="spill" data-layout-allow-overflow>
+            <div id="spillSmall" data-layout-allow-overflow>
+              <div id="v0spill">
+                <video id="g0a" class="clip spillvid" src="assets/shots/s011-vice-highway-h.mp4" muted playsinline data-start="0" data-duration="2.1" data-media-start="0.5" data-track-index="5"></video>
+                <video id="g0b" class="clip spillvid" src="assets/shots/s064-jetski-h.mp4" muted playsinline data-start="2.1" data-duration="1.1" data-media-start="0.5" data-track-index="5"></video>
+                <video id="g0c" class="clip spillvid" src="assets/shots/s027-sunset-dock-h.mp4" muted playsinline data-start="3.2" data-duration="0.9" data-media-start="0" data-track-index="5"></video>
+                <video id="g0d" class="clip spillvid" src="assets/shots/s026-sunset-pier-h.mp4" muted playsinline data-start="4.1" data-duration="1.5333" data-media-start="0.01" data-track-index="5"></video>
+                <video id="g0e" class="clip spillvid" src="assets/shots/s108-balcony-sunset-h.mp4" muted playsinline data-start="5.6333" data-duration="0.9667" data-media-start="0.2" data-track-index="5"></video>
+              </div>
+              <div id="v1spill">
+                <video id="g1a" class="clip spillvid" src="assets/shots/s084-swamp-sunset-h.mp4" muted playsinline data-start="0" data-duration="1.4" data-media-start="0" data-track-index="6"></video>
+                <video id="g1b" class="clip spillvid" src="assets/shots/s039-blue-club-h.mp4" muted playsinline data-start="1.4" data-duration="1.5333" data-media-start="1.1" data-track-index="6"></video>
+                <video id="g1c" class="clip spillvid" src="assets/shots/s036-beach-bar-h.mp4" muted playsinline data-start="2.9333" data-duration="1.3667" data-media-start="0.02" data-track-index="6"></video>
+                <video id="g1d" class="clip spillvid" src="assets/shots/s018-lucia-gate-h.mp4" muted playsinline data-start="4.3" data-duration="2.3" data-media-start="0.4" data-track-index="6"></video>
+              </div>
+            </div>
+          </div>
+          <div id="room"></div>
+          <div id="floorDeep"></div>
+          <div id="floorTint"></div>
+          <div id="slateScrim"></div>
+          <div id="topScrim"></div>
+          <div id="fillTint"></div>
+          <div id="floorScrim" class="lk-scrim-bottom"></div>
+          <!-- v0 (r08): the screen's soft reflection on the floor (a mirrored, 40 px-blurred copy, frame-locked) -->
+          <div id="refl" data-layout-allow-overflow>
+            <div id="reflSmall" data-layout-allow-overflow>
+              <video id="r0a" class="clip reflvid" src="assets/shots/s011-vice-highway-h.mp4" muted playsinline data-start="0" data-duration="2.1" data-media-start="0.5" data-track-index="8"></video>
+              <video id="r0b" class="clip reflvid" src="assets/shots/s064-jetski-h.mp4" muted playsinline data-start="2.1" data-duration="1.1" data-media-start="0.5" data-track-index="8"></video>
+              <video id="r0c" class="clip reflvid" src="assets/shots/s027-sunset-dock-h.mp4" muted playsinline data-start="3.2" data-duration="0.9" data-media-start="0" data-track-index="8"></video>
+              <video id="r0d" class="clip reflvid" src="assets/shots/s026-sunset-pier-h.mp4" muted playsinline data-start="4.1" data-duration="1.5333" data-media-start="0.01" data-track-index="8"></video>
+              <video id="r0e" class="clip reflvid" src="assets/shots/s108-balcony-sunset-h.mp4" muted playsinline data-start="5.6333" data-duration="0.9667" data-media-start="0.2" data-track-index="8"></video>
+            </div>
+          </div>
+        </div>
+
+        <!-- the screen: the sharp 16:9 shot -->
+        <div id="screen">
+          <div id="push" data-layout-allow-overflow>
+            <div id="v0shots">
+              <video id="s0a" class="clip scrvid" src="assets/shots/s011-vice-highway-h.mp4" muted playsinline data-start="0" data-duration="2.1" data-media-start="0.5" data-track-index="1"></video>
+              <video id="s0b" class="clip scrvid" src="assets/shots/s064-jetski-h.mp4" muted playsinline data-start="2.1" data-duration="1.1" data-media-start="0.5" data-track-index="1"></video>
+              <video id="s0c" class="clip scrvid" src="assets/shots/s027-sunset-dock-h.mp4" muted playsinline data-start="3.2" data-duration="0.9" data-media-start="0" data-track-index="1"></video>
+              <video id="s0d" class="clip scrvid" src="assets/shots/s026-sunset-pier-h.mp4" muted playsinline data-start="4.1" data-duration="1.5333" data-media-start="0.01" data-track-index="1"></video>
+              <video id="s0e" class="clip scrvid" src="assets/shots/s108-balcony-sunset-h.mp4" muted playsinline data-start="5.6333" data-duration="0.9667" data-media-start="0.2" data-track-index="1"></video>
+            </div>
+            <div id="v1shots">
+              <video id="s1a" class="clip scrvid" src="assets/shots/s084-swamp-sunset-h.mp4" muted playsinline data-start="0" data-duration="1.4" data-media-start="0" data-track-index="3"></video>
+              <video id="s1b" class="clip scrvid" src="assets/shots/s039-blue-club-h.mp4" muted playsinline data-start="1.4" data-duration="1.5333" data-media-start="1.1" data-track-index="3"></video>
+              <video id="s1c" class="clip scrvid" src="assets/shots/s036-beach-bar-h.mp4" muted playsinline data-start="2.9333" data-duration="1.3667" data-media-start="0.02" data-track-index="3"></video>
+              <video id="s1d" class="clip scrvid" src="assets/shots/s018-lucia-gate-h.mp4" muted playsinline data-start="4.3" data-duration="2.3" data-media-start="0.4" data-track-index="3"></video>
+            </div>
+          </div>
+          <div class="edge" id="edgeT"></div>
+          <div class="edge" id="edgeB"></div>
+        </div>
+      </div></div>
+
+      <div id="ov" class="clip" data-start="0" data-duration="6.6" data-track-index="4">
+        <!-- variant 0: Title + clip -->
+        <div id="v0">
+          <div id="kicker" class="t-label-wide"></div>
+          <div id="heroWrap"><div id="hero" class="t-wide" data-layout-allow-overflow data-layout-allow-occlusion></div></div>
+          <div id="credit" class="t-label-wide"><span id="creditSrc"></span><span class="dot"> · </span><span class="tc" id="tc0">0:00</span></div>
+        </div>
+        <!-- variant 1: Clip + caption -->
+        <div id="v1">
+          <div id="slate"><div id="slateL"><span class="rec"></span><span id="slateSrc"></span><span class="dot">·</span><span class="tc" id="tc1">0:00</span></div><div id="slateH"></div></div>
+          <div id="capWrap"><div id="caption"></div></div>
+        </div>
+      </div>
+      <!-- v0 (r08) payoff: LEONIDA filled with the jetski shot on the 2.1 s cut (clipped by the measured glyphs) -->
+      <div id="vtLayer" data-layout-allow-overflow data-layout-allow-occlusion><div id="vtChroma" data-layout-allow-overflow><div id="vt" data-layout-allow-overflow>
+        <video id="t0b" class="clip" src="assets/shots/s064-jetski-h.mp4" muted playsinline data-start="2.1" data-duration="1.1" data-media-start="0.5" data-track-index="7"></video><div id="vtTint"></div>
+      </div><svg id="vtEdge" width="864" height="240" aria-hidden="true"><g id="vtEdgeG" clip-path="url(#vtClip)"></g></svg></div></div>
+      <svg id="vtDefs" width="0" height="0" style="position:absolute;left:0;top:0" aria-hidden="true"><defs><clipPath id="vtClip" clipPathUnits="userSpaceOnUse"></clipPath></defs></svg>
+    </div>
+
+    <script>
+      const CONFIG = {
+        handle: "@everestchris6",          // v1: right end of the slate row, above the frame
+        // the glow behind/around the screen: blur in px, default grade, how far it is enlarged and how much it drifts in
+        // bleed = how far (px, on the 1/4-size canvas) the glow copy runs past the frame edge, so the blur never
+        // samples empty edges; spillOpacity = how much light the screen throws (variants[n].fill overrides any of these)
+        fill: { blur: 64, brightness: 0.7, saturate: 1.65, zoom: 1.12, drift: 0.07, bleed: 0, spillBlur: 30, spillBright: 0.95, spillMax: 1.08, spillOpacity: 1 },
+        // the hit light (plate only): exposure gain on the footage + a faint warm additive veil; 2-frame peak, 0.25 s decay
+        light: { gain: 0.6, contrast: 0.3, veil: 0.04, hold: 0.05, decay: 0.25 },   // per variant: variants[n].gain overrides gain
+        // the shots. MUST mirror the <video> tags (screen copy s.., glow copy f.., spill copy g.. share src + timing).
+        // tc = where the shot starts in its source video (seconds): drives the live source timecode.
+        // label = which trailer the shot is from (v1 slate; defaults to the variant's slate).
+        // scrim = strength (0-1) of the soft shadow behind the v1 slate row while this shot is up (light shots only).
+        // top = strength (0-1) of a v1 top-of-frame scrim while this shot is up (light shots only).
+        // tint = [colour, strength 0-1]: a multiply grade on the glow while this shot is up, so white sky and spray in
+        //        the glow take the scene's colour (amber at the bar, azure on the water) instead of going milky grey.
+        // focus = which vertical stripe of the 16:9 frame the glow samples (0 left .. 0.5 centre .. 1 right).
+        // glow = [brightness, saturate] of the glow for this shot (optional; dark shots get more, so the room stays lit).
+        variants: {
+          "0": {
+            end: 6.6,
+            kicker: "Welcome to",
+            title: "Leonida",                 // one word or a short phrase, wide caps, Rockstar date-card style (white + #EE08F2 offset)
+            credit: "Rockstar Games · Trailer 2",
+            shots: [
+              // r08: s011 glow 0.84 -> 1.0 and an azure tint, so the highway room reads as sky blue, not grey-brown
+              { src: "assets/shots/s011-vice-highway-h.mp4", start: 0.0,    dur: 2.1,    in: 0.5,  tc: 34.67,  focus: 0.62, glow: [1.0, 1.75], tint: ["#7FB0FF", 0.3] },
+              // r07: in 0.5 = the jetski's close pass (media 0.5-1.6, ends in its own spray before the golden-hour cut)
+              { src: "assets/shots/s064-jetski-h.mp4",       start: 2.1,    dur: 1.1,    in: 0.5,  tc: 140.10, focus: 0.4,  glow: [0.74, 1.95], tint: ["#5FA0FF", 0.4] },
+              // r10 (defect): hazy s027 is a 0.9 s quick cut only (DESIGN lesson 4), never the end
+              { src: "assets/shots/s027-sunset-dock-h.mp4",  start: 3.2,    dur: 0.9,    in: 0,    tc: 83.17,  focus: 0.55 },
+              { src: "assets/shots/s026-sunset-pier-h.mp4",  start: 4.1,    dur: 1.5333, in: 0.01, tc: 81.47,  focus: 0.5 },
+              // r10: the piece ends on the bright Launch Trailer balcony sunset (in 0.2, media 0.2-1.17 of 1.33);
+              // credit = the source line while this shot is up (it is from the Launch Trailer, not Trailer 2)
+              { src: "assets/shots/s108-balcony-sunset-h.mp4", start: 5.6333, dur: 0.9667, in: 0.2, tc: 66.47, focus: 0.15,
+                glow: [0.7, 2.1], credit: "Rockstar · Launch Trailer" }
+            ],
+            // r08: inset screen; its spill lights the room on all four sides (screen blend)
+            fill: { spillBlur: 30, spillBright: 0.95, spillMax: 0.95, spillOpacity: 0.8 },
+            // r08 payoff: on the hit, the title is filled with the shot itself (video-in-type), then the white title
+            // takes the word back with a soft wipe. shot = index into shots (MUST match the #t0b <video>); hold/cross (wipe) in s;
+            // w/x/y place the video behind the title box (864x240, title glyphs at about y 81-177 inside it).
+            // r09: a 2x crop aimed at the green hull (frame x .54, y .60 at the glyph centre: measured, the hull's
+            // centroid), graded darker and denser than the white title (grade), with an inner white edge (edge = [stroke
+            // px, alpha]: half falls inside). The hull leaves the frame at media 1.33 (2.93 s) and only spray follows, so
+            // the word holds footage .62 s, then the white wipes back RIGHT to left (dir -1), chasing the jetski out
+            // zoom = [from, dur]: on the hit the crop starts that much closer on the hull (still small and far at
+            // the cut) and pulls back as the jetski arrives, so the word is dense green from the first frame
+            typeFill: { shot: 1, hold: 0.62, cross: 0.26, dir: -1, w: 2080, x: -691, y: -573, zoom: [2.3, 0.5],
+              grade: "brightness(.85) contrast(1.25) saturate(1.35)", edge: [3, 0.55] },
+            gain: 0.12,    // the jetski shot is already bright: a light exposure push, so the water flares instead of whiting out
+            hit: 2.1,      // the payoff: the title takes the jetski footage + light hit + shake, then white again + a bloom swell
+            beat2: 5.6333, // a second, smaller light beat: a softer bloom swell on the cut into the last shot (r10: s108)
+            grain: 0.10,   // r09: lighter grain than the library default, so it doesn't crawl on the flat blurred fill
+            leak: 3.0,     // warm light leak carrying the cut into golden hour
+            out: 6.05      // exit starts (type blurs out, the screen closes back to a line)
+          },
+          "1": {
+            end: 6.6,
+            slate: "Trailer 2",               // label above the frame, followed by the live timecode (shots[].label overrides)
+            // \n = line break. The line holding the *word* is the payoff: the whole line slams in as one unit on the hit,
+            // and the *word* takes the sunset fill. Other lines rise word by word at the start.
+            caption: "Every frame\nis *unreal.*",
+            // r08: px sizes of the setup lines and of the payoff line (the line holding the *word*)
+            setupSize: 112, payoffSize: 184,
+            shots: [
+              // r07: the hook opens on the Launch Trailer swamp sunset, so the frame glows pink-orange from frame 0
+              { src: "assets/shots/s084-swamp-sunset-h.mp4",  start: 0.0,    dur: 1.4,    in: 0,    tc: 27.24, focus: 0.5,  glow: [0.8, 2.0], label: "Launch Trailer", scrim: 0.5 },
+              // s039 has trailer cuts baked in at 1.067 s and 2.667 s: in 1.1 + dur 1.5333 plays ONE continuous orbit
+              // (media 1.1-2.63), so the hit lands on a clean shot that holds 1.53 s
+              { src: "assets/shots/s039-blue-club-h.mp4",    start: 1.4,    dur: 1.5333, in: 1.1,  tc: 99.74, focus: 0.2,  glow: [1.0, 1.5] },
+              // r08: glow 0.55/2.0, a top scrim (top) and a warm multiply tint (tint), so the bar's white sky glows
+              // amber above the frame instead of milky grey
+              { src: "assets/shots/s036-beach-bar-h.mp4",    start: 2.9333, dur: 1.3667, in: 0.02, tc: 96.20, focus: 0.45, glow: [0.55, 2.0], scrim: 0.62, top: 0.45, tint: ["#FFAE6A", 0.55] },
+              { src: "assets/shots/s018-lucia-gate-h.mp4",   start: 4.3,    dur: 2.3,    in: 0.4,  tc: 63.17, focus: 0.75, glow: [0.96, 1.7] }
+            ],
+            // the glow keeps the scene's structure (less blur, no extra zoom) and the frame throws light into the caption
+            fill: { blur: 36, zoom: 1.0, drift: 0.05, bleed: 18, spillBlur: 30, spillBright: 1.05, spillOpacity: 0.8 },
+            gain: 0.9,     // the club shot is dark: a stronger exposure push so the hit reads (blacks still hold)
+            hit: 1.4,
+            beat2: 4.3,
+            leak: 4.1,
+            out: 6.1
+          }
+        }
+      };
+
+      (function () {
+        const VARS = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+        const vKey = CONFIG.variants[String(VARS.variant)] ? String(VARS.variant) : "0";
+        const plate = VARS.bg !== "none";
+        const V = CONFIG.variants[vKey], F = Object.assign({}, CONFIG.fill, V.fill || {}), D = V.end;
+        const $ = (s) => document.querySelector(s);
+        const root = $("#root");
+        root.classList.add("v" + vKey);
+
+        // glow geometry: each fill video covers the 270x480 small canvas; focus picks the stripe it samples
+        const fillVids = Array.from(document.querySelectorAll("#v" + vKey + "fill video"));
+        const spillVids = Array.from(document.querySelectorAll("#v" + vKey + "spill video"));
+        fillVids.forEach((v, i) => {
+          const sh = V.shots[i] || {};
+          const f = sh.focus != null ? sh.focus : 0.5;
+          const B = F.bleed || 0, FH = 480 + 2 * B, FW = FH * 16 / 9;
+          v.style.top = -B + "px"; v.style.height = FH + "px"; v.style.width = FW.toFixed(2) + "px";
+          v.style.left = Math.min(-B, Math.max(270 + B - FW, 135 - f * FW)).toFixed(2) + "px";
+          // per-shot grade of the glow + spill (the blur stays on the shared container)
+          const g = sh.glow || [F.brightness, F.saturate];
+          v.style.filter = `brightness(${g[0]}) saturate(${g[1]})`;
+          if (spillVids[i]) spillVids[i].style.filter = `brightness(${Math.min(F.spillMax, F.spillBright * g[0] / F.brightness).toFixed(3)}) saturate(${g[1]})`;
+        });
+        $("#fillSmall").style.filter = `blur(${F.blur / 4}px)`;
+        $("#spillSmall").style.filter = `blur(${F.spillBlur / 4}px)`;
+        // r08: v0's inset screen throws light past all four edges (about 54 px each side, 127 px above and below)
+        const SPX = vKey === "0" ? 1.12 : 1.1, SPY = vKey === "0" ? 1.5 : 1.42;
+        gsap.set("#spill", { scaleX: SPX, scaleY: SPY });
+
+        const fmt = (s) => { s = Math.max(0, Math.floor(s)); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); };
+        const shotAt = (t) => {
+          let sh = V.shots[0];
+          V.shots.forEach((s) => { if (t >= s.start - 1 / 60) sh = s; });   // half-frame tolerance: the label flips on the cut frame
+          return sh;
+        };
+        const tcAt = (t) => { const sh = shotAt(t); return fmt(sh.tc + sh.in + Math.max(0, Math.min(t - sh.start, sh.dur))); };
+
+        let tcEl, capParts = null;
+        if (vKey === "0") {
+          $("#kicker").textContent = V.kicker;
+          $("#hero").textContent = V.title;
+          $("#creditSrc").textContent = V.credit;
+          tcEl = $("#tc0");
+        } else {
+          $("#slateSrc").textContent = V.shots[0].label || V.slate;
+          $("#slateH").textContent = CONFIG.handle;
+          // caption: plain lines rise word by word; the line holding the *word* is ONE unit that slams in on the hit
+          const cap = $("#caption"); capParts = { rv: [], hl: [], hlwrap: [], slam: [] };
+          V.caption.split("\n").forEach((line) => {
+            const ln = document.createElement("div"); ln.className = "ln";
+            const isHit = /\*[^*]+\*/.test(line);
+            line.split(/(\*[^*]+\*)/).filter((s) => s.length).forEach((seg) => {
+              if (seg.startsWith("*")) {
+                const w = document.createElement("span"); w.className = "hlwrap";
+                const h = document.createElement("span"); h.className = "hl"; h.textContent = seg.slice(1, -1);
+                w.appendChild(h); ln.appendChild(w); capParts.hl.push(h); capParts.hlwrap.push(w);
+              } else if (seg.trim()) {
+                if (/^\s/.test(seg) && ln.childNodes.length) ln.appendChild(document.createTextNode(" "));
+                const s = document.createElement("span"); s.className = isHit ? "pl" : "rv"; s.textContent = seg.trim();
+                ln.appendChild(s); if (!isHit) capParts.rv.push(s);
+                if (/\s$/.test(seg)) ln.appendChild(document.createTextNode(" "));
+              } else ln.appendChild(document.createTextNode(" "));
+            });
+            if (isHit) { ln.classList.add("slam"); capParts.slam.push(ln); ln.style.fontSize = V.payoffSize + "px"; }
+            else { ln.classList.add("setup"); ln.style.fontSize = V.setupSize + "px"; }
+            cap.appendChild(ln);
+          });
+          tcEl = $("#tc1");
+        }
+        tcEl.textContent = tcAt(0);
+
+        document.fonts.ready.then(() => {
+          const tl = gsap.timeline({ paused: true });
+          const SUNSET = "linear-gradient(100deg, #F84FA4 0%, #FE78A6 24%, #FE8E4E 62%, #FEB747 100%)";
+
+          // the hit light (r05): adds light instead of greying the frame. The footage gets an exposure push
+          // (brightness multiplies, so blacks stay black and highlights blow), plus a faint warm screen veil
+          // (#FFF4E6 at .10: black rises to ~#1a at most). Peak for 2 frames, then a 0.25 s expo.out decay.
+          const L = Object.assign({}, CONFIG.light, V.gain != null ? { gain: V.gain } : {}), expoOut = gsap.parseEase("expo.out");
+          const lightK = (u) => (u < L.hold ? 1 : 1 - expoOut(Math.min(1, (u - L.hold) / L.decay)));
+          const hitLight = (at) => {
+            if (!plate) return;
+            const world = $("#world"), veil = document.createElement("div");
+            veil.className = "hitveil"; root.appendChild(veil);
+            const dur = L.hold + L.decay;
+            // the drive starts PRE before the hit so the peak lands ON the cut frame (a drive at p=0 is "before")
+            const PRE = 0.02;
+            Look.drive(tl, at - PRE, dur + PRE, (p) => {
+              const u = p * (dur + PRE) - PRE, k = (p <= 0 || p >= 1 || u < -0.005) ? 0 : lightK(Math.max(0, u));
+              // brightness lifts mids and blows highlights; the contrast term pulls the toe back down so blacks hold
+              world.style.filter = k > 0.002 ? `brightness(${(1 + L.gain * k).toFixed(3)}) contrast(${(1 + L.contrast * k).toFixed(3)}) saturate(${(1 + 0.12 * k).toFixed(3)})` : "none";
+              veil.style.opacity = (L.veil * k).toFixed(3);
+            });
+          };
+          // bloom on the hit: the type's own glow (a drop-shadow on its wrapper, since gradient type can't carry a
+          // text-shadow) swells for the hit and settles back to its resting strength
+          const bloomHit = (el, at, o) => {
+            const n = typeof el === "string" ? $(el) : el, dur = o.dur || 0.8, E = gsap.parseEase("power2.out");
+            const css = (k) => `drop-shadow(0 0 ${(o.r + o.dr * k).toFixed(1)}px rgba(${o.rgb},${(o.a + o.da * k).toFixed(3)}))` + (o.tail || "");
+            n.style.filter = css(0);
+            Look.drive(tl, at - 0.02, dur + 0.02, (p) => {
+              const u = p * (dur + 0.02) - 0.02;
+              const k = (p <= 0 || p >= 1 || u < -0.005) ? 0 : (u < 0.05 ? 1 : 1 - E((u - 0.05) / (dur - 0.05)));
+              n.style.filter = css(k);
+            });
+          };
+
+          // per-frame state that depends on absolute time (seek-safe: one driver over the whole piece)
+          const screen = $("#screen"), spill = $("#spill");
+          const H = vKey === "0" ? 506 : 486, TOP = vKey === "0" ? 707 : 532;
+          const openE = gsap.parseEase("expo.out"), closeE = gsap.parseEase("power3.in"), K0 = 0.25;
+          let heroMasks = null;
+          const creditSrc = $("#creditSrc"), slateSrc = $("#slateSrc"), slateScrim = $("#slateScrim"), topScrim = $("#topScrim"), fillTint = $("#fillTint"), refl = $("#refl");
+          Look.drive(tl, 0, D, (p) => {
+            const t = p * D;
+            tcEl.textContent = tcAt(t);
+            const shNow = shotAt(t), tint = shNow.tint || ["#000", 0];
+            if (fillTint.dataset.c !== tint[0]) { fillTint.dataset.c = tint[0]; fillTint.style.backgroundColor = tint[0]; }
+            fillTint.style.opacity = String(tint[1]);
+            if (vKey === "1") {
+              const sh = shotAt(t), lab = sh.label || V.slate;
+              if (slateSrc.textContent !== lab) slateSrc.textContent = lab;
+              slateScrim.style.opacity = String(sh.scrim || 0);
+              topScrim.style.opacity = String(sh.top || 0);
+            }
+            if (vKey === "0") {
+              // r10: the source line names the shot's own trailer (flips on the cut frame, with the timecode)
+              const cr = shotAt(t).credit || V.credit;
+              if (creditSrc.textContent !== cr) creditSrc.textContent = cr;
+              // the char-reveal mask is only needed while LEONIDA rises; after that the glyphs may spread past it
+              if (!heroMasks || !heroMasks.length) heroMasks = Array.from(document.querySelectorAll("#hero .lk-mask"));
+              const ov = t >= 1.5 ? "visible" : "hidden";
+              heroMasks.forEach((m) => { if (m.style.overflow !== ov) m.style.overflow = ov; });
+              // aperture (r08): frame 0 is already a 135 px slit of footage (k .25); it opens over 0.5 s expo.out
+              // and closes back to the same slit on the exit, so the last frame matches frame 0
+              let k = 1;
+              if (t < 0.03) k = K0;
+              else if (t < 0.53) k = K0 + (1 - K0) * openE((t - 0.03) / 0.5);
+              else if (t > V.out + 0.08) k = 1 - (1 - K0) * closeE(Math.min(1, (t - V.out - 0.08) / 0.42));
+              const h = H * k;
+              screen.style.height = h.toFixed(2) + "px";
+              screen.style.top = (TOP + (H - h) / 2).toFixed(2) + "px";
+              spill.style.transform = "scale(" + SPX + "," + (SPY * Math.max(k, 0.06)).toFixed(4) + ")";
+              // the reflection stays attached to the screen's lower edge and fades in with the opening
+              refl.style.transform = "translateY(" + (-(1 - k) * H / 2).toFixed(2) + "px) scaleY(-1)";
+              refl.style.opacity = (0.22 * k * k).toFixed(3);
+            }
+          });
+
+          // glow: dim at frame 0, it fills the room as the screen opens; slow drift for life
+          gsap.set("#fillDrift", { scale: F.zoom });
+          tl.fromTo("#fillDrift", { scale: F.zoom }, { scale: F.zoom * (1 + F.drift), duration: D, ease: "none", immediateRender: false }, 0);
+          // the glow is already lit on frame 0, so the hook is never a dark frame (v1 since r07, v0 since r08)
+          const fill0 = vKey === "0" ? 0.7 : 0.55;
+          gsap.set("#fill", { opacity: fill0 });
+          tl.fromTo("#fill", { opacity: fill0 }, { opacity: 1, duration: 0.75, ease: "power2.out", immediateRender: false }, 0);
+          Look.push(tl, "#push", 0, D, { from: 1.0, to: 1.065 });
+
+          if (vKey === "0") {
+            gsap.set("#spill", { opacity: F.spillOpacity });
+            // the lit edges: bright on the opening slit, they ride the aperture apart and settle into the hairline
+            gsap.set(".edge", { opacity: 0.85 });
+            tl.fromTo(".edge", { opacity: 0.85 }, { opacity: 0.0, duration: 0.6, ease: "power2.out", immediateRender: false }, 0.12);
+            tl.fromTo(".edge", { opacity: 0 }, { opacity: 0.85, duration: 0.3, ease: "power2.out", immediateRender: false }, V.out + 0.1);
+
+            Look.enter(tl, "#kicker", 0.2, { from: "blur", dur: 0.6, blur: 10 });
+            // r08: measure the title's baseline before the split (a 0x0 inline-block marker sits on it)
+            const heroEl = $("#hero"), sc = root.getBoundingClientRect().width / 1080 || 1, mk = document.createElement("i");
+            mk.style.cssText = "display:inline-block;width:0;height:0;vertical-align:baseline";
+            heroEl.appendChild(mk);
+            const baseOff = (mk.getBoundingClientRect().bottom - heroEl.getBoundingClientRect().top) / sc;
+            heroEl.removeChild(mk);
+            Look.reveal(tl, "#hero", 0.3, { by: "chars", stagger: 0.04, dur: 0.75 });
+            // r09: no sunset fill. The title rests white in Rockstar's date-card style (CSS: #EE08F2 offset + bloom)
+            Look.enter(tl, "#credit", 0.7, { from: "up", dist: 24, dur: 0.6, blur: 8 });
+
+            // r08 payoff, video-in-type: an SVG clipPath built from the measured glyphs (one <text> per char, at
+            // the char's own x, so it matches the split title exactly) clips a frame-locked copy of the jetski shot
+            const T = V.typeFill, vtL = $("#vtLayer"), R0 = vtL.getBoundingClientRect(), HR = heroEl.getBoundingClientRect();
+            const cs = getComputedStyle(heroEl), clip = $("#vtClip"), edgeG = $("#vtEdgeG"), NS = "http://www.w3.org/2000/svg";
+            const by = (HR.top - R0.top) / sc + baseOff;
+            document.querySelectorAll("#hero .lk-c").forEach((c) => {
+              const tx = document.createElementNS(NS, "text");
+              tx.setAttribute("x", ((c.getBoundingClientRect().left - R0.left) / sc).toFixed(2));
+              tx.setAttribute("y", by.toFixed(2));
+              tx.style.cssText = `font-family:${cs.fontFamily};font-weight:${cs.fontWeight};font-stretch:${cs.fontStretch};font-size:${cs.fontSize}`;
+              tx.textContent = c.textContent.toUpperCase();
+              clip.appendChild(tx);
+              // r09: the inner edge: the same glyph, stroked and clipped to itself, so only the inner half shows
+              const ed = tx.cloneNode(true);
+              ed.setAttribute("fill", "none"); ed.setAttribute("stroke", "#fff");
+              ed.setAttribute("stroke-width", String(T.edge[0])); ed.setAttribute("stroke-opacity", String(T.edge[1]));
+              ed.setAttribute("stroke-linejoin", "miter");
+              edgeG.appendChild(ed);
+            });
+            Object.assign($("#t0b").style, { left: T.x + "px", top: T.y + "px", width: T.w + "px", height: (T.w * 9 / 16).toFixed(1) + "px",
+              filter: T.grade });
+            const tIn = V.hit - 0.005, tOut = V.hit + T.hold;
+            tl.set("#vtLayer", { opacity: 1 }, tIn);
+            // r09: the crop pulls back from the hull (origin = the video point under the word's centre)
+            const zO = `${(432 - T.x).toFixed(0)}px ${(129 - T.y).toFixed(0)}px`;
+            gsap.set("#t0b", { scale: T.zoom[0], transformOrigin: zO });
+            tl.fromTo("#t0b", { scale: T.zoom[0] }, { scale: 1, duration: T.zoom[1], ease: "power2.out", immediateRender: false }, tIn);
+            // r09: the white title stays under the footage-filled one (its #EE08F2 offset still shows at the glyph
+            // edges), and the white wipes back in from the left (a wipe, not a dissolve: no muddy middle frame)
+            const wipeE = gsap.parseEase("power2.inOut");
+            Look.drive(tl, tOut, T.cross, (p) => {
+              let m = "none";
+              if (p > 0) {
+                const e = wipeE(Math.min(1, p));
+                // dir 1: the white comes in from the left; dir -1 (r09): from the right, following the jetski's travel
+                if (T.dir === -1) { const x = 114 - 128 * e; m = `linear-gradient(90deg, #000 ${(x - 14).toFixed(1)}%, rgba(0,0,0,0) ${(x + 14).toFixed(1)}%)`; }
+                else { const x = -14 + 128 * e; m = `linear-gradient(90deg, rgba(0,0,0,0) ${(x - 14).toFixed(1)}%, #000 ${(x + 14).toFixed(1)}%)`; }
+              }
+              vtL.style.webkitMaskImage = m; vtL.style.maskImage = m;
+            });
+            tl.set("#vtLayer", { opacity: 0 }, tOut + T.cross);
+
+            // the hit on the cut into shot 2: a 2-frame light hit, shake + punch and a white bloom swell on the
+            // footage-filled title (r09: no RGB split, so the knockout glyphs stay crisp); then the white title wipes
+            // back with a bloom swell
+            hitLight(V.hit);
+            Look.impact(tl, V.hit, { shake: "#shake", amp: 9, flash: 0, zoom: 1.035 });
+            bloomHit("#vtLayer", V.hit, { r: 18, dr: 22, rgb: "255,255,255", a: 0.18, da: 0.34, dur: 0.6,
+              tail: " drop-shadow(0 3px 14px rgba(0,0,0,.40))" });
+            const heroTail = " drop-shadow(0 0 46px rgba(238,8,242,.16)) drop-shadow(0 3px 14px rgba(0,0,0,.28))";
+            bloomHit("#heroWrap", tOut + 0.1, { r: 16, dr: 18, rgb: "255,255,255", a: 0.20, da: 0.30, dur: 0.85, tail: heroTail });
+            // the hold breathes: the title tracks out slowly (linear) from .02em to .05em until the exit. Done as a
+            // per-glyph x spread from the centre (transforms stay sub-pixel smooth; letter-spacing would snap)
+            const chars = Array.from(document.querySelectorAll("#hero .lk-c")), nC = chars.length;
+            const spread = 0.02 * parseFloat(cs.fontSize);
+            const breathe = tOut + T.cross;
+            chars.forEach((c, i) => tl.fromTo(c, { x: 0 }, { x: (i - (nC - 1) / 2) * spread, duration: V.out - 0.05 - breathe,
+              ease: "none", immediateRender: false }, breathe));
+            if (plate) Look.leak(tl, V.leak, 1.4, { colors: ["#FE8E4E", "#F84FA4"], y: 0.5, opacity: 0.5 });
+            // a second, smaller light beat on the cut into the last shot
+            bloomHit("#heroWrap", V.beat2, { r: 16, dr: 12, rgb: "255,255,255", a: 0.20, da: 0.18, dur: 0.8, tail: heroTail });
+
+            Look.exit(tl, ["#credit", "#hero", "#kicker"], V.out, { to: "blur", dur: 0.38, stagger: 0.05 });
+            tl.to("#fill", { opacity: fill0, duration: 0.45, ease: "power2.in" }, V.out + 0.05);
+          } else {
+            // the frame resolves out of its own glow
+            gsap.set("#screen", { opacity: 0.5, scale: 1.05, filter: "blur(18px)" });
+            tl.fromTo("#screen", { opacity: 0.5, scale: 1.05, filter: "blur(18px)" },
+              { opacity: 1, scale: 1, filter: "blur(0px)", duration: 0.55, ease: "expo.out", immediateRender: false }, 0);
+            tl.set("#screen", { filter: "none" }, 0.6);
+            gsap.set("#spill", { opacity: 0.1 });
+            tl.fromTo("#spill", { opacity: 0.1 }, { opacity: F.spillOpacity, duration: 0.6, ease: "power2.out", immediateRender: false }, 0);
+
+            Look.enter(tl, "#slateL", 0.22, { from: "blur", dur: 0.55, blur: 10 });
+            Look.enter(tl, "#slateH", 0.34, { from: "blur", dur: 0.55, blur: 10 });
+            // r08 (defect): each word also fades and un-blurs over its first .12 s, so no lone glyph stroke can
+            // show in the mask's padding on the first frame of the rise
+            let at = 0.28;
+            capParts.rv.forEach((el) => {
+              const t0 = at;
+              at = Look.reveal(tl, el, at, { by: "words", stagger: 0.08, dur: 0.7 }) - 0.55;
+              const ins = el.querySelectorAll(".lk-in");
+              gsap.set(ins, { opacity: 0, filter: "blur(6px)" });
+              // the fade starts one frame into the rise, so the first frame of the rise shows nothing at all
+              tl.fromTo(ins, { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.12, ease: "power1.out",
+                stagger: 0.08, immediateRender: false }, t0 + 0.034);
+              tl.set(ins, { filter: "none" }, t0 + 0.034 + 0.12 + 0.08 * (ins.length - 1) + 0.02);
+            });
+
+            // payoff on the cut: "is unreal." slams in as ONE unit (anchored at its left edge, so the word space
+            // scales with it) with the light hit, shake, a small RGB split on that line and bloom on the sunset word, then a sheen
+            capParts.hl.forEach((h) => Look.fill(h, SUNSET, { sheen: true }));
+            // r10 (defect): the RGB split runs on the incoming payoff line ONLY, after it is sharp: 5 px for 0.15 s at
+            // hit + 0.12. The setup line never splits. Built first, while the slam line's filter is still "none", so
+            // the split hands the line back to "none" when it ends.
+            const slamLn = capParts.slam[0];
+            slamLn.style.filter = "none";
+            Look.chroma(tl, slamLn, V.hit + 0.12, 0.15, { px: 5 });
+            // r08: 1.4 -> 1.25, because the payoff line is now 184 px (it stays inside the frame while it slams)
+            // r10 (defect): the slam finishes its blur-in by hit + 0.1 (0.25 s, expo.out), so it is sharp on the cut
+            gsap.set(capParts.slam, { opacity: 0, scale: 1.25, filter: "blur(16px)", transformOrigin: "0% 60%" });
+            tl.fromTo(capParts.slam, { opacity: 0, scale: 1.25, filter: "blur(16px)" },
+              { opacity: 1, scale: 1, filter: "blur(0px)", duration: 0.25, ease: "expo.out", immediateRender: false }, V.hit - 0.15);
+            tl.set(capParts.slam, { filter: "none" }, V.hit + 0.1);
+            hitLight(V.hit);
+            Look.impact(tl, V.hit, { shake: "#shake", amp: 9, flash: 0, zoom: 1.035 });
+            capParts.hlwrap.forEach((w) => bloomHit(w, V.hit, { r: 24, dr: 22, rgb: "248,79,164", a: 0.34, da: 0.40, dur: 0.85 }));
+            capParts.hl.forEach((h) => Look.sheen(tl, h, V.hit + 0.25, { dur: 0.8 }));
+            if (plate) Look.leak(tl, V.leak, 1.4, { colors: ["#FEB747", "#F84FA4"], y: 0.3, opacity: 0.5 });
+            // a second, smaller light beat on the cut to Lucia
+            capParts.hl.forEach((h) => Look.sheen(tl, h, V.beat2 + 0.04, { dur: 0.9 }));
+
+            // exit: type blurs out, the frame dissolves back into its glow
+            Look.exit(tl, ["#caption", "#slateH", "#slateL"], V.out, { to: "blur", dur: 0.36, stagger: 0.04 });
+            tl.fromTo("#screen", { opacity: 1, scale: 1, filter: "blur(0px)" },
+              { opacity: 0, scale: 1.04, filter: "blur(18px)", duration: 0.42, ease: "power2.in", immediateRender: false }, V.out + 0.06);
+            tl.to("#fill", { opacity: 0.55, duration: 0.42, ease: "power2.in" }, V.out + 0.06);
+            tl.to("#spill", { opacity: 0.1, duration: 0.42, ease: "power2.in" }, V.out + 0.06);
+          }
+
+          Look.install(tl, { duration: D, grain: V.grain != null ? V.grain : 0.12, vignette: 0.45, enabled: plate });
+          tl.set({}, {}, D);
+          window.__timelines = window.__timelines || {};
+          window.__timelines["main"] = tl;
+          tl.seek(0);
+        });
+      })();
+    </script>
+  </body>
+</html>

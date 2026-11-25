@@ -1,0 +1,333 @@
+<!doctype html>
+<!-- GTA 6 component #17 "Freeze-frame detail", craft v2. 1080x1920 (9:16), 30 fps, 5.0 s.
+     Full-frame component. The clip plays, then slams to a stop on one frame (shake + exposure hit). The world drains to a cold
+     grey and only the detail keeps its colour: lit like a spotlight (v0) or developed by a scan of light (v1). The camera keeps
+     pushing into the frozen frame while one big word names the detail. Then the colour comes back, playback resumes and the
+     push punches out.
+     How the freeze works: each variant's clip runs as play (data-media-start = clip in-point, until the freeze) | a pre-extracted
+     still of the frozen frame (assets/stills/, same pixels as the clip) | resume (data-media-start = the frozen frame).
+     The renderer shows frame floor(t x 30), so the freeze frame N is resumed with data-media-start N/30 + 0.002.
+     Layers on the still, all inside #push so they move with the camera: the colour still, a cold mono copy on top of it with a
+     hole for the detail (v0: a feathered ellipse that closes in from the frame edges; v1: revealed top-down by the scan line,
+     with the sign itself cut out on top and lifted).
+     Variables: variant "0" Spotlight / "1" Scan reveal; bg "plate" (finishing grain + vignette on) / "none" (finishing off;
+     footage still shows, because this component transforms the footage itself).
+     Safe zones: all text inside x 72-936, y 230-1480. -->
+<html lang="en" data-composition-variables='[
+  {"id":"variant","type":"enum","label":"Variant","default":"0","options":[{"value":"0","label":"Spotlight"},{"value":"1","label":"Scan reveal"}]},
+  {"id":"bg","type":"enum","label":"Background","default":"plate","options":[{"value":"plate","label":"Sample footage + finishing"},{"value":"none","label":"No finishing (footage still shows: full-frame component)"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link rel="stylesheet" href="assets/fonts/fonts.css" />
+    <link rel="stylesheet" href="assets/kit/look/look.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="assets/kit/look/look.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: #000; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; background: #000; font-family: "Inter", sans-serif; color: #fff;
+        -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; }
+      #shake, #push { position: absolute; inset: 0; }
+      .m, .hold { position: absolute; inset: 0; }
+      .shot { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; object-fit: cover; display: block; }
+
+      /* the cold surround: a mono copy of the frozen frame. Its hole (mask or clip-path) is set per variant in the script */
+      .mono { will-change: mask-image, clip-path; }
+      /* v0 light pool: warm light spilling just past the colour pool, added on top of the footage */
+      #v0glow { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; mix-blend-mode: screen; opacity: 0; pointer-events: none; }
+      /* v1: the sign cut out of the frozen frame and lifted off it (contact shadow on the wrapper, clip on the image) */
+      #v1lift { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; }
+      #v1shadow { position: absolute; inset: 0; filter: drop-shadow(0 22px 26px rgba(0,0,0,.55)) drop-shadow(0 4px 6px rgba(0,0,0,.45)); opacity: 0; }
+      #v1shadow .cutfill { position: absolute; inset: 0; background: #000; }
+      /* v1 scan: one blade of light, full width, with a soft light trail above it */
+      #scan { position: absolute; left: -60px; width: 1200px; top: 0; height: 0; pointer-events: none; opacity: 0; }
+      #scan .trail { position: absolute; left: 0; right: 0; bottom: 0; height: 260px; mix-blend-mode: screen;
+        background: linear-gradient(to top, rgba(255,170,120,.30), rgba(248,79,164,.10) 40%, rgba(248,79,164,0)); }
+      #scan .blade { position: absolute; left: 0; right: 0; bottom: -2px; height: 4px;
+        background: linear-gradient(90deg, rgba(255,255,255,0) 0%, #FFF4EA 12%, #FFFFFF 50%, #FFF4EA 88%, rgba(255,255,255,0) 100%);
+        box-shadow: 0 0 10px 1px rgba(255,255,255,.85), 0 0 34px 6px rgba(254,142,78,.62), 0 0 90px 18px rgba(248,79,164,.32); }
+
+      /* screen-space overlay: scrim + type */
+      #ov { position: absolute; inset: 0; z-index: 20; pointer-events: none; }
+      .scrim { position: absolute; left: 0; right: 0; opacity: 0; }
+      #v0scrim { top: 980px; bottom: 0; background: linear-gradient(180deg, rgba(4,5,9,0) 0%, rgba(4,5,9,.55) 34%, rgba(4,5,9,.82) 70%, rgba(4,5,9,.88) 100%); }
+      #v1scrim { top: 380px; height: 640px; background: radial-gradient(ellipse 70% 48% at 42% 52%, rgba(4,5,9,.62) 0%, rgba(4,5,9,.34) 55%, rgba(4,5,9,0) 100%); }
+
+      .block { position: absolute; left: 72px; width: 864px; }
+      .kicker { display: flex; align-items: center; gap: 18px; color: rgba(255,255,255,.88); white-space: nowrap; }
+      .kicker .pause { display: flex; gap: 6px; flex: none; transform: translateY(-1px); }
+      .kicker .pause i { display: block; width: 6px; height: 22px; border-radius: 1px; background: #fff; }
+      .kicker .t-label-wide { font-size: 25px; letter-spacing: .3em; color: rgba(255,255,255,.88); }
+      .hero { position: relative; white-space: nowrap; }
+      .hero .in { display: inline-block; }
+      .line { font-weight: 600; font-size: 38px; line-height: 1.2; letter-spacing: -0.012em; color: rgba(255,255,255,.88);
+        text-wrap: balance; max-width: 820px; text-shadow: 0 2px 2px rgba(0,0,0,.35), 0 6px 22px rgba(0,0,0,.45); }
+
+      #v0block .hero { margin-top: 22px; font-weight: 900; line-height: .9; letter-spacing: .01em;
+        filter: drop-shadow(0 4px 14px rgba(0,0,0,.42)) drop-shadow(0 0 26px rgba(255,214,176,.30)) drop-shadow(0 0 70px rgba(255,190,150,.16)); }
+      #v0block .line { margin-top: 26px; }
+      #v1block .hero { margin-top: 20px; font-weight: 900; line-height: .92; letter-spacing: .012em;
+        filter: drop-shadow(0 3px 10px rgba(0,0,0,.45)) drop-shadow(0 0 30px rgba(248,79,164,.28)); }
+      #v1block .line { margin-top: 22px; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="5" data-width="1080" data-height="1920">
+
+      <div id="shake"><div id="push">
+        <!-- ===== variant 0: s014 (Trailer 2), the mural behind the police stop. Plays frames 30-59, freezes on frame 60
+             (the whole Haitian coat of arms sits just under the rear-view mirror), resumes from frame 60 ===== -->
+        <div class="m" id="m0">
+          <video id="v0play" class="clip shot" src="assets/shots/s014-driveby-police-v.mp4" muted playsinline data-start="0" data-duration="1" data-media-start="1.002" data-track-index="0"></video>
+          <!-- the hold: one timed layer holding the colour still, its cold mono copy and the light spill -->
+          <div id="v0hold" class="clip hold" data-start="1" data-duration="3.35" data-track-index="1">
+            <img id="v0still" class="shot" src="assets/stills/s014-driveby-f060.png" alt="" />
+            <img id="v0mono" class="shot mono" src="assets/stills/s014-driveby-f060.png" alt="" />
+            <div id="v0glow"></div>
+          </div>
+          <video id="v0resume" class="clip shot" src="assets/shots/s014-driveby-police-v.mp4" muted playsinline data-start="4.35" data-duration="0.65" data-media-start="2.002" data-track-index="0"></video>
+        </div>
+        <!-- ===== variant 1: s011 (Trailer 2), Vice City highway. Own 4K re-crop (assets/clips, same master, grade and timing as
+             assets/shots/s011, centred 0.46 instead of 0.55 so the VCI Airport / Ambrosia sign is whole). Plays frames 50-79,
+             freezes on frame 80 (the jet above, the sign below, sky between), resumes from frame 80 ===== -->
+        <div class="m" id="m1">
+          <video id="v1play" class="clip shot" src="assets/clips/s011-vice-highway-signs-v.mp4" muted playsinline data-start="0" data-duration="1" data-media-start="1.669" data-track-index="3"></video>
+          <!-- the hold: colour still, mono copy (revealed by the scan), the sign cut out on top, and the scan blade -->
+          <div id="v1hold" class="clip hold" data-start="1" data-duration="3.3" data-track-index="4">
+            <img id="v1still" class="shot" src="assets/stills/s011-signs-f080.png" alt="" />
+            <img id="v1mono" class="shot mono" src="assets/stills/s011-signs-f080.png" alt="" />
+            <!-- the blade runs over the frozen frame but BEHIND the lifted sign: the sign is the one thing the drain never touches -->
+            <div id="scan"><div class="trail"></div><div class="blade"></div></div>
+            <div id="v1lift">
+              <div id="v1shadow"><div class="cutfill" id="v1cutfill"></div></div>
+              <img id="v1cut" class="shot" src="assets/stills/s011-signs-f080.png" alt="" />
+            </div>
+          </div>
+          <video id="v1resume" class="clip shot" src="assets/clips/s011-vice-highway-signs-v.mp4" muted playsinline data-start="4.3" data-duration="0.7" data-media-start="2.669" data-track-index="3"></video>
+        </div>
+      </div></div>
+
+      <div id="ov" class="clip" data-start="0" data-duration="5" data-track-index="7">
+        <div class="scrim" id="v0scrim"></div>
+        <div class="scrim" id="v1scrim"></div>
+        <div class="block" id="v0block">
+          <div class="kicker" id="v0kick"><span class="pause"><i></i><i></i></span><span class="t-label-wide" id="v0kickText"></span></div>
+          <div class="heroWrap" id="v0heroWrap"><div class="hero t-wide" id="v0hero" data-layout-allow-overflow><span class="in" id="v0heroIn" data-layout-allow-overflow></span></div></div>
+          <div class="line" id="v0line"></div>
+        </div>
+        <div class="block" id="v1block">
+          <div class="kicker" id="v1kick"><span class="pause"><i></i><i></i></span><span class="t-label-wide" id="v1kickText"></span></div>
+          <div class="heroWrap" id="v1heroWrap"><div class="hero t-wide" id="v1hero" data-layout-allow-overflow><span class="in" id="v1heroIn" data-layout-allow-overflow></span></div></div>
+          <div class="line" id="v1line"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const CONFIG = {
+        duration: 5.0,
+        // the cold surround on the frozen frame (both variants): mono, a touch cool, dimmed
+        surround: "grayscale(1) sepia(.2) hue-rotate(178deg) saturate(1.2) brightness(.44) contrast(1.12)",
+        variants: {
+          "0": {
+            name: "Spotlight",
+            // footage: clip + still must match the <video>/<img> tags of #m0 above (src, data-start, data-media-start)
+            clip: "assets/shots/s014-driveby-police-v.mp4",
+            still: "assets/stills/s014-driveby-f060.png",   // ffmpeg -i clip -vf "select='eq(n\,60)'" -frames:v 1 still.png
+            freezeFrame: 60,       // 2.000 s into s014 = Trailer 2 at 47.3 s
+            freezeAt: 1.0,         // composition second the picture stops (play clip data-duration; data-media-start = 2.002 - 1.0)
+            resumeAt: 4.35,        // composition second playback resumes (resume clip data-start). The resume ends at clip 2.65 s,
+                                   // just as the car's A-pillar starts to sweep in from the bottom-left
+            // camera on the frozen frame: scale about `origin` (frame px). The emblem (centre 650,595) rides up to ~(572,560)
+            push: { origin: [1080, 789], play: 1.025, punch: 1.13, hold: 1.19 },
+            // the spotlight: a feathered ellipse in frame px on the coat of arms (x 370-930, y 340-850 on frame 60)
+            spot: { cx: 650, cy: 600, rx: 404, ry: 362, feather: 0.36, lift: "brightness(1.2) saturate(1.28) contrast(1.07)" },
+            block: { bottom: 1466 },   // the type block sits in the lower third, over the drained police car and dashboard
+            kicker: "Trailer 2 · 0:47",
+            hero: "Haiti",
+            heroSize: 200,
+            heroShift: -0.075,     // em: optical alignment, the H's side bearing (ink lands on x 72 with the kicker and the line)
+            exposePeak: 1.7,       // freeze hit on dark dusk footage
+            resumePeak: 1.32,
+            line: "Its coat of arms, painted on the mural behind the police stop."
+          },
+          "1": {
+            name: "Scan reveal",
+            clip: "assets/clips/s011-vice-highway-signs-v.mp4",
+            still: "assets/stills/s011-signs-f080.png",
+            freezeFrame: 80,       // 2.667 s into s011 = Trailer 2 at 37.3 s
+            freezeAt: 1.0,
+            resumeAt: 4.3,
+            // scale about the sign's top edge, so the sign stays put and the jet climbs away from it: the sky between them opens up
+            push: { origin: [545, 912], play: 1.025, punch: 1.12, hold: 1.17 },
+            // the sign (green panel + yellow EXIT ONLY panel) on frame 80, in frame px: outer edge, rounded corners
+            // measured on the still's pixels: top 912.5, bottom 1257, left 315 -> 310, right 776 -> 780 -> 775; the path runs ~1 px inside
+            sign: "M338 914 L755 914 Q775 914 775 934 L778 1100 L777 1180 L774 1236 Q774 1255 755 1255 L330 1255 Q311 1255 311 1236 L311 1150 L316 936 Q316 914 338 914 Z",
+            signCentre: [545, 1085],
+            pop: 1.07,             // the cut-out lifts toward camera
+            scanDur: 0.85,         // top to bottom, sine.inOut: the blade is on screen for ~24 frames
+            block: { bottom: 866 },    // the type sits in the open sky between the jet and the sign
+            kicker: "Trailer 2 · 0:37",
+            hero: "Ambrosia",
+            heroSize: 112,
+            heroStretch: 114,      // % width: AMBROSIA at the full 125% ran 816 px (94% of the safe width); 114% keeps it under 88%
+            heroShift: 0,
+            exposePeak: 1.4,       // freeze hit on bright daylight footage (1.72 blew the clouds out to flat white for 4 frames)
+            resumePeak: 1.18,
+            line: "On the 35 North exit for VCI Airport."
+          }
+        }
+      };
+
+      (function () {
+        const VARS = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+        const vKey = CONFIG.variants[String(VARS.variant)] ? String(VARS.variant) : "0";
+        const V = CONFIG.variants[vKey];
+        const plate = VARS.bg !== "none";
+        const $ = (s) => document.querySelector(s);
+        const D = CONFIG.duration, Tf = V.freezeAt, Tr = V.resumeAt;
+
+        // keep only the active variant
+        const other = vKey === "0" ? "1" : "0";
+        ["#m" + other, "#v" + other + "block", "#v" + other + "scrim"].forEach((s) => { $(s).style.display = "none"; });
+        document.querySelectorAll("#m" + other + " video, #m" + other + " img").forEach((el) => { el.style.display = "none"; });
+        document.querySelectorAll("#m" + vKey + " video").forEach((el) => { if (!el.getAttribute("src").endsWith(V.clip.split("/").pop())) console.warn("[freeze-detail] clip src differs from CONFIG:", el.id); });
+
+        // content
+        $("#v" + vKey + "kickText").textContent = V.kicker;
+        $("#v" + vKey + "heroIn").textContent = V.hero;
+        $("#v" + vKey + "line").textContent = V.line;
+        $("#v" + vKey + "hero").style.fontSize = V.heroSize + "px";
+        if (V.heroStretch) $("#v" + vKey + "hero").style.fontStretch = V.heroStretch + "%";
+        $("#v" + vKey + "hero").style.marginLeft = (V.heroShift || 0) + "em";
+
+        const mono = $("#v" + vKey + "mono"), still = $("#v" + vKey + "still");
+        mono.style.filter = CONFIG.surround;
+
+        document.fonts.ready.then(() => {
+          const tl = gsap.timeline({ paused: true });
+          const F = (o) => Object.assign({ immediateRender: false }, o);
+          const block = $("#v" + vKey + "block");
+          block.style.top = (V.block.bottom - block.offsetHeight) + "px";
+          // safety: a creator's longer hero never runs past x 936 (warn; the floor is the DESIGN.md hero minimum, 110 px)
+          const hero = $("#v" + vKey + "hero"), heroIn = $("#v" + vKey + "heroIn"), heroWrap = $("#v" + vKey + "heroWrap");
+          if (heroIn.offsetWidth > 864) {
+            const fs = Math.max(110, Math.floor(V.heroSize * 864 / heroIn.offsetWidth));
+            hero.style.fontSize = fs + "px"; console.warn("[freeze-detail] hero too wide, font-size ->", fs);
+            block.style.top = (V.block.bottom - block.offsetHeight) + "px";
+          }
+
+          // ---------- camera: one scale lane on #push about a fixed origin (scale >= 1 about a point inside the frame always covers it)
+          gsap.set("#push", { transformOrigin: `${V.push.origin[0]}px ${V.push.origin[1]}px`, scale: 1 });
+          tl.fromTo("#push", { scale: 1 }, F({ scale: V.push.play, duration: Tf, ease: "none" }), 0);
+          tl.fromTo("#push", { scale: V.push.play }, F({ scale: V.push.punch, duration: 0.8, ease: "expo.out" }), Tf);
+          tl.fromTo("#push", { scale: V.push.punch }, F({ scale: V.push.hold, duration: Tr - (Tf + 0.8), ease: "sine.in" }), Tf + 0.8);
+          tl.fromTo("#push", { scale: V.push.hold }, F({ scale: 1, duration: D - Tr, ease: "expo.out" }), Tr);
+
+          // ---------- the freeze hit (shake + exposure pulse that blows highlights, blacks stay black)
+          Look.impact(tl, Tf, { shake: "#shake", amp: 9, zoom: 1.03, flash: 0, dur: 0.34 });
+          Look.expose(tl, Tf, { target: "#shake", peak: V.exposePeak || 1.6, dur: 0.28 });
+          // resume: playback rolls on with a softer pulse while the push punches out
+          Look.expose(tl, Tr, { target: "#shake", peak: V.resumePeak || 1.3, dur: 0.24 });
+
+          const kick = $("#v" + vKey + "kick"), line = $("#v" + vKey + "line"), scrim = $("#v" + vKey + "scrim");
+
+          if (vKey === "0") {
+            // ---------- Spotlight: the grey closes in from the frame edges onto the coat of arms (feathered ellipse = light falloff)
+            const S = V.spot, big = 2600;
+            const setHole = (k) => {   // k: 0 = no grey anywhere, 1 = the settled pool
+              const rx = big + (S.rx - big) * k, ry = big * (S.ry / S.rx) + (S.ry - big * (S.ry / S.rx)) * k;
+              const a = Math.round((1 - S.feather) * 100);
+              const m = `radial-gradient(ellipse ${rx.toFixed(1)}px ${ry.toFixed(1)}px at ${S.cx}px ${S.cy}px, rgba(0,0,0,0) 0%, rgba(0,0,0,0) ${a}%, rgba(0,0,0,.55) ${Math.round(a + (100 - a) * 0.55)}%, #000 100%)`;
+              mono.style.webkitMaskImage = m; mono.style.maskImage = m;
+            };
+            const E1 = gsap.parseEase("power3.out"), E2 = gsap.parseEase("power2.in");
+            Look.drive(tl, Tf + 0.06, 0.72, (p) => setHole(E1(p)));
+            Look.drive(tl, Tr - 0.38, 0.38, (p) => setHole(p >= 1 ? 0 : 1 - E2(p)));
+            tl.set(mono, { opacity: 1 }, 0);
+            // the pool is lit, not just left in colour: lift inside it, plus a warm spill just past its edge
+            $("#v0glow").style.background = `radial-gradient(ellipse ${S.rx * 1.25}px ${S.ry * 1.25}px at ${S.cx}px ${S.cy}px, rgba(255,226,196,.20) 0%, rgba(255,210,170,.10) 55%, rgba(255,200,160,0) 100%)`;
+            const LIFT = S.lift;
+            Look.drive(tl, Tf + 0.12, 0.6, (p) => { still.style.filter = p <= 0 ? "" : LIFT.replace(/\(([\d.]+)\)/g, (m, v) => `(${(1 + (parseFloat(v) - 1) * p).toFixed(3)})`); });
+            Look.drive(tl, Tr - 0.38, 0.38, (p) => { still.style.filter = p >= 1 ? "" : LIFT.replace(/\(([\d.]+)\)/g, (m, v) => `(${(1 + (parseFloat(v) - 1) * (1 - p)).toFixed(3)})`); });
+            tl.fromTo("#v0glow", { opacity: 0 }, F({ opacity: 1, duration: 0.6, ease: "power2.out" }), Tf + 0.3);
+            tl.fromTo("#v0glow", { opacity: 1 }, F({ opacity: 0, duration: 0.36, ease: "power2.in" }), Tr - 0.38);
+            tl.fromTo(scrim, { opacity: 0 }, F({ opacity: 1, duration: 0.5, ease: "power2.out" }), Tf + 0.1);
+            tl.fromTo(scrim, { opacity: 1 }, F({ opacity: 0, duration: 0.36, ease: "power2.in" }), Tr - 0.38);
+
+            // ---------- type: kicker, then HAITI by masked character rise, then the line
+            Look.enter(tl, kick, Tf + 0.30, { from: "blur", dur: 0.55, blur: 10 });
+            const tHero = Tf + 0.34;
+            Look.reveal(tl, heroIn, tHero, { by: "chars", stagger: 0.04, dur: 0.72 });
+            Look.chroma(tl, heroIn, tHero + 0.22, 0.18, { px: 4 });
+            Look.enter(tl, line, Tf + 0.62, { from: "up", dist: 34, dur: 0.6, blur: 8 });
+            // exit: blur out, last in first out
+            Look.exit(tl, [line, heroWrap, kick], Tr - 0.48, { to: "blur", dur: 0.34, stagger: 0.05, blur: 14 });
+            // build-time state = the state before the freeze (each Look.drive ran fn(0) at build; the reverse ones would win)
+            setHole(0); still.style.filter = "";
+          } else {
+            // ---------- Scan reveal: one blade of light runs down the frozen frame; behind it the world is grey, the sign stays lit
+            const SIGN = V.sign, cut = $("#v1cut"), cutfill = $("#v1cutfill");
+            cut.style.clipPath = `path("${SIGN}")`; cut.style.webkitClipPath = cut.style.clipPath;
+            cutfill.style.clipPath = cut.style.clipPath; cutfill.style.webkitClipPath = cut.style.clipPath;
+            gsap.set("#v1lift", { transformOrigin: `${V.signCentre[0]}px ${V.signCentre[1]}px`, scale: 1 });
+            const scanEl = $("#scan"), y0 = 0, y1 = 1960, H = 1920;
+            const setScan = (y) => {   // above y: grey; below y: still in colour
+              const c = `inset(0px 0px ${Math.max(0, H - y).toFixed(1)}px 0px)`;
+              mono.style.clipPath = c; mono.style.webkitClipPath = c;
+              scanEl.style.height = Math.max(0, y).toFixed(1) + "px";
+            };
+            setScan(y0);
+            const t0 = Tf + 0.08, sd = V.scanDur, Ein = gsap.parseEase("sine.inOut");
+            Look.drive(tl, t0, sd, (p) => setScan(y0 + (y1 - y0) * Ein(p)));
+            tl.fromTo(scanEl, { opacity: 0 }, F({ opacity: 1, duration: 0.06, ease: "none" }), t0);
+            tl.fromTo(scanEl, { opacity: 1 }, F({ opacity: 0, duration: 0.14, ease: "power1.in" }), t0 + sd - 0.12);
+            // the blade leaves the sign's bottom edge at fraction f of the sweep: the sign lifts off the frozen frame right there
+            const f = (1257 - y0) / (y1 - y0);
+            let lo = 0, hi = 1; for (let i = 0; i < 40; i++) { const m = (lo + hi) / 2; if (Ein(m) < f) lo = m; else hi = m; }
+            const tp = t0 + sd * lo;
+            tl.fromTo("#v1lift", { scale: 1 }, F({ scale: V.pop, duration: 0.7, ease: "expo.out" }), tp);
+            tl.fromTo("#v1shadow", { opacity: 0 }, F({ opacity: 1, duration: 0.5, ease: "power2.out" }), tp);
+            // the payoff light: an exposure pulse on the sign alone as it lifts (2-frame hold), settling a touch brighter than the frame
+            Look.drive(tl, tp, 0.5, (p) => {
+              const t = p * 0.5, k = p <= 0 ? 0 : (t < 1 / 30 ? t * 30 : t < 3 / 30 ? 1 : 1 - (t - 3 / 30) / (0.5 - 3 / 30));
+              const b = 1.06 + 0.62 * Math.max(0, Math.min(1, k)) * (p < 1 ? 1 : 0);
+              cut.style.filter = p <= 0 ? "" : `brightness(${b.toFixed(3)}) saturate(1.08)`;
+            });
+            tl.fromTo(scrim, { opacity: 0 }, F({ opacity: 1, duration: 0.5, ease: "power2.out" }), t0 + 0.2);
+
+            // ---------- type, in the open sky between the jet and the sign
+            Look.enter(tl, kick, tp - 0.02, { from: "blur", dur: 0.55, blur: 10 });
+            const tHero = tp + 0.04;
+            Look.reveal(tl, heroIn, tHero, { by: "chars", stagger: 0.03, dur: 0.7 });
+            Look.fill(heroIn, "linear-gradient(100deg, #F84FA4 0%, #FE78A6 24%, #FE8E4E 62%, #FEB747 100%)", { sheen: true });
+            Look.chroma(tl, heroIn, tHero + 0.24, 0.16, { px: 4 });
+            Look.sheen(tl, heroIn, tHero + 0.95, { dur: 1.1 });
+            Look.enter(tl, line, tHero + 0.3, { from: "up", dist: 30, dur: 0.6, blur: 8 });
+
+            // ---------- out: type blurs away, the sign settles back into the frame, the blade runs back up and gives the colour back
+            Look.exit(tl, [line, heroWrap, kick], Tr - 0.64, { to: "blur", dur: 0.34, stagger: 0.05, blur: 14 });
+            tl.fromTo(scrim, { opacity: 1 }, F({ opacity: 0, duration: 0.4, ease: "power2.in" }), Tr - 0.62);
+            tl.fromTo("#v1lift", { scale: V.pop }, F({ scale: 1, duration: 0.38, ease: "power2.inOut" }), Tr - 0.5);
+            tl.fromTo("#v1shadow", { opacity: 1 }, F({ opacity: 0, duration: 0.32, ease: "power2.in" }), Tr - 0.46);
+            Look.drive(tl, Tr - 0.26, 0.26, (p) => { cut.style.filter = p >= 1 ? "" : `brightness(${(1.06 - 0.06 * p).toFixed(3)}) saturate(${(1.08 - 0.08 * p).toFixed(3)})`; });
+            const r0 = Tr - 0.46, Eo = gsap.parseEase("power2.in");
+            Look.drive(tl, r0, 0.46, (p) => setScan(p <= 0 ? y1 : y1 + (y0 - y1) * Eo(p)));
+            tl.fromTo(scanEl, { opacity: 0 }, F({ opacity: 1, duration: 0.06, ease: "none" }), r0);
+            tl.fromTo(scanEl, { opacity: 1 }, F({ opacity: 0, duration: 0.1, ease: "power1.in" }), Tr - 0.1);
+            // build-time state = before the freeze (the reverse drives ran fn(0) last at build)
+            setScan(y0); cut.style.filter = "";
+          }
+
+          Look.install(tl, { duration: D, grain: 0.15, vignette: 0.5, enabled: plate });
+          tl.set({}, {}, D);
+          window.__timelines = window.__timelines || {};
+          window.__timelines["main"] = tl;
+          tl.seek(0);
+        });
+      })();
+    </script>
+  </body>
+</html>

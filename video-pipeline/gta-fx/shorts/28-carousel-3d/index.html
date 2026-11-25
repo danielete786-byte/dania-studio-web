@@ -1,0 +1,578 @@
+<!doctype html>
+<!-- GTA 6 component #28 "Clip carousel" (craft v2). 1080x1920 (9:16), 30 fps, 6.2 s.
+     A top-5 intro built in Three.js. Five vertical clips (9:16 panels, the same shape as the screen) sit in 3D space: on a turning
+     ring (variant 0 "Ring") or in a dealt deck (variant 1 "Stack flip"). "TOP 5" opens the piece; its sunset "5" flies down into the
+     rank lockup for the first clip. The carousel then turns (ring) or flips its top card away (deck) while the camera flies into #4
+     until that panel IS the screen, and the payoff lands on that arrival: a cut to #4's full-bleed footage, a shake + punch-zoom
+     (Look.impact, flash 0) and an exposure hit (Look.expose), while the numeral rolls 5 -> 4 in its own mask.
+     All 3D state is a pure function of the timeline time; fast moves get real 3D motion blur (8 sub-frame renders averaged).
+     Variables: variant "0" Ring / "1" Stack flip; bg "plate" (graded blurred backdrop + grain/vignette/exposure hits) / "none"
+     (transparent around the carousel, no finishing). The clips always show: it is a full-frame component.
+     Safe zone: all type sits inside x 72-936, y 230-1480 (left axis x = 72). -->
+<html lang="en" data-composition-variables='[
+  {"id":"variant","type":"enum","label":"Variant","default":"0","options":[{"value":"0","label":"Ring"},{"value":"1","label":"Stack flip"}]},
+  {"id":"bg","type":"enum","label":"Background","default":"plate","options":[{"value":"plate","label":"Graded backdrop + finishing"},{"value":"none","label":"Transparent around the carousel"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link rel="stylesheet" href="assets/fonts/fonts.css" />
+    <link rel="stylesheet" href="assets/kit/look/look.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+    <script src="assets/kit/look/look.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: transparent; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; font-family: "Inter", sans-serif; color: #fff;
+        -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; }
+      /* panel texture sources: read into WebGL only, never shown directly */
+      #bank { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; opacity: 0; pointer-events: none; }
+      #bank video { position: absolute; left: 0; top: 0; width: 270px; height: 480px; object-fit: cover; }
+      #shake, #push { position: absolute; inset: 0; }
+      .shot { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      #stage { position: absolute; inset: 0; }
+      #gl { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; display: block; }
+
+      #ov { position: absolute; inset: 0; z-index: 10; }
+      .scrim { position: absolute; left: 0; right: 0; pointer-events: none; }
+      #scrimT { top: 0; height: 640px; }
+      #scrimB { bottom: 0; height: 1080px; }
+
+      /* type: one family (Archivo), three sizes per frame: hero (title 190 / numeral 440), name (~74), labels (24) */
+      #kicker { position: absolute; left: 72px; top: 252px; font-size: 24px; color: rgba(255,255,255,.86); white-space: nowrap; }
+      #title { position: absolute; left: 72px; top: 300px; font-size: 190px; font-weight: 900; line-height: .86; white-space: nowrap; }
+      #num { position: absolute; left: 0; top: 0; font-weight: 900; letter-spacing: 0; font-size: 440px; line-height: .86; transform-origin: 0 0; }
+      #numGlow { filter: drop-shadow(0 0 26px rgba(254,142,78,.34)) drop-shadow(0 12px 34px rgba(0,0,0,.5)); }
+      #numIn { position: relative; overflow: hidden; height: .86em; padding: 0 .04em; margin: 0 -.04em; }
+      #numIn .d { display: block; height: .86em; white-space: nowrap; }
+      #numIn .d1 { position: absolute; left: .04em; top: 0; }
+      .name { position: absolute; left: 0; top: 0; }
+      .name .lbl { font-size: 24px; color: rgba(255,255,255,.86); white-space: nowrap; margin-bottom: 18px; }
+      .name .nm { font-size: 74px; font-weight: 800; line-height: .92; white-space: nowrap; }
+      .lift { filter: drop-shadow(0 2px 2px rgba(0,0,0,.3)) drop-shadow(0 8px 26px rgba(0,0,0,.45)); }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6.2" data-width="1080" data-height="1920">
+      <!-- Panel footage (WebGL textures). Each panel plays one or more segments; a segment only changes while its panel is hidden
+           (behind the ring or under the deck) or carried into a new state, and no segment runs past its shot's length.
+           Variant 0 "Ring" -->
+      <div id="bank">
+        <video id="r5"  class="clip" src="assets/shots/s004-palm-shirt-truck-v.mp4" muted playsinline data-start="0"    data-duration="5.0"  data-track-index="0"></video>
+        <video id="r4"  class="clip" src="assets/shots/s011-vice-highway-v.mp4"     muted playsinline data-start="0"    data-duration="3.6"  data-track-index="1"></video>
+        <video id="r3a" class="clip" src="assets/shots/s083-duo-convertible-v.mp4"  muted playsinline data-start="0"    data-duration="1.3"  data-track-index="2"></video>
+        <video id="r3b" class="clip" src="assets/shots/s092-duo-car-v.mp4"          muted playsinline data-start="2.8"  data-duration="1.75" data-track-index="2"></video>
+        <video id="r2"  class="clip" src="assets/shots/s074-keys-sign-v.mp4"        muted playsinline data-start="0"    data-duration="2.2"  data-track-index="3"></video>
+        <video id="r1"  class="clip" src="assets/shots/s007-jason-door-v.mp4"       muted playsinline data-start="0"    data-duration="3.9"  data-track-index="4"></video>
+        <!-- Variant 1 "Stack flip" -->
+        <video id="k5"  class="clip" src="assets/shots/s012-muscle-beach-v.mp4"     muted playsinline data-start="0"    data-duration="3.1"  data-track-index="5"></video>
+        <video id="k4a" class="clip" src="assets/shots/s096-police-street-v.mp4"    muted playsinline data-start="0.4"  data-duration="0.45" data-media-start="1.3" data-track-index="6"></video>
+        <video id="k4b" class="clip" src="assets/shots/s057-ocean-drive-v.mp4"      muted playsinline data-start="2.8"  data-duration="0.8"  data-track-index="6"></video>
+        <video id="k3"  class="clip" src="assets/shots/s039-blue-club-v.mp4"        muted playsinline data-start="0.15" data-duration="3.3"  data-track-index="7"></video>
+        <video id="k2"  class="clip" src="assets/shots/s018-lucia-gate-v.mp4"       muted playsinline data-start="0"    data-duration="2.95" data-track-index="8"></video>
+        <video id="k1"  class="clip" src="assets/shots/s076-jason-boat-v.mp4"       muted playsinline data-start="0"    data-duration="2.85" data-track-index="9"></video>
+      </div>
+
+      <div id="shake"><div id="push">
+        <!-- #4's full-bleed footage after the payoff (cut on the arrival, then one more cut on rhythm). 1.0x, never past a shot's end. -->
+        <video id="f0a" class="clip shot" src="assets/shots/s135-skydive-city-v.mp4" muted playsinline data-start="3.6"    data-duration="1.6333" data-track-index="10"></video>
+        <video id="f0b" class="clip shot" src="assets/shots/s064-jetski-v.mp4"       muted playsinline data-start="5.2333" data-duration="0.9667" data-track-index="10"></video>
+        <video id="f1a" class="clip shot" src="assets/shots/s096-police-street-v.mp4" muted playsinline data-start="3.6"   data-duration="1.2667" data-media-start="0.5" data-track-index="11"></video>
+        <video id="f1b" class="clip shot" src="assets/shots/s083-duo-convertible-v.mp4" muted playsinline data-start="4.8667" data-duration="1.3333" data-track-index="11"></video>
+        <div id="stage" class="clip" data-start="0" data-duration="3.6" data-track-index="12">
+          <canvas id="gl" width="1080" height="1920" data-layout-allow-overflow></canvas>
+        </div>
+      </div></div>
+
+      <div id="ov" class="clip" data-start="0" data-duration="6.2" data-track-index="13">
+        <div class="scrim lk-scrim-top" id="scrimT" data-layout-allow-occlusion></div>
+        <div class="scrim lk-scrim-bottom" id="scrimB" data-layout-allow-occlusion></div>
+        <div id="kicker" class="t-label-wide"></div>
+        <div id="title" class="t-wide lift" data-layout-allow-occlusion data-layout-allow-overflow><span id="titleWord" data-layout-allow-occlusion></span></div>
+        <div class="name lift" id="name0" data-layout-allow-overlap data-layout-allow-occlusion data-layout-allow-overflow><div class="lbl t-label-wide" data-layout-allow-occlusion data-layout-allow-overflow></div><div class="nm t-wide nm1" data-layout-allow-occlusion data-layout-allow-overflow></div><div class="nm t-wide nm2" data-layout-allow-occlusion data-layout-allow-overflow></div></div>
+        <div class="name lift" id="name1" data-layout-allow-overlap data-layout-allow-occlusion data-layout-allow-overflow><div class="lbl t-label-wide" data-layout-allow-occlusion data-layout-allow-overflow></div><div class="nm t-wide nm1" data-layout-allow-occlusion data-layout-allow-overflow></div><div class="nm t-wide nm2" data-layout-allow-occlusion data-layout-allow-overflow></div></div>
+        <div id="num" class="t-wide" data-layout-allow-occlusion data-layout-allow-overflow><div id="numGlow"><div id="numIn" data-layout-allow-overflow><span class="d d0" data-layout-allow-occlusion></span><span class="d d1" data-layout-allow-occlusion></span></div></div></div>
+      </div>
+    </div>
+
+    <script>
+      const CONFIG = {
+        duration: 6.2,
+        variants: {
+          // "Ring": five 9:16 clips on a turning ring. Lands on #5, then turns one step and flies into #4.
+          "0": {
+            mode: "ring",
+            kicker: "GTA 6 · Trailer moments",
+            title: "Top",                 // the hero reads "TOP 5": the count numeral is items[0].rank
+            items: [
+              // panels[k] = the clip segments that panel shows: { id: <video id in #bank>, src, at: data-start, from: data-media-start }.
+              { rank: 5, name: ["Leonida", "Man"], label: "Florida Man energy", panel: [{ id: "r5", src: "assets/shots/s004-palm-shirt-truck-v.mp4", at: 0, from: 0 }] },
+              { rank: 4, name: ["Vice", "City"], label: "From sky to sea", panel: [{ id: "r4", src: "assets/shots/s011-vice-highway-v.mp4", at: 0, from: 0 }],
+                // the payoff: full-bleed shots after the camera arrives (in #push). They must match the f0* videos.
+                full: [{ id: "f0a", src: "assets/shots/s135-skydive-city-v.mp4", at: 3.6 }, { id: "f0b", src: "assets/shots/s064-jetski-v.mp4", at: 5.2333 }] },
+              { rank: 3, name: ["Jason", "& Lucia"], label: "", panel: [{ id: "r3a", src: "assets/shots/s083-duo-convertible-v.mp4", at: 0, from: 0 }, { id: "r3b", src: "assets/shots/s092-duo-car-v.mp4", at: 2.8, from: 0 }] },
+              { rank: 2, name: ["The", "Keys"], label: "", panel: [{ id: "r2", src: "assets/shots/s074-keys-sign-v.mp4", at: 0, from: 0 }] },
+              { rank: 1, name: ["Jason", "Duval"], label: "", panel: [{ id: "r1", src: "assets/shots/s007-jason-door-v.mp4", at: 0, from: 0 }] }
+            ]
+          },
+          // "Stack flip": five clips tossed onto a loose deck (#1 first, #5 on top). The top card flips up and away; the camera flies into #4.
+          "1": {
+            mode: "stack",
+            kicker: "GTA 6 · Vice City moments",
+            title: "Top",
+            items: [
+              { rank: 5, name: ["Muscle", "Beach"], label: "Beach gym energy", panel: [{ id: "k5", src: "assets/shots/s012-muscle-beach-v.mp4", at: 0, from: 0 }] },
+              { rank: 4, name: ["Ocean", "Drive"], label: "Vice City streets",
+                panel: [{ id: "k4a", src: "assets/shots/s096-police-street-v.mp4", at: 0.4, from: 1.3 }, { id: "k4b", src: "assets/shots/s057-ocean-drive-v.mp4", at: 2.8, from: 0 }],
+                full: [{ id: "f1a", src: "assets/shots/s096-police-street-v.mp4", at: 3.6, from: 0.5 }, { id: "f1b", src: "assets/shots/s083-duo-convertible-v.mp4", at: 4.8667 }] },
+              { rank: 3, name: ["Club", "Night"], label: "", panel: [{ id: "k3", src: "assets/shots/s039-blue-club-v.mp4", at: 0.15, from: 0 }] },
+              { rank: 2, name: ["Lucia", "Caminos"], label: "", panel: [{ id: "k2", src: "assets/shots/s018-lucia-gate-v.mp4", at: 0, from: 0 }] },
+              { rank: 1, name: ["Jason", "Duval"], label: "", panel: [{ id: "k1", src: "assets/shots/s076-jason-boat-v.mp4", at: 0, from: 0 }] }
+            ]
+          }
+        },
+        // seconds. land = the carousel settles on #5; travel = "5" flies from the title into the lockup; out0 = #5's name leaves;
+        // turn = ring turn / deck flip starts; push = camera starts flying into #4; hit = arrival + payoff (a cut to #4's full-bleed shot);
+        // roll = numeral 5 -> 4 (lands on the hit); name1 = #4's name; cut2 = the next cut on rhythm; exit = type blurs out.
+        timing: {
+          "0": { title: 0.10, kick: 0.30, land: 1.05, travel: 1.0, travelDur: 0.62, name0: 1.26, out0: 2.80, turn: 2.92, push: 3.0, hit: 3.6, roll: 3.30, name1: 3.64, cut2: 5.2333, exit: 5.55 },
+          "1": { title: 0.10, kick: 0.30, deal: 0.0, dealGap: 0.15, dealDur: 0.45, land: 1.05, travel: 1.0, travelDur: 0.62, name0: 1.26, out0: 2.80, turn: 2.92, push: 3.02, hit: 3.6, roll: 3.30, name1: 3.64, cut2: 4.8667, exit: 5.55 }
+        },
+        look: {
+          sideLit: 0.62,          // Ring: brightness of the panels that are not in front
+          lipLit: 0.55,           // Stack: brightness of the cards under the top card (their edges show around it)
+          backdrop: 1.0,          // bg "plate": brightness of the blurred copy of the front clip behind the carousel
+          numGrad: "linear-gradient(170deg, #F84FA4 0%, #FE78A6 30%, #FE8E4E 66%, #FEB747 100%)"   // the one accent: Leonida sunset
+        }
+      };
+
+      (function () {
+        const VARS = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+        const vKey = CONFIG.variants[String(VARS.variant)] ? String(VARS.variant) : "0";
+        const plate = VARS.bg !== "none";
+        const V = CONFIG.variants[vKey], T = CONFIG.timing[vKey], L = CONFIG.look, D = CONFIG.duration;
+        const RING = V.mode === "ring";
+        const $ = (s) => document.querySelector(s);
+
+        // ---------- footage: keep this variant's videos, hide the other variant's ----------
+        const used = new Set();
+        V.items.forEach((it) => { it.panel.forEach((s) => used.add(s.id)); (it.full || []).forEach((s) => used.add(s.id)); });
+        document.querySelectorAll("#bank video, #push video").forEach((v) => { if (!used.has(v.id)) v.style.display = "none"; });
+        const segs = V.items.map((it) => it.panel.map((s) => ({ v: document.getElementById(s.id), at: s.at })));
+
+        // ---------- text ----------
+        $("#kicker").textContent = V.kicker;
+        $("#titleWord").textContent = V.title;
+        $("#numIn .d0").textContent = String(V.items[0].rank);
+        $("#numIn .d1").textContent = String(V.items[1].rank);
+        ["#name0", "#name1"].forEach((sel, i) => {
+          const it = V.items[i];
+          $(sel + " .lbl").textContent = it.label;
+          $(sel + " .nm1").textContent = it.name[0];
+          $(sel + " .nm2").textContent = it.name[1];
+        });
+
+        // ---------- pure easing helpers (all 3D state is f(t): seek-safe) ----------
+        const E = { p3out: gsap.parseEase("power3.out"), p3io: gsap.parseEase("power3.inOut"), p2io: gsap.parseEase("power2.inOut"),
+          p2in: gsap.parseEase("power2.in"), p3in: gsap.parseEase("power3.in"), expoOut: gsap.parseEase("expo.out"), lin: (x) => x };
+        const clamp01 = (x) => Math.max(0, Math.min(1, x));
+        const seg = (t, t0, d, ease) => (ease || E.lin)(clamp01((t - t0) / d));
+        const lerp = (a, b, u) => a + (b - a) * u;
+        const smooth = (a, b, x) => { const u = clamp01((x - a) / (b - a)); return u * u * (3 - 2 * u); };
+
+        // ---------- Three.js ----------
+        const PW = 9, PH = 16;                                   // a panel is 9:16, the screen's own shape
+        const FOV = 34, TAN = Math.tan(THREE.MathUtils.degToRad(FOV / 2));
+        const D_FULL = (PH / 2) / TAN;                           // camera distance at which a panel fills the frame exactly
+        const INTRO_PX = 900, HOLD_PX = 1240;                    // front panel height on screen: under the title (y ≈ 510-1410), then
+        const D_INTRO = D_FULL * 1920 / INTRO_PX;                // once the title has gone the camera moves in (y ≈ 340-1580, x ≈ 191-889)
+        const D_HOLD = D_FULL * 1920 / HOLD_PX;
+        const R = 8.0;                                           // ring radius
+        const GAP = 1.2;                                         // deck: depth between cards
+        // a loose deck: each card under the top one sits a little rotated and offset, so its edges show around the top card
+        const SLOT = [{ x: 0, y: 0, rz: 0 }, { x: -0.38, y: 0.30, rz: -3.4 }, { x: 0.34, y: 0.55, rz: 2.8 }, { x: -0.52, y: 0.75, rz: -4.8 }, { x: 0.48, y: 0.95, rz: 4.0 }];
+        const SHUTTER = 0.5 / 30;                                // 180° shutter for the 3D motion blur
+
+        const canvas = document.getElementById("gl");
+        const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: false, preserveDrawingBuffer: true, premultipliedAlpha: true });
+        renderer.setPixelRatio(1);
+        renderer.setSize(1080, 1920, false);
+        renderer.outputColorSpace = THREE.LinearSRGBColorSpace;   // footage passes through untouched
+        renderer.autoClear = false;
+        const rtOpts = { type: THREE.HalfFloatType, depthBuffer: true };
+        const rtSub = new THREE.WebGLRenderTarget(1080, 1920, Object.assign({ samples: 4 }, rtOpts));
+        const rtAcc = new THREE.WebGLRenderTarget(1080, 1920, { type: THREE.HalfFloatType, depthBuffer: false });
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(FOV, 1080 / 1920, 0.5, 600);
+        const ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+        const quadGeo = new THREE.PlaneGeometry(2, 2);
+        const QVS = `varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`;
+
+        // panel textures: each clip is drawn into a fixed-size canvas (no GPU size changes). #4 flies to full screen: full 1080x1920.
+        const stageC = V.items.map((it, k) => { const c = document.createElement("canvas"); c.width = k === 1 ? 1080 : 540; c.height = k === 1 ? 1920 : 960; return c; });
+        const tex = stageC.map((c) => { const t = new THREE.Texture(c); t.colorSpace = THREE.NoColorSpace; t.minFilter = THREE.LinearMipmapLinearFilter;
+          t.magFilter = THREE.LinearFilter; t.generateMipmaps = true; t.anisotropy = 4; return t; });
+        const hasImg = V.items.map(() => false);
+        const lastKey = V.items.map(() => null);
+
+        const SDF = `float sdBox(vec2 p, vec2 b, float r) { vec2 q = abs(p) - b + r; return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r; }`;
+        const VS = `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+        // a clip panel: square-cornered (3-unit radius only for clean edges), 1 px light rim with a lit top edge, a dark ink back
+        const cardFS = SDF + `
+          uniform sampler2D uMap; uniform float uHas, uLit, uSat, uBias, uRim, uAlpha; uniform vec2 uSize;
+          varying vec2 vUv;
+          void main() {
+            vec2 c = vUv * uSize - uSize * 0.5;
+            float d = sdBox(c, uSize * 0.5, 3.0);
+            float fw = max(fwidth(d), 0.4);
+            float mask = 1.0 - smoothstep(-fw, fw, d);
+            if (mask < 0.003) discard;
+            vec3 col;
+            if (gl_FrontFacing) {
+              vec3 v = uHas > 0.5 ? texture2D(uMap, vUv, uBias).rgb : vec3(0.05, 0.05, 0.06);
+              float g = dot(v, vec3(0.299, 0.587, 0.114));
+              col = mix(vec3(g), v, uSat) * uLit;
+            } else {
+              col = mix(vec3(0.075, 0.078, 0.105), vec3(0.15, 0.155, 0.2), smoothstep(0.0, 1.0, vUv.y));   // ink card back
+            }
+            float rw = max(fwidth(d), 0.8);
+            float rim = 1.0 - smoothstep(0.0, 1.3 * rw, abs(d + 0.9 * rw));
+            col = mix(col, vec3(1.0), rim * uRim * (0.55 + 0.45 * smoothstep(0.55, 1.0, vUv.y)));
+            gl_FragColor = vec4(col, mask * uAlpha);
+          }`;
+        // soft contact shadow behind each panel
+        const shadowFS = SDF + `
+          uniform float uAlpha; uniform vec2 uSize; uniform vec2 uCard;
+          varying vec2 vUv;
+          void main() {
+            vec2 c = vUv * uSize - uSize * 0.5;
+            float soft = sdBox(c - vec2(0.0, -40.0), uCard * 0.5, 40.0);
+            float tight = sdBox(c - vec2(0.0, -6.0), uCard * 0.5, 6.0);
+            float a = 0.5 * (1.0 - smoothstep(-60.0, 140.0, soft)) + 0.35 * (1.0 - smoothstep(-4.0, 14.0, tight));
+            gl_FragColor = vec4(0.0, 0.0, 0.0, clamp(a, 0.0, 1.0) * uAlpha);
+          }`;
+
+        const CARD = new THREE.Vector2(900, 1600);
+        const cards = V.items.map((it, k) => {
+          const pivot = new THREE.Group();                  // used by the deck flip (hinge on the top edge); identity otherwise
+          const group = new THREE.Group();
+          const mat = new THREE.ShaderMaterial({ vertexShader: VS, fragmentShader: cardFS, transparent: true, side: THREE.DoubleSide, depthWrite: true,
+            uniforms: { uMap: { value: tex[k] }, uHas: { value: 0 }, uLit: { value: 1 }, uSat: { value: 1 }, uBias: { value: 0 }, uRim: { value: 0.2 },
+              uAlpha: { value: 1 }, uSize: { value: CARD } } });
+          const mesh = new THREE.Mesh(new THREE.PlaneGeometry(PW, PH), mat);
+          const pad = 3.0;
+          const smat = new THREE.ShaderMaterial({ vertexShader: VS, fragmentShader: shadowFS, transparent: true, depthWrite: false,
+            uniforms: { uAlpha: { value: 0.6 }, uSize: { value: new THREE.Vector2(CARD.x * (PW + 2 * pad) / PW, CARD.y * (PH + 2 * pad) / PH) }, uCard: { value: CARD } } });
+          const shadow = new THREE.Mesh(new THREE.PlaneGeometry(PW + 2 * pad, PH + 2 * pad), smat);
+          shadow.position.z = -0.12; shadow.renderOrder = -1;
+          group.add(shadow); group.add(mesh); pivot.add(group); scene.add(pivot);
+          return { pivot, group, mesh, mat, shadow, smat };
+        });
+
+        // backdrop (bg "plate"): the front clip itself, full frame (same 9:16 shape), heavily blurred and graded, so the carousel
+        // sits inside its own light instead of a dark void. Darker in the title band and under the lockup.
+        const bgMat = new THREE.ShaderMaterial({
+          depthWrite: false, depthTest: false,
+          uniforms: { uA: { value: tex[0] }, uB: { value: tex[1] }, uMix: { value: 0 }, uGain: { value: L.backdrop } },
+          vertexShader: QVS,
+          fragmentShader: `
+            uniform sampler2D uA; uniform sampler2D uB; uniform float uMix, uGain; varying vec2 vUv;
+            vec3 blurT(sampler2D t, vec2 uv) {
+              vec3 acc = vec3(0.0);
+              for (int i = 0; i < 24; i++) {
+                float fi = float(i);
+                float r = sqrt((fi + 0.5) / 24.0) * 0.032;
+                float a = fi * 2.39996;
+                acc += texture2D(t, clamp(uv + vec2(cos(a) * r * 1.777, sin(a) * r), 0.0, 1.0), 3.3).rgb;
+              }
+              return acc / 24.0;
+            }
+            void main() {
+              vec2 uv = 0.5 + (vUv - 0.5) / 1.14;
+              vec3 c = mix(blurT(uA, uv), blurT(uB, uv), uMix);
+              float avg = dot(mix(texture2D(uA, vec2(0.5), 12.0).rgb, texture2D(uB, vec2(0.5), 12.0).rgb, uMix), vec3(0.299, 0.587, 0.114));
+              c *= clamp(0.34 / max(avg, 0.03), 0.7, 1.7);                  // exposure-matched: a night clip still gives a lit field
+              float g = dot(c, vec3(0.299, 0.587, 0.114));
+              c = max(mix(vec3(g), c, 1.3), 0.0);
+              c = max((c - 0.30) * 1.18 + 0.30, 0.0) * uGain;                  // a little contrast back after the blur
+              float y = 1.0 - vUv.y;                                          // 0 = top
+              c *= 1.0 - 0.38 * (1.0 - smoothstep(0.04, 0.28, y));          // title band
+              c *= 1.0 - 0.12 * smoothstep(0.75, 1.0, y);
+              float r = length((vUv - vec2(0.5, 0.52)) * vec2(1.3, 1.0));
+              c *= 1.0 - 0.22 * smoothstep(0.5, 1.05, r);
+              gl_FragColor = vec4(c, 1.0);
+            }`
+        });
+        const bgScene = new THREE.Scene(); bgScene.add(new THREE.Mesh(quadGeo, bgMat));
+
+        // motion-blur accumulation (premultiplied averaging) and the final copy
+        const accMat = new THREE.ShaderMaterial({ depthTest: false, depthWrite: false, transparent: true,
+          blending: THREE.CustomBlending, blendEquation: THREE.AddEquation, blendSrc: THREE.OneFactor, blendDst: THREE.OneFactor,
+          blendSrcAlpha: THREE.OneFactor, blendDstAlpha: THREE.OneFactor,
+          uniforms: { tMap: { value: null }, uW: { value: 1 } }, vertexShader: QVS,
+          fragmentShader: `uniform sampler2D tMap; uniform float uW; varying vec2 vUv; void main() { gl_FragColor = texture2D(tMap, vUv) * uW; }` });
+        const accScene = new THREE.Scene(); accScene.add(new THREE.Mesh(quadGeo, accMat));
+        const copyMat = new THREE.ShaderMaterial({ depthTest: false, depthWrite: false, blending: THREE.NoBlending,
+          uniforms: { tMap: { value: rtAcc.texture } }, vertexShader: QVS,
+          fragmentShader: `uniform sampler2D tMap; varying vec2 vUv; void main() { gl_FragColor = texture2D(tMap, vUv); }` });
+        const copyScene = new THREE.Scene(); copyScene.add(new THREE.Mesh(quadGeo, copyMat));
+
+        // ---------- footage -> textures (render: the frame <img> HyperFrames injects after each <video>; preview: the video) ----------
+        function activeSeg(k, t) { let s = segs[k][0]; segs[k].forEach((sg) => { if (t >= sg.at - 1e-4) s = sg; }); return s; }
+        function syncTextures(t) {
+          V.items.forEach((it, k) => {
+            const sg = activeSeg(k, t), v = sg && sg.v;
+            if (!v) return;
+            const n = v.nextElementSibling;
+            let src = null;
+            if (n && n.tagName === "IMG" && n.classList.contains("__render_frame__") && n.complete && n.naturalWidth > 0) src = n;
+            else if (v.readyState >= 2 && v.videoWidth > 0 && t >= sg.at - 1e-4) src = v;
+            if (!src) return;
+            const key = src.tagName === "IMG" ? v.id + "|" + (src.currentSrc || src.src) : null;
+            if (src.tagName === "VIDEO" || lastKey[k] !== key) {
+              try {
+                stageC[k].getContext("2d").drawImage(src, 0, 0, stageC[k].width, stageC[k].height);
+                lastKey[k] = key; tex[k].needsUpdate = true; hasImg[k] = true;
+              } catch (e) { /* frame not decodable yet: keep the previous one */ }
+            }
+          });
+        }
+
+        // ---------- 3D state as a function of t ----------
+        // Ring: panel k sits at angle a_k = 72k - rot. rot spins in from -216 (three steps, power3.out) to 0 (#5 in front), then
+        // turns +72 (power3.inOut) so #4 comes in from the right. A panel's yaw is a - 33.6°·sin(a): it faces the camera more than a
+        // radial panel would (40° at the side instead of 72°), so the side clips show about 45% of their face, and it is still
+        // continuous all the way round (yaw = ±180 at the back).
+        function ringPose(t, k) {
+          const rot = -216 * (1 - seg(t, 0, T.land, E.p3out)) + 72 * seg(t, T.turn, T.hit - 0.1 - T.turn, E.p3io);
+          let a = 72 * k - rot; a = ((a + 180) % 360 + 360) % 360 - 180;
+          const ar = THREE.MathUtils.degToRad(a);
+          const yaw = ar - THREE.MathUtils.degToRad(33.6) * Math.sin(ar);
+          const front = Math.cos(ar);
+          const f = Math.pow(clamp01((front - 0.72) / 0.28), 1.5);
+          return { pos: [R * Math.sin(ar), 0, R * Math.cos(ar)], rot: [0, yaw, 0], hinge: null, f, lit: lerp(L.sideLit, 1, f), sat: lerp(0.85, 1, f), bias: lerp(0.5, 0, f) };
+        }
+        // Stack: slot s (SLOT, -s·GAP deep). Cards are tossed onto the deck back to front from alternate sides (expo.out), each
+        // spinning in with a roll that settles onto its slot's loose angle. The top card then flips up and away on a hinge at its
+        // top edge while the deck advances one slot (each card squares up as it moves forward) and the camera flies into #4.
+        function slotAt(s) {
+          const i = Math.max(0, Math.min(3, Math.floor(s))), f = clamp01(s - i), a = SLOT[i], b = SLOT[i + 1];
+          return { x: lerp(a.x, b.x, f), y: lerp(a.y, b.y, f), rz: lerp(a.rz, b.rz, f) };
+        }
+        function stackPose(t, k) {
+          const dealAt = T.deal + (4 - k) * T.dealGap;
+          const dIn = seg(t, dealAt, T.dealDur, E.expoOut);
+          const adv = seg(t, T.turn + 0.16, 0.42, E.p3out);
+          let s = k === 0 ? 0 : k - adv;
+          const sl = slotAt(s), side = k % 2 ? -1 : 1;                                  // tossed in from alternate sides
+          const pos = [sl.x + (1 - dIn) * side * 17, sl.y - (1 - dIn) * 3, -s * GAP];
+          const rot = [0, (1 - dIn) * side * -0.25, THREE.MathUtils.degToRad(sl.rz + (1 - dIn) * side * -24)];
+          // lit: a card is bright while it is the top card; once the next card lands on it, it dims to a card edge
+          const coverAt = k === 0 ? 1e9 : T.deal + (4 - (k - 1)) * T.dealGap + T.dealDur * 0.35;
+          let lit = lerp(1, L.lipLit, seg(t, coverAt, 0.22, E.lin));
+          if (k === 1) lit = lerp(lit, 1, seg(t, T.turn + 0.05, 0.3, E.p2io));     // #4 lights up as the flip uncovers it
+          let hinge = null;
+          if (k === 0) {
+            const u = clamp01((t - T.turn) / (T.hit - 0.12 - T.turn));
+            const phi = -Math.PI * 0.95 * E.p2io(u);
+            hinge = { y: PH / 2 + 15 * E.p3in(u), z: 2.5 * Math.sin(Math.PI * u), phi };
+          }
+          return { pos, rot, hinge, f: k === 0 || (k === 1 && t > T.turn) ? 1 : 0, lit, sat: lerp(0.8, 1, lit), bias: 0 };
+        }
+        function camZ(t) {
+          const base = RING ? R : 0;
+          const intro = 1 + (RING ? 0.22 : 0.12) * (1 - seg(t, 0, T.land + 0.25, E.p3out));
+          const moveIn = seg(t, T.travel + 0.05, 0.85, E.p3io);                          // camera moves in as the "5" flies down
+          const drift = 1 - 0.03 * seg(t, T.travel + 0.9, T.turn - T.travel - 0.9, E.lin);  // slow push while #5 holds
+          const hold = lerp(D_INTRO * intro, D_HOLD, moveIn) * drift;
+          const push = seg(t, T.push, T.hit - T.push, (x) => E.p3in(x) * 0.65 + E.p2io(x) * 0.35);
+          return base + lerp(hold, D_FULL, push);
+        }
+
+        const SPEEDY = (t) => (t < T.land + 0.12) || (t > T.turn - 0.02 && t < T.hit + 0.02);
+        function applyState(t) {
+          camera.position.set(0, 0, camZ(t)); camera.lookAt(0, 0, -1000); camera.updateMatrixWorld();
+          const pushU = seg(t, T.push, T.hit - T.push, E.lin);
+          for (let k = 0; k < cards.length; k++) {
+            const c = cards[k], st = RING ? ringPose(t, k) : stackPose(t, k);
+            if (st.hinge) {
+              c.pivot.position.set(st.pos[0], st.pos[1] + st.hinge.y, st.pos[2] + st.hinge.z);
+              c.pivot.rotation.set(st.hinge.phi, 0, 0);
+              c.group.position.set(0, -PH / 2, 0); c.group.rotation.set(st.rot[0], st.rot[1], st.rot[2]);
+            } else {
+              c.pivot.position.set(0, 0, 0); c.pivot.rotation.set(0, 0, 0);
+              c.group.position.set(st.pos[0], st.pos[1], st.pos[2]); c.group.rotation.set(st.rot[0], st.rot[1], st.rot[2]);
+            }
+            const u = c.mat.uniforms;
+            u.uHas.value = hasImg[k] ? 1 : 0;
+            u.uLit.value = st.lit; u.uSat.value = st.sat; u.uBias.value = st.bias;
+            u.uRim.value = 0.22 * (k === 1 ? 1 - pushU : 1);
+            c.smat.uniforms.uAlpha.value = 0.62 * (1 - pushU);
+            c.mesh.renderOrder = 0;
+          }
+        }
+        function renderAt(t) {
+          syncTextures(t);
+          if (plate) {
+            const turnMix = seg(t, T.turn, T.hit - T.turn, E.p2io);
+            bgMat.uniforms.uMix.value = turnMix;
+            bgMat.uniforms.uGain.value = L.backdrop * lerp(0.15, 1, seg(t, 0, 0.6, E.p3out));
+          }
+          const N = SPEEDY(t) ? 8 : 1;
+          renderer.setRenderTarget(rtAcc); renderer.setClearColor(0x000000, 0); renderer.clear();
+          for (let i = 0; i < N; i++) {
+            applyState(N === 1 ? t : Math.max(0, t + (i / (N - 1) - 0.5) * SHUTTER));
+            renderer.setRenderTarget(rtSub); renderer.setClearColor(0x000000, 0); renderer.clear();
+            if (plate) renderer.render(bgScene, ortho);
+            renderer.render(scene, camera);
+            accMat.uniforms.tMap.value = rtSub.texture; accMat.uniforms.uW.value = 1 / N;
+            renderer.setRenderTarget(rtAcc); renderer.render(accScene, ortho);
+          }
+          renderer.setRenderTarget(null); renderer.setClearColor(0x000000, 0); renderer.clear();
+          renderer.render(copyScene, ortho);
+        }
+
+        // ---------- type layout (measured once fonts are ready) ----------
+        const NUM_FS = 440, TITLE_FS = 190, X0 = 72, BASE = 1404;          // lockup baseline y
+        function baselineOf(el) {                                           // y of el's first-line baseline, in page px
+          const m = document.createElement("span"); m.style.cssText = "display:inline-block;width:0;height:0;vertical-align:baseline";
+          el.appendChild(m); const r = m.getBoundingClientRect().top; el.removeChild(m); return r;
+        }
+        const POSE = {};
+        // optical alignment: wide caps and big numerals carry side bearing, so every line's visible INK (not its box) is put on
+        // x = 72. Ink edges are measured with canvas measureText in the same face (Archivo, wdth 125).
+        const mctx = document.createElement("canvas").getContext("2d");
+        function ink(text, weight, size) {
+          mctx.font = weight + " " + size + 'px "Archivo"';
+          try { mctx.fontStretch = "extra-expanded"; } catch (e) { /* older engines: box metrics only */ }
+          const m = mctx.measureText(text);
+          return { l: -m.actualBoundingBoxLeft, r: m.actualBoundingBoxRight, adv: m.width };
+        }
+        function layoutType() {
+          const title = $("#title"), num = $("#num"), word = $("#titleWord");
+          const up = (x) => String(x).toUpperCase();
+          // kicker + title: first glyph's ink on x = 72
+          $("#kicker").style.left = (X0 - ink(up(V.kicker)[0], 600, 24).l) + "px";
+          title.style.left = (X0 - ink(up(V.title)[0], 900, TITLE_FS).l) + "px";
+          // lockup numeral: baseline on BASE, each digit's ink on x = 72 (d1 is shifted by the difference so the roll keeps the edge)
+          const d0 = String(V.items[0].rank), d1 = String(V.items[1].rank);
+          const i0 = ink(d0, 900, NUM_FS), i1 = ink(d1, 900, NUM_FS), PAD = 0.04 * NUM_FS;
+          num.style.left = "0px"; num.style.top = "0px";
+          const nb = baselineOf($("#numIn .d0")) - num.getBoundingClientRect().top;
+          const NX = X0 - i0.l, NY = BASE - nb;                         // #numIn's padding and negative margin cancel: d0's pen origin is NX
+          num.style.left = NX + "px"; num.style.top = NY + "px";
+          $("#numIn .d1").style.left = (PAD + i0.l - i1.l) + "px";
+          // title pose of the numeral: its ink a word space after the ink of "TOP", same baseline, scaled to the title size
+          const s0 = TITLE_FS / NUM_FS;
+          const lastCh = up(V.title).slice(-1), lc = ink(lastCh, 900, TITLE_FS);
+          const tr = word.getBoundingClientRect();
+          const tInkR = tr.right - 0.015 * TITLE_FS - (lc.adv - lc.r);
+          const tx = (tInkR + TITLE_FS * 0.24 - i0.l * s0) - NX;
+          const ty = baselineOf(word) - nb * s0 - NY;
+          POSE.title = { x: tx, y: ty, scale: s0 };
+          // names: a stacked two-line name + label to the right of the numeral, bottom line on the numeral's baseline
+          const numInkW = Math.max(i0.r - i0.l, i1.r - i1.l);
+          const colX = X0 + numInkW + 34;
+          ["#name0", "#name1"].forEach((sel, i) => {
+            const n = $(sel), it = V.items[i]; n.style.left = colX + "px"; n.style.top = "0px";
+            let fs = 74; const lines = Array.from(n.querySelectorAll(".nm"));
+            const inkW = (el) => { const r = document.createRange(); r.selectNodeContents(el); return r.getBoundingClientRect().width; };
+            const fit = () => Math.max(...lines.map(inkW)) <= 936 - colX;
+            while (fs > 58 && !fit()) { fs -= 2; lines.forEach((l) => (l.style.fontSize = fs + "px")); }
+            lines.forEach((l, j) => (l.style.marginLeft = (-ink(up(it.name[j])[0], 800, fs).l) + "px"));
+            if (it.label) n.querySelector(".lbl").style.marginLeft = (-ink(up(it.label)[0], 600, 24).l) + "px";
+            const b2 = baselineOf(n.querySelector(".nm2")) - n.getBoundingClientRect().top;
+            n.style.top = (BASE - b2) + "px";
+          });
+        }
+
+        const fontsReady = Promise.all([document.fonts.load('900 440px "Archivo"'), document.fonts.load('800 74px "Archivo"'), document.fonts.load('600 24px "Archivo"')])
+          .then(() => document.fonts.ready);
+        window.__hf = window.__hf || {}; window.__hf.buildReady = window.__hf.buildReady || {};
+        window.__hf.buildReady["carousel-3d"] = fontsReady;
+
+        fontsReady.then(() => {
+          layoutType();
+          const tl = gsap.timeline({ paused: true });
+
+          // scrims (part of the graphic): top for the title band, bottom for the lockup
+          gsap.set("#scrimT", { opacity: 0.85 }); gsap.set("#scrimB", { opacity: 0 });
+          tl.fromTo("#scrimB", { opacity: 0 }, { opacity: 0.9, duration: 0.6, ease: "power2.out", immediateRender: false }, T.travel);
+
+          // 1. title "TOP 5": masked char rise; the "5" rises in its own mask; the kicker blurs in
+          Look.enter(tl, "#kicker", T.kick, { from: "blur", dur: 0.6, blur: 10 });
+          Look.reveal(tl, "#titleWord", T.title, { by: "chars", stagger: 0.035, dur: 0.7 });
+          gsap.set("#num", { x: POSE.title.x, y: POSE.title.y, scale: POSE.title.scale });
+          gsap.set("#numIn .d0", { yPercent: 105 }); gsap.set("#numIn .d1", { yPercent: 105 });
+          tl.fromTo("#numIn .d0", { yPercent: 105 }, { yPercent: 0, duration: 0.7, ease: "expo.out", immediateRender: false }, T.title + 0.12);
+
+          // 2. "TOP" masks out up; the "5" flies down into the rank lockup (expo.inOut) with a little motion blur
+          const chars = Array.from(document.querySelectorAll("#titleWord .lk-c"));
+          tl.to(chars, { yPercent: -115, duration: 0.42, ease: "power3.in", stagger: 0.03 }, T.travel - 0.05);
+          tl.fromTo("#num", { x: POSE.title.x, y: POSE.title.y, scale: POSE.title.scale }, { x: 0, y: 0, scale: 1, duration: T.travelDur, ease: "expo.inOut", immediateRender: false }, T.travel);
+          Look.drive(tl, T.travel, T.travelDur, (p) => { const b = 7 * Math.sin(Math.PI * p); $("#numIn").style.filter = p > 0 && p < 1 && b > 0.3 ? "blur(" + b.toFixed(2) + "px)" : ""; });
+
+          // 3. #5's name + label
+          Look.enter(tl, "#name0 .lbl", T.name0, { from: "blur", dur: 0.55, blur: 8 });
+          Look.reveal(tl, "#name0 .nm1", T.name0 + 0.04, { by: "chars", stagger: 0.03, dur: 0.6 });
+          Look.reveal(tl, "#name0 .nm2", T.name0 + 0.12, { by: "chars", stagger: 0.03, dur: 0.6 });
+          Look.exit(tl, "#name0", T.out0, { to: "blur", dur: 0.32 });
+
+          // 4. the turn / flip + fly-in (3D), the numeral rolls 5 -> 4 in its own mask and lands on the hit
+          tl.fromTo("#numIn .d0", { yPercent: 0 }, { yPercent: -105, duration: 0.3, ease: "expo.inOut", immediateRender: false }, T.roll);
+          tl.fromTo("#numIn .d1", { yPercent: 105 }, { yPercent: 0, duration: 0.3, ease: "expo.inOut", immediateRender: false }, T.roll);
+          // vertical motion blur on the roll, peaking mid-roll (SVG blur on the y axis only)
+          (function () {
+            const NS = "http://www.w3.org/2000/svg", svg = document.createElementNS(NS, "svg");
+            svg.setAttribute("width", "0"); svg.setAttribute("height", "0"); svg.style.position = "absolute";
+            svg.innerHTML = '<defs><filter id="rollBlur" x="-10%" y="-30%" width="120%" height="160%"><feGaussianBlur stdDeviation="0 0"/></filter></defs>';
+            document.body.appendChild(svg);
+            const g = svg.querySelector("feGaussianBlur");
+            Look.drive(tl, T.roll, 0.3, (p) => {
+              const b = 16 * Math.pow(Math.sin(Math.PI * p), 2);
+              g.setAttribute("stdDeviation", "0 " + b.toFixed(2));
+              $("#numIn").style.filter = p > 0 && p < 1 && b > 0.4 ? "url(#rollBlur)" : "";
+            });
+          })();
+
+          // 5. PAYOFF on the arrival: cut to #4's full-bleed shot, shake + punch-zoom, exposure hit (light from Look.expose), RGB split ≤ 5 px
+          if (plate) {
+            Look.impact(tl, T.hit, { shake: "#shake", amp: 9, flash: 0, zoom: 1.04 });
+            Look.expose(tl, T.hit, { target: "#shake", peak: 1.8, hold: 2 / 30, dur: 0.34 });
+          }
+          Look.chroma(tl, "#numIn", T.hit, 0.16, { px: 5 });
+          Look.enter(tl, "#name1 .lbl", T.name1 + 0.1, { from: "blur", dur: 0.55, blur: 8 });
+          Look.reveal(tl, "#name1 .nm1", T.name1, { by: "chars", stagger: 0.03, dur: 0.6 });
+          Look.reveal(tl, "#name1 .nm2", T.name1 + 0.08, { by: "chars", stagger: 0.03, dur: 0.6 });
+          Look.fill("#numIn", L.numGrad, { sheen: true });
+          Look.sheen(tl, "#numIn", T.hit + 0.42, { dur: 0.9 });
+          if (plate) Look.push(tl, "#push", T.hit, D - T.hit, { from: 1.0, to: 1.06 });
+          if (plate) Look.expose(tl, T.cut2, { target: "#shake", peak: 1.3, dur: 0.25 });
+
+          // 6. exit: the lockup and kicker blur out; the clip plays on to the end
+          Look.exit(tl, ["#name1", "#num", "#kicker"], T.exit, { to: "blur", dur: 0.4, stagger: 0.05 });
+          tl.to(["#scrimB", "#scrimT"], { opacity: 0, duration: 0.45, ease: "power2.inOut" }, T.exit + 0.05);
+
+          // masked type is parked outside its own clip box before/after it reads: tell the layout check that this is deliberate
+          document.querySelectorAll("#title .lk-mask, #title .lk-in, #title .lk-c, .name .lk-mask, .name .lk-in, .name .lk-c")
+            .forEach((n) => { n.setAttribute("data-layout-allow-occlusion", ""); n.setAttribute("data-layout-allow-overflow", ""); });
+
+          // the 3D scene: a proxy whose setter renders the frame for the timeline time
+          const clock = { _t: 0 };
+          Object.defineProperty(clock, "t", { get() { return this._t; }, set(v) { this._t = v; renderAt(v); } });
+          tl.fromTo(clock, { t: 0 }, { t: T.hit, duration: T.hit, ease: "none", immediateRender: true }, 0);
+          window.addEventListener("hf-seek", (e) => { if (e && e.detail && typeof e.detail.time === "number" && e.detail.time <= T.hit + 0.05) renderAt(e.detail.time); });
+
+          Look.install(tl, { duration: D, grain: 0.14, vignette: 0.5, enabled: plate });
+          tl.set({}, {}, D);
+          window.__timelines = window.__timelines || {};
+          window.__timelines["main"] = tl;
+          tl.seek(0);
+          renderAt(0);
+        });
+      })();
+    </script>
+  </body>
+</html>

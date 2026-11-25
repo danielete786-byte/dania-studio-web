@@ -1,0 +1,321 @@
+<!doctype html>
+<!-- GTA 6 component #20 — Spec card (Comparisons), craft v2. 1080x1920 (9:16), 30 fps, 5 s.
+     A spec block for one item in an evolution/detail compilation: a name plus 3 stats with bars.
+     No card: the type frames the subject. Name (or year) across the top of the shot, a numeral-led stat strip
+     across the bottom, the vehicle or the era's place clear in the middle. The Leonida sunset ignites on the payoff.
+     Variables: variant "0" Vehicle (Vice City Police cruiser, rating strip) / "1" Era (2013 GTA V -> 2026 GTA 6 year roll);
+                bg "plate" (sample GTA 6 footage + finishing layer) / "none" (transparent overlay, scrims kept, no finishing).
+     Safe zone: all type sits inside x 72–936, y 230–1480. -->
+<html lang="en" data-composition-variables='[
+  {"id":"variant","type":"enum","label":"Variant","default":"0","options":[{"value":"0","label":"Vehicle"},{"value":"1","label":"Era"}]},
+  {"id":"bg","type":"enum","label":"Background","default":"plate","options":[{"value":"plate","label":"Sample footage"},{"value":"none","label":"Transparent"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link rel="stylesheet" href="assets/fonts/fonts.css" />
+    <link rel="stylesheet" href="assets/kit/look/look.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="assets/kit/look/look.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: transparent; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; font-family: "Inter", sans-serif; color: #fff;
+        -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; }
+      #shake, #push { position: absolute; inset: 0; }
+      .shot { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      #ov { position: absolute; inset: 0; z-index: 10; }
+      .scrim { position: absolute; left: 0; right: 0; pointer-events: none; }
+      #scrimT { top: 0; height: 1000px; background: linear-gradient(180deg, rgba(5,5,9,.80) 0%, rgba(5,5,9,.64) 38%, rgba(5,5,9,.36) 64%, rgba(5,5,9,.12) 84%, rgba(5,5,9,0) 100%) !important; }
+      #scrimB { bottom: 0; height: 1000px; background: linear-gradient(0deg, rgba(5,5,9,.86) 0%, rgba(5,5,9,.72) 40%, rgba(5,5,9,.58) 62%, rgba(5,5,9,.34) 82%, rgba(5,5,9,0) 100%) !important; }
+      .num-tab { font-variant-numeric: tabular-nums lining-nums; font-feature-settings: "tnum" 1, "lnum" 1, "ss01" 1, "cv11" 1; }
+
+      /* ---------- shared blocks ---------- */
+      #top { position: absolute; left: 72px; width: 864px; top: 248px; }
+      #bot { position: absolute; left: 72px; width: 864px; }
+      .kick { color: rgba(255,255,255,.88); white-space: nowrap; }
+      .t-label { font-size: 24px; letter-spacing: .24em; }
+      .bar { position: relative; height: 8px; background: rgba(255,255,255,.2); }
+      .bar i { position: absolute; left: 0; top: 0; height: 8px; display: block; }
+      .bar .fw { width: 0; background: #fff; box-shadow: 0 0 10px rgba(255,255,255,.35); }
+      .bar .fs { width: 0; opacity: 0; box-shadow: 0 0 16px rgba(248,79,164,.6), 0 0 36px rgba(254,142,78,.3); }
+      .bar .gl { left: -70px; top: -12px; width: 140px; height: 32px; opacity: 0;
+        background: radial-gradient(ellipse 50% 50% at 50% 50%, rgba(255,255,255,1) 0%, rgba(255,255,255,.55) 35%, rgba(255,255,255,0) 72%); mix-blend-mode: screen; }
+
+      /* ---------- Vehicle ---------- */
+      .is-vehicle .name { margin-top: 26px; font-weight: 900; color: #fff; }
+      .is-vehicle .nl { display: block; white-space: nowrap; }
+      .is-vehicle .rate { color: rgba(255,255,255,.72); white-space: nowrap; }
+      .is-vehicle .cols { display: flex; gap: 36px; margin-top: 20px; }
+      .is-vehicle .col { flex: 1 1 0; min-width: 0; }
+      .is-vehicle .num { font-size: 104px; line-height: .9; letter-spacing: -0.035em; white-space: nowrap; }
+      .is-vehicle .num .nv { display: inline-block; }
+      .is-vehicle .col .bar { margin-top: 16px; }
+      .is-vehicle .col .lbl { margin-top: 18px; color: rgba(255,255,255,.86); white-space: nowrap; font-size: 22px; letter-spacing: .2em; }
+
+      /* ---------- Era ---------- */
+      .is-era .krow { display: flex; justify-content: space-between; align-items: flex-start; }
+      .roll { display: inline-block; overflow: hidden; vertical-align: top; position: relative; }
+      .roll .strip { display: flex; flex-direction: column; }
+      .roll .cell { display: block; white-space: nowrap; }
+      .roll.right .cell { text-align: right; }
+      .is-era .krow .roll { height: 1.3em; }
+      .is-era .krow .cell { height: 1.3em; line-height: 1.3em; margin-bottom: .2em; }
+      .is-era .year { display: flex; margin-top: 14px; font-size: 300px; }
+      .is-era .year .roll { height: .9em; }
+      .is-era .year .cell { height: .9em; line-height: .9em; margin-bottom: .18em; }
+      .is-era .game { margin-top: 4px; font-size: 84px; font-weight: 800; }
+      .is-era .game .roll { height: 1.08em; }
+      .is-era .game .cell { height: 1.08em; line-height: 1.08em; margin-bottom: .2em; }
+      .is-era .erow + .erow { margin-top: 30px; }
+      .is-era .ehead { display: flex; justify-content: space-between; align-items: flex-end; }
+      .is-era .elbl { color: rgba(255,255,255,.86); white-space: nowrap; padding-bottom: 10px; }
+      .is-era .eval { white-space: nowrap; display: flex; align-items: baseline; gap: 12px; }
+      .is-era .eval .nv { font-size: 84px; line-height: .9; letter-spacing: -0.035em; display: inline-block; text-align: right; }
+      .is-era .eval .unit { color: rgba(255,255,255,.72); }
+      .is-era .erow .bar { margin-top: 12px; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="5" data-width="1080" data-height="1920">
+      <div id="shake"><div id="push">
+        <!-- Vehicle: POV drive-by past the Vice City Police cruiser (4K re-crop following it, 1.0x) -> cut on the cruiser's nose
+             drifting into the daylight shot (the payoff) -> Ocean Drive as the clean out-shot (the type exits on that cut) -->
+        <video id="v0a" class="clip shot" data-variant="0" src="assets/clips/s014-follow-v.mp4" muted playsinline data-start="0" data-duration="3.2333" data-media-start="0" data-track-index="0"></video>
+        <video id="v0b" class="clip shot" data-variant="0" src="assets/shots/s096-police-street-v.mp4" muted playsinline data-start="3.2333" data-duration="0.9333" data-media-start="0.8333" data-track-index="0"></video>
+        <video id="v0c" class="clip shot" data-variant="0" src="assets/shots/s057-ocean-drive-v.mp4" muted playsinline data-start="4.1667" data-duration="0.8333" data-media-start="0" data-track-index="0"></video>
+        <!-- Era: GTA V Vinewood (2013) -> hard cut to the Vice City highway (2026, the payoff) -> skydive over Vice City -> jetski out-shot -->
+        <video id="v1a" class="clip shot" data-variant="1" src="assets/shots/g39-gta5-vinewood-v.mp4" muted playsinline data-start="0" data-duration="1.0667" data-media-start="0" data-track-index="1"></video>
+        <video id="v1b" class="clip shot" data-variant="1" src="assets/shots/s011-vice-highway-v.mp4" muted playsinline data-start="1.0667" data-duration="1.9" data-media-start="0" data-track-index="1"></video>
+        <video id="v1c" class="clip shot" data-variant="1" src="assets/shots/s135-skydive-city-v.mp4" muted playsinline data-start="2.9667" data-duration="1.3833" data-media-start="0.25" data-track-index="1"></video>
+        <video id="v1d" class="clip shot" data-variant="1" src="assets/shots/s064-jetski-v.mp4" muted playsinline data-start="4.35" data-duration="0.65" data-media-start="0" data-track-index="1"></video>
+      </div></div>
+      <div id="ov" class="clip" data-start="0" data-duration="5" data-track-index="2">
+        <div class="scrim lk-scrim-top" id="scrimT"></div>
+        <div class="scrim lk-scrim-bottom" id="scrimB"></div>
+        <div id="top"></div>
+        <div id="bot"></div>
+      </div>
+    </div>
+    <script>
+      // ============================== CONFIG (all content + timing) ==============================
+      const CONFIG = {
+        duration: 5.0,
+        sunset: "linear-gradient(90deg, #F84FA4 0%, #FE78A6 24%, #FE8E4E 62%, #FEB747 100%)",
+        variants: {
+          // Vehicle: the name across the top, a 3-column rating strip across the bottom, the vehicle clear in the middle.
+          // Scores are the creator's own ratings (the strip says "Our rating"): swap in yours. Only put it over the vehicle it names.
+          "0": {
+            style: "vehicle",
+            kicker: "Vice City Police Dept.",        // read off the cruiser's livery in the official trailers
+            name: ["Police", "Cruiser"],             // one entry per line (1–2 lines); set in wide caps
+            nameSize: 150,                           // px; shrinks only if a line would overflow the safe width (floor 120)
+            rateLabel: "Our rating · out of 10",
+            max: 10, decimals: 1,
+            stats: [                                 // creator fill: exactly 3
+              { label: "Top speed",    value: 8.6 },
+              { label: "Acceleration", value: 7.9 },
+              { label: "Braking",      value: 6.8 }
+            ],
+            // seconds. payoff = the cut to the hero shot, as the vehicle drifts in (expose + shake + the bars ignite in sunset);
+            // out = the type blurs off just before the out-shot cut, so the name never labels another vehicle
+            timing: { kickIn: 0.12, nameIn: 0.20, nameLine: 0.12, rateIn: 0.86, statsIn: 0.94, statStagger: 0.09, statDur: 0.85,
+                      cuts: [3.2333, 4.1667], payoff: 3.2333, out: 3.92, outDur: 0.28 },
+            pushes: [[0, 3.2333, 1.0, 1.05], [3.2333, 4.1667, 1.02, 1.06], [4.1667, 5.0, 1.0, 1.03]]   // [start, end, scaleFrom, scaleTo] per shot
+          },
+          // Era: opens on the previous era (2013 · GTA V · Los Santos over GTA V footage); the year, game, era count and
+          // setting roll to the new era (2026 · GTA 6 · Leonida · Vice City) and land on the cut to GTA 6 footage.
+          // Stats are a series timeline every era card can carry, from the release years in research/gta6/FACTS.md.
+          // Keep max at 29 (the 1997–2026 span) on every era card so the bars compare across a compilation.
+          "1": {
+            style: "era",
+            kickerFrom: "Era 07 / 08",       kicker: "Era 08 / 08",
+            placeFrom: "Los Santos",          place: "Leonida · Vice City",
+            yearFrom: "2013",                 year: "2026",          // same digit count; every column rolls and lands in sunset
+            gameFrom: "GTA V",                game: "GTA 6",
+            max: 29, unit: "yrs",
+            stats: [                                                   // creator fill: exactly 3 (years since ...)
+              { label: "Since GTA V",         value: 13 },             // 2013 -> 2026
+              { label: "Since GTA Vice City", value: 24 },             // 2002 -> 2026
+              { label: "Since the first GTA", value: 29 }              // 1997 -> 2026
+            ],
+            timing: { kickIn: 0.06, yearIn: 0.08, yearStagger: 0.035, gameIn: 0.20, roll: 0.78, rollDur: 0.42,
+                      cuts: [1.0667, 2.9667, 4.35], payoff: 1.0667, statsIn: 1.30, statStagger: 0.10, statDur: 0.80, sheen: 2.9667,
+                      out: 4.40, outDur: 0.34 },
+            pushes: [[0, 1.0667, 1.0, 1.035], [1.0667, 2.9667, 1.0, 1.04], [2.9667, 4.35, 1.0, 1.04], [4.35, 5.0, 1.0, 1.03]]
+          }
+        }
+      };
+
+      // ============================== build ==============================
+      (function () {
+        const VARS = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+        const vKey = CONFIG.variants[String(VARS.variant)] ? String(VARS.variant) : "0";
+        const V = CONFIG.variants[vKey], T = V.timing, D = CONFIG.duration;
+        const plate = VARS.bg !== "none";
+        const $ = (s) => document.querySelector(s);
+        const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+        document.querySelectorAll("video.shot").forEach((v) => { if (!plate || v.dataset.variant !== vKey) v.style.display = "none"; });
+        $("#root").classList.add(V.style === "era" ? "is-era" : "is-vehicle");
+        const top = $("#top"), bot = $("#bot");
+
+        function roll(oldText, newText, cls) {
+          const m = el("span", "roll" + (cls ? " " + cls : "")), s = el("span", "strip");
+          s.append(el("span", "cell old", oldText), el("span", "cell new", newText)); m.append(s); return m;
+        }
+
+        // ---------- DOM ----------
+        const parts = { cols: [] };
+        if (V.style === "vehicle") {
+          parts.kick = el("div", "kick t-label-wide", V.kicker); top.append(parts.kick);
+          parts.name = el("div", "name t-wide"); parts.lines = V.name.map((t, i) => { const l = el("div", "nl", t); l.id = "nl" + i; parts.name.append(l); return l; });
+          top.append(parts.name);
+          parts.rate = el("div", "rate t-label", V.rateLabel); bot.append(parts.rate);
+          const cols = el("div", "cols");
+          V.stats.forEach((s) => {
+            const c = el("div", "col"), num = el("div", "num t-display num-tab"), nv = el("span", "nv", (0).toFixed(V.decimals));
+            num.append(nv);
+            const bar = el("div", "bar"), fw = el("i", "fw"), fs = el("i", "fs"), gl = el("i", "gl"); bar.append(fw, fs, gl);
+            const lbl = el("div", "lbl t-label", s.label);
+            c.append(num, bar, lbl); cols.append(c); parts.cols.push({ c, num, nv, bar, fw, fs, gl, lbl, s });
+          });
+          bot.append(cols);
+          bot.style.bottom = (1920 - 1452) + "px";
+        } else {
+          parts.krow = el("div", "krow t-label-wide");
+          parts.kL = roll(V.kickerFrom, V.kicker); parts.kR = roll(V.placeFrom, V.place, "right");
+          parts.krow.append(parts.kL, parts.kR); top.append(parts.krow);
+          parts.year = el("div", "year t-display num-tab"); parts.digits = [];
+          for (let i = 0; i < V.year.length; i++) { const r = roll(V.yearFrom[i] || "", V.year[i]); parts.year.append(r); parts.digits.push(r); }
+          top.append(parts.year);
+          parts.game = el("div", "game t-wide"); parts.gameRoll = roll(V.gameFrom, V.game); parts.game.append(parts.gameRoll); top.append(parts.game);
+          V.stats.forEach((s) => {
+            const row = el("div", "erow"), head = el("div", "ehead"), lbl = el("div", "elbl t-label", s.label);
+            const val = el("div", "eval"), nv = el("span", "nv t-display num-tab", "0"), unit = el("span", "unit t-label", V.unit);
+            val.append(nv, unit); head.append(lbl, val);
+            const bar = el("div", "bar"), fw = el("i", "fw"), fs = el("i", "fs"), gl = el("i", "gl"); bar.append(fw, fs, gl);
+            row.append(head, bar); bot.append(row); parts.cols.push({ c: row, nv, unit, bar, fw, fs, gl, lbl, s });
+          });
+          bot.style.bottom = (1920 - 1460) + "px";
+        }
+
+        document.fonts.ready.then(() => {
+          const tl = gsap.timeline({ paused: true });
+
+          // ---------- fit + optical alignment ----------
+          if (V.style === "vehicle") {
+            let size = V.nameSize; parts.name.style.fontSize = size + "px";
+            const widest = () => Math.max.apply(null, parts.lines.map((l) => l.scrollWidth));
+            while (widest() > 852 && size > 120) { size -= 2; parts.name.style.fontSize = size + "px"; }
+            parts.name.style.marginLeft = (-0.055 * size) + "px";           // wide-cap side bearing: ink edge on x 72
+          } else {
+            parts.year.style.marginLeft = "-14px";                          // Inter "2" side bearing at 300 px
+            parts.game.style.marginLeft = (-0.05 * 84) + "px";
+            // the rolling year's new digits carry one continuous sunset sweep (+ a sheen layer for the hold beat)
+            const yr = parts.year.getBoundingClientRect(), W = yr.width;
+            parts.digits.forEach((r) => {
+              const n = r.querySelector(".cell.new"), H = n.offsetHeight, x = n.getBoundingClientRect().left - yr.left;
+              const SH = "linear-gradient(105deg, rgba(255,255,255,0) 38%, rgba(255,255,255,.92) 50%, rgba(255,255,255,0) 62%)";
+              Object.assign(n.style, { backgroundImage: SH + ", " + CONFIG.sunset, backgroundRepeat: "no-repeat",
+                backgroundSize: (W * 3) + "px " + H + "px, " + W + "px " + H + "px", backgroundPosition: (W * 1.6) + "px 0px, " + (-x) + "px 0px",
+                webkitBackgroundClip: "text", backgroundClip: "text", color: "transparent", webkitTextFillColor: "transparent" });
+              n.__lk = { x: -x, y: 0, W: W, H: H, sheen: true };
+            });
+          }
+
+          // ---------- footage: pushes per shot ----------
+          if (plate) V.pushes.forEach((p, i) => {
+            if (i === 0) gsap.set("#push", { scale: p[2], transformOrigin: "50% 45%" });
+            tl.fromTo("#push", { scale: p[2] }, { scale: p[3], duration: p[1] - p[0], ease: "none", immediateRender: false }, p[0]);
+          });
+
+          // scrims: part of the graphic (kept for bg:none so the overlay stays legible on any clip)
+          gsap.set(["#scrimT", "#scrimB"], { opacity: 0 });
+          tl.fromTo("#scrimT", { opacity: 0 }, { opacity: 1, duration: 0.45, ease: "power2.out", immediateRender: false }, 0);
+
+          // bar fill helper (white fill + sunset layer sized to the full track so high values reach amber)
+          function fillBar(p, at, dur) {
+            const bw = p.bar.offsetWidth, w = bw * Math.min(1, p.s.value / V.max);
+            p.fs.style.backgroundImage = CONFIG.sunset; p.fs.style.backgroundSize = bw + "px 8px"; p.fs.style.backgroundRepeat = "no-repeat";
+            gsap.set([p.fw, p.fs], { width: 0 });
+            tl.fromTo([p.fw, p.fs], { width: 0 }, { width: w, duration: dur, ease: "expo.out", immediateRender: false }, at);
+            p.w = w;
+          }
+          function ignite(p, at) {   // payoff: sunset takes the bar, a glint runs to its head
+            tl.fromTo(p.fs, { opacity: 0 }, { opacity: 1, duration: 0.14, ease: "power2.out", immediateRender: false }, at);
+            gsap.set(p.gl, { x: 0, opacity: 0 });
+            tl.fromTo(p.gl, { x: 0 }, { x: p.w, duration: 0.5, ease: "power2.inOut", immediateRender: false }, at);
+            tl.fromTo(p.gl, { opacity: 0 }, { opacity: 1, duration: 0.08, ease: "none", immediateRender: false }, at);
+            tl.fromTo(p.gl, { opacity: 1 }, { opacity: 0, duration: 0.22, ease: "power2.in", immediateRender: false }, at + 0.4);
+          }
+
+          let exitEls;
+          if (V.style === "vehicle") {
+            const glow = Look.bloom(parts.lines, { color: "#DCE6FF", strength: 0.32 });
+            parts.lines.forEach((l) => (l.style.textShadow = glow + ", 0 4px 14px rgba(0,0,0,.34), 0 14px 48px rgba(0,0,0,.4)"));
+            Look.enter(tl, parts.kick, T.kickIn, { from: "blur", dur: 0.55, blur: 10 });
+            parts.lines.forEach((l, i) => Look.reveal(tl, l, T.nameIn + i * T.nameLine, { by: "chars", stagger: 0.028, dur: 0.62 }));
+            tl.fromTo("#scrimB", { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "power2.out", immediateRender: false }, T.rateIn - 0.2);
+            Look.enter(tl, parts.rate, T.rateIn, { from: "blur", dur: 0.5, blur: 8 });
+            parts.cols.forEach((p, i) => {
+              const at = T.statsIn + i * T.statStagger;
+              Look.enter(tl, p.num, at, { from: "up", dist: 40, dur: 0.5, blur: 8 });
+              Look.count(tl, p.nv, at, T.statDur, 0, p.s.value, { format: (v) => v.toFixed(V.decimals) });
+              fillBar(p, at + 0.04, T.statDur);
+              Look.enter(tl, p.lbl, at + 0.08, { from: "blur", dur: 0.45, blur: 8 });
+              gsap.set(p.bar, { opacity: 0 });
+              tl.fromTo(p.bar, { opacity: 0 }, { opacity: 1, duration: 0.2, ease: "power1.out", immediateRender: false }, at);
+            });
+            // payoff: the cruiser drifts into the daylight shot
+            if (plate) { Look.impact(tl, T.payoff, { shake: "#shake", amp: 8, flash: 0, zoom: 1.03 }); Look.expose(tl, T.payoff, { target: "#shake", peak: 1.7, dur: 0.26 }); }
+            parts.cols.forEach((p, i) => ignite(p, T.payoff + i * 0.05));
+            exitEls = [bot, top];
+          } else {
+            const cellShift = (r) => { const c = r.querySelector(".cell.old"); return c.offsetHeight + parseFloat(getComputedStyle(c).marginBottom); };
+            const rise = (r, at, dur) => { const s = r.querySelector(".strip"), h = cellShift(r);
+              gsap.set(s, { y: h }); tl.fromTo(s, { y: h }, { y: 0, duration: dur, ease: "expo.out", immediateRender: false }, at); };
+            const turn = (r, at, dur, blur) => { const s = r.querySelector(".strip"), h = cellShift(r);
+              tl.fromTo(s, { y: 0 }, { y: -h, duration: dur, ease: "expo.out", immediateRender: false }, at);
+              if (blur) Look.mblur(tl, s, at, dur * 0.55, { y: blur, ease: "power2.out" }); };
+            gsap.set(parts.year, { filter: "drop-shadow(0 10px 40px rgba(0,0,0,.38))" });
+            parts.game.classList.add("t-lift"); parts.krow.classList.add("t-lift");
+            // previous era rises in
+            Look.enter(tl, parts.krow, T.kickIn, { from: "blur", dur: 0.5, blur: 8 });
+            rise(parts.kL, T.kickIn, 0.5); rise(parts.kR, T.kickIn + 0.04, 0.5);
+            parts.digits.forEach((r, i) => rise(r, T.yearIn + i * T.yearStagger, 0.55));
+            rise(parts.gameRoll, T.gameIn, 0.55);
+            // the roll: every column turns over to the new era (old white -> new sunset) and lands on the cut
+            parts.digits.forEach((r, i) => turn(r, T.roll + i * T.yearStagger, T.rollDur, 22));
+            turn(parts.gameRoll, T.roll + 0.06, T.rollDur, 12);
+            turn(parts.kL, T.roll + 0.04, T.rollDur, 0); turn(parts.kR, T.roll + 0.08, T.rollDur, 0);
+            if (plate) { Look.impact(tl, T.payoff, { shake: "#shake", amp: 10, flash: 0, zoom: 1.04 }); Look.expose(tl, T.payoff, { target: "#shake", peak: 1.8 }); }
+            // stats: the series timeline
+            tl.fromTo("#scrimB", { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "power2.out", immediateRender: false }, T.statsIn - 0.2);
+            parts.cols.forEach((p, i) => {
+              const at = T.statsIn + i * T.statStagger;
+              Look.reveal(tl, p.lbl, at, { by: "words", stagger: 0.06, dur: 0.6 });
+              Look.enter(tl, p.nv, at, { from: "up", dist: 36, dur: 0.5, blur: 8 });
+              Look.count(tl, p.nv, at, T.statDur, 0, p.s.value, { format: (v) => String(Math.round(v)) });
+              Look.enter(tl, p.unit, at + 0.1, { from: "blur", dur: 0.4, blur: 6 });
+              gsap.set(p.bar, { opacity: 0 });
+              tl.fromTo(p.bar, { opacity: 0 }, { opacity: 1, duration: 0.2, ease: "power1.out", immediateRender: false }, at);
+              fillBar(p, at + 0.04, T.statDur);
+            });
+            Look.sheen(tl, parts.year, T.sheen, { dur: 1.0 });
+            exitEls = [bot, top];
+          }
+
+          // designed exit: blur-out, bottom strip first, kicker last
+          Look.exit(tl, exitEls, T.out, { to: "blur", dur: T.outDur, stagger: 0.05, blur: 14, scale: 1.03 });
+          tl.fromTo(["#scrimT", "#scrimB"], { opacity: 1 }, { opacity: 0, duration: 0.35, ease: "power2.in", immediateRender: false }, T.out + 0.08);
+
+          Look.install(tl, { duration: D, grain: 0.15, vignette: 0.5, enabled: plate });
+          tl.set({}, {}, D);
+          window.__timelines = window.__timelines || {};
+          window.__timelines["main"] = tl;
+          tl.seek(0);
+        });
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,413 @@
+<!doctype html>
+<!-- GTA 6 component #43, Phone message: 1080x1920 (9:16), 30 fps, 7 s.
+     A text from Lucia, in an in-game phone style.
+     Variant "0" Notification: each text drops in as its own smoked-glass banner; older ones step back into a stack.
+     Variant "1" Thread: a handset rises, Lucia types, you reply, she answers.
+     In-world detail: a fictional "LEONIDA" network tag in wide-tracked caps (banner tag and status bar).
+     bg "plate" shows sample GTA VI footage; bg "none" renders a transparent overlay.
+     Safe zone: every word sits inside x 72–936, y 230–1480. -->
+<html lang="en" data-composition-variables='[
+  {"id":"variant","type":"enum","label":"Variant","default":"0","options":[{"value":"0","label":"Notification"},{"value":"1","label":"Thread"}]},
+  {"id":"bg","type":"enum","label":"Background","default":"plate","options":[{"value":"plate","label":"Sample footage"},{"value":"none","label":"Transparent"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link rel="stylesheet" href="assets/fonts/fonts.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="assets/kit/motion/motion.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: transparent; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; font-family: "Inter", sans-serif;
+        -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; font-feature-settings: "tnum" 1, "ss01" 1; }
+      .plate { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      #ov { position: absolute; inset: 0; }
+      :root {
+        --ink: #0B0B0E; --paper: #FFFFFF;
+        --sunset: linear-gradient(118deg, #F84FA4 0%, #FE8E4E 62%, #FEB747 100%);
+        --shadow-card: 0 1px 2px rgba(0,0,0,.30), 0 30px 80px -24px rgba(0,0,0,.70);
+        --hair: rgba(255,255,255,.14);
+      }
+      .hidden { display: none !important; }
+      .nt-msg, .nt-name, .bub, .hd-name, #draft, .cmp-ph span { font-feature-settings: "tnum" 0, "ss01" 1; }
+      /* in-world label voice: Inter 600 caps, wide-tracked like Rockstar's own title cards */
+      .lbl { font-weight: 600; font-size: 24px; letter-spacing: .3em; text-transform: uppercase; color: rgba(255,255,255,.62);
+        font-feature-settings: "tnum" 1, "ss01" 1; white-space: nowrap; }
+
+      /* ============ Variant 0: notification banner ============ */
+      #notifWrap { position: absolute; left: 72px; top: 292px; width: 864px; height: 310px; }
+      .nt { position: absolute; left: 0; top: 0; width: 100%; display: flex; gap: 30px; align-items: flex-start;
+        padding: 32px 38px 36px 32px; border-radius: 36px;
+        background: rgba(16,16,24,.84);
+        -webkit-backdrop-filter: blur(30px) saturate(1.5); backdrop-filter: blur(30px) saturate(1.5);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.20), inset 0 0 0 1px rgba(255,255,255,.09), var(--shadow-card); }
+      .nt-av { position: relative; flex: 0 0 136px; width: 136px; height: 136px; }
+      .nt-av img { width: 136px; height: 136px; border-radius: 50%; object-fit: cover; display: block;
+        box-shadow: 0 0 0 2px rgba(255,255,255,.10); }
+      .nt-av .mono { width: 136px; height: 136px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+        background: linear-gradient(160deg, #9C7AA8, #D689A1 45%, #FAA08D 75%, #FFC88F); color: #fff; font-weight: 700; font-size: 52px; }
+      .nt-app { position: absolute; right: -8px; bottom: -8px; width: 56px; height: 56px; border-radius: 17px;
+        background: var(--sunset); display: flex; align-items: center; justify-content: center;
+        box-shadow: 0 0 0 4px rgba(20,20,28,.95), 0 4px 10px rgba(0,0,0,.35); }
+      .nt-app svg { width: 34px; height: 34px; display: block; }
+      .nt-main { flex: 1; min-width: 0; padding-top: 6px; }
+      .nt-row { display: flex; align-items: baseline; justify-content: space-between; }
+      .nt-name { color: #fff; font-weight: 700; font-size: 44px; letter-spacing: -0.022em; line-height: 1.15; }
+      .nt-tag { margin-right: -.3em; }
+      /* light veil that fades in as a card steps back, so the stack edges read on dark footage too */
+      .nt-veil { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0;
+        background: rgba(255,255,255,.2); box-shadow: inset 0 -1px 0 rgba(255,255,255,.3); }
+      .nt-body { height: 108px; margin-top: 6px; }
+      .nt-msg { color: rgba(255,255,255,.94); font-weight: 500; font-size: 44px; line-height: 1.2; letter-spacing: -0.02em; }
+
+      /* ============ Variant 1: handset thread ============ */
+      #phone { position: absolute; left: 150px; top: 290px; width: 780px; height: 1120px; border-radius: 118px;
+        background: linear-gradient(150deg, #3b3c47 0%, #1a1b22 38%, #0c0d12 100%);
+        box-shadow: inset 0 0 0 3px #2a2b34, inset 0 2px 0 3px rgba(255,255,255,.10), 0 2px 3px rgba(0,0,0,.40),
+          0 60px 140px -30px rgba(0,0,0,.80); }
+      .side { position: absolute; width: 7px; border-radius: 4px; background: linear-gradient(90deg, #2c2d36, #4a4b57); }
+      .side.l1 { left: -6px; top: 230px; height: 70px; }
+      .side.l2 { left: -6px; top: 330px; height: 120px; }
+      .side.r1 { right: -6px; top: 300px; height: 170px; background: linear-gradient(270deg, #2c2d36, #4a4b57); }
+      .screen { position: absolute; inset: 16px; border-radius: 102px; overflow: hidden;
+        background: radial-gradient(120% 60% at 50% 0%, #2a2340 0%, rgba(42,35,64,0) 60%), linear-gradient(180deg, #1F202B 0%, #1a1426 55%, #160123 100%);
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
+      .cam { position: absolute; left: 50%; top: 30px; width: 30px; height: 30px; margin-left: -15px; border-radius: 50%;
+        background: radial-gradient(circle at 40% 38%, #2b2f45 0%, #08080b 55%); box-shadow: 0 0 0 2px #050507; }
+      .sb { position: absolute; left: 0; right: 0; top: 0; height: 88px; display: flex; align-items: center; justify-content: space-between;
+        padding: 6px 78px 0 82px; color: #fff; font-weight: 600; font-size: 24px; letter-spacing: -0.005em; }
+      .sb-l { display: flex; align-items: baseline; gap: 18px; }
+      .sb-r { display: flex; align-items: center; gap: 12px; }
+      .sb-r svg { display: block; }
+      .hd { position: absolute; left: 0; right: 0; top: 88px; height: 124px; display: flex; align-items: center; gap: 20px;
+        padding: 0 46px 0 34px; border-bottom: 1px solid rgba(255,255,255,.10); }
+      .hd .back { width: 34px; height: 34px; flex: 0 0 34px; }
+      .hd img, .hd .mono { width: 84px; height: 84px; flex: 0 0 84px; border-radius: 50%; object-fit: cover; display: block; }
+      .hd .mono { display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 38px;
+        background: linear-gradient(160deg, #9C7AA8, #D689A1 45%, #FAA08D 75%, #FFC88F); }
+      .hd-txt { flex: 1; min-width: 0; }
+      .hd-name { color: #fff; font-weight: 700; font-size: 44px; letter-spacing: -0.022em; line-height: 1.1; }
+      .hd-sub { margin-top: 8px; }
+      .hd .call { width: 46px; height: 46px; flex: 0 0 46px; }
+      .msgs { position: absolute; left: 0; right: 0; top: 236px; padding: 0 36px; }
+      .chip { text-align: center; padding-left: .3em; margin-bottom: 30px; }
+      .row { position: relative; display: flex; }
+      .row.them { justify-content: flex-start; }
+      .row.me { justify-content: flex-end; }
+      .row + .row { margin-top: 10px; }
+      .row.gap { margin-top: 28px; }
+      .bub { max-width: 620px; padding: 24px 32px 26px; border-radius: 42px; font-size: 44px; line-height: 1.2; font-weight: 500;
+        letter-spacing: -0.02em; color: #fff; }
+      .them .bub { background: rgba(255,255,255,.13); box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
+      .them.tail .bub { border-bottom-left-radius: 12px; }
+      .me .bub { background: var(--sunset); color: #1b0712; font-weight: 600; box-shadow: 0 10px 30px -12px rgba(248,79,164,.55); }
+      .me.tail .bub { border-bottom-right-radius: 12px; }
+      .typing { position: absolute; left: 0; top: 0; height: 103px; width: 164px; border-radius: 42px; border-bottom-left-radius: 12px;
+        background: rgba(255,255,255,.13); display: flex; align-items: center; justify-content: center; gap: 12px; }
+      .typing i { display: block; width: 16px; height: 16px; border-radius: 50%; background: rgba(255,255,255,.9); opacity: .4; }
+      .dlv { text-align: right; margin-top: 12px; padding-right: 8px; margin-right: -.3em; }
+      .cmp { position: absolute; left: 30px; right: 30px; bottom: 46px; height: 88px; display: flex; align-items: center; gap: 14px; }
+      .cmp-plus { width: 68px; height: 68px; flex: 0 0 68px; border-radius: 50%; background: rgba(255,255,255,.10);
+        display: flex; align-items: center; justify-content: center; }
+      .cmp-field { position: relative; flex: 1; height: 88px; border-radius: 44px; box-shadow: inset 0 0 0 2px rgba(255,255,255,.14);
+        display: flex; align-items: center; padding: 0 88px 0 32px; overflow: hidden; }
+      .cmp-ph { position: absolute; left: 32px; top: 0; bottom: 0; display: flex; align-items: center; }
+      .cmp-ph span { color: rgba(255,255,255,.36); font-weight: 500; font-size: 34px; letter-spacing: -0.015em; }
+      #draftWrap { white-space: nowrap; }
+      #draft { color: #fff; font-weight: 500; font-size: 34px; letter-spacing: -0.015em; --km-caret-color: #FE8E4E; --km-caret-w: 3px; }
+      .cmp-send { position: absolute; right: 10px; top: 10px; width: 68px; height: 68px; border-radius: 50%; background: #fff;
+        display: flex; align-items: center; justify-content: center; }
+      .home { position: absolute; left: 50%; bottom: 14px; width: 240px; height: 9px; margin-left: -120px; border-radius: 5px; background: rgba(255,255,255,.55); }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="7" data-width="1080" data-height="1920">
+      <!-- sample footage: one framework-owned muted video per plate; the script hides all but the one the variant names -->
+      <video id="plateA" class="clip plate" src="assets/plates/p03-jason-door-v.mp4" muted playsinline data-start="0" data-duration="7" data-track-index="0"></video>
+      <video id="plateB" class="clip plate" src="assets/plates/p07-convertible-v.mp4" muted playsinline data-start="0" data-duration="7" data-track-index="0"></video>
+
+      <div id="ov" class="clip" data-start="0" data-duration="7" data-track-index="1">
+
+        <!-- Variant 0: notification -->
+        <!-- one banner per text; the script clones #ntTpl. Each new text drops in as its own card
+             and the older ones step back into a stack, so two strings never share one box. -->
+        <div id="notifWrap" class="hidden" data-layout-allow-overlap>
+          <div class="nt" id="ntTpl">
+            <div class="nt-veil" data-layout-allow-overlap></div>
+            <div class="nt-av">
+              <div class="nt-app"><svg viewBox="0 0 24 24"><path fill="#fff" d="M12 3.2c-5 0-9 3.3-9 7.5 0 2.4 1.3 4.5 3.4 5.9-.2 1.3-.8 2.6-1.8 3.6 2 0 3.7-.7 4.9-1.7.8.2 1.6.2 2.5.2 5 0 9-3.4 9-7.5S17 3.2 12 3.2z"/></svg></div>
+            </div>
+            <div class="nt-main">
+              <div class="nt-row"><span class="nt-name"></span><span class="nt-tag lbl"></span></div>
+              <div class="nt-body"><div class="nt-msg"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Variant 1: thread on a handset -->
+        <div id="phone" class="hidden">
+          <div class="side l1"></div><div class="side l2"></div><div class="side r1"></div>
+          <div class="screen">
+            <div class="sb">
+              <div class="sb-l"><span id="sbTime"></span><span class="lbl" id="sbCarrier"></span></div>
+              <div class="sb-r">
+                <svg width="40" height="24" viewBox="0 0 40 24"><rect x="0" y="16" width="7" height="8" rx="2" fill="#fff"/><rect x="11" y="11" width="7" height="13" rx="2" fill="#fff"/><rect x="22" y="6" width="7" height="18" rx="2" fill="#fff"/><rect x="33" y="0" width="7" height="24" rx="2" fill="#fff" opacity=".35"/></svg>
+                <svg width="54" height="26" viewBox="0 0 54 26"><rect x="1" y="1" width="46" height="24" rx="7" fill="none" stroke="#fff" stroke-opacity=".45" stroke-width="2"/><rect x="5" y="5" width="30" height="16" rx="4" fill="#fff"/><rect x="49.5" y="9" width="3.5" height="8" rx="1.5" fill="#fff" fill-opacity=".45"/></svg>
+              </div>
+            </div>
+            <div class="cam"></div>
+            <div class="hd">
+              <svg class="back" viewBox="0 0 24 24"><path d="M15.5 4.5 8 12l7.5 7.5" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <div id="hdAv"></div>
+              <div class="hd-txt"><div class="hd-name" id="hdName"></div><div class="hd-sub lbl" id="hdSub"></div></div>
+              <svg class="call" viewBox="0 0 24 24"><path d="M6.6 3.5h2.6l1.4 4-1.9 1.5a11 11 0 0 0 6.3 6.3l1.5-1.9 4 1.4v2.6a2 2 0 0 1-2.1 2A16.5 16.5 0 0 1 4.6 5.6a2 2 0 0 1 2-2.1z" fill="none" stroke="#fff" stroke-width="1.9" stroke-linejoin="round"/></svg>
+            </div>
+            <div class="msgs" id="msgs"><div class="chip lbl" id="chip"></div></div>
+            <div class="cmp">
+              <div class="cmp-plus"><svg width="30" height="30" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="#fff" stroke-opacity=".8" stroke-width="2.4" stroke-linecap="round"/></svg></div>
+              <div class="cmp-field">
+                <div class="cmp-ph" id="phWrap"><span id="ph"></span></div>
+                <div id="draftWrap"><span id="draft"></span></div>
+                <div class="cmp-send" id="send"><svg width="34" height="34" viewBox="0 0 24 24"><path d="M12 19V6M6.5 11.5 12 6l5.5 5.5" fill="none" stroke="#1b0712" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              </div>
+            </div>
+            <div class="home"></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <script>
+      const CONFIG = {
+        contact: {
+          name: "Lucia",
+          subtitle: "Vice City",                       // line under the name in the thread header
+          avatar: "assets/avatar/lucia.jpg",           // square image; "" falls back to a monogram
+          initial: "L",
+          carrier: "Leonida"                           // fictional in-world network tag (shown in caps); "" hides it
+        },
+        variants: {
+          // 0, Notification: each text drops in as its own banner; older ones step back into a stack
+          "0": {
+            plate: "assets/plates/p03-jason-door-v.mp4",
+            time: "now",
+            messages: [
+              "Pre-load's done. You ready for tomorrow?",
+              "Nov 19. Vice City. Just you and me.",
+              "I'm outside. Don't keep me waiting."
+            ]
+          },
+          // 1, Thread: the handset rises, Lucia texts, you reply, she answers
+          "1": {
+            plate: "assets/plates/p07-convertible-v.mp4",
+            statusTime: "11:58",
+            stamp: "Wed, Nov 18 · 11:58 PM",
+            placeholder: "Message",
+            delivered: "Delivered",
+            typingAfter: true,                       // she starts typing again during the final hold
+            messages: [
+              { from: "them", text: "You still up?" },
+              { from: "them", text: "Pre-load's done." },
+              { from: "me",   text: "Tomorrow. Vice City." },
+              { from: "them", text: "Don't keep me waiting." }
+            ]
+          }
+        },
+        timing: {
+          in: 0.08,          // first motion
+          second: 2.0,       // Notification: second banner lands
+          next: 1.8,         // Notification: gap before each later banner
+          typingAt: 0.30,    // Thread: first "typing..." bubble
+          typing: 0.35,      // Thread: how long "typing..." shows before each of her texts
+          read: 0.55,        // Thread: pause after each of her texts
+          cps: 20,           // Thread: your typing speed
+          out: 6.5,          // start of the exit
+          end: 7.0
+        }
+      };
+
+      (function () {
+        const VARS = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+        const vKey = CONFIG.variants[String(VARS.variant)] ? String(VARS.variant) : "0";
+        const showPlate = VARS.bg !== "none";
+        const V = CONFIG.variants[vKey], T = CONFIG.timing, C = CONFIG.contact;
+        const $ = (s) => document.querySelector(s);
+
+        document.querySelectorAll("video.plate").forEach((v) => {
+          if (!showPlate || v.getAttribute("src") !== V.plate) v.style.display = "none";
+        });
+
+        function avatar(size) {
+          if (C.avatar) { const img = document.createElement("img"); img.src = C.avatar; img.alt = C.name; return img; }
+          const m = document.createElement("div"); m.className = "mono"; m.textContent = C.initial || C.name.charAt(0); return m;
+        }
+
+        const builders = [];
+
+        // ---------------- Variant 0: notification ----------------
+        if (vKey === "0") {
+          const wrap = $("#notifWrap"), tpl = $("#ntTpl");
+          wrap.classList.remove("hidden");
+          tpl.removeAttribute("id");
+          tpl.remove();
+          const tag = [C.carrier, V.time].filter(Boolean).join(" · ");
+          // one banner per text, newest on top
+          const cards = V.messages.map((text, i) => {
+            const c = tpl.cloneNode(true);
+            c.id = "nt" + i;
+            c.style.zIndex = String(10 + i);
+            c.querySelector(".nt-av").insertBefore(avatar(), c.querySelector(".nt-app"));
+            c.querySelector(".nt-name").textContent = C.name;
+            c.querySelector(".nt-tag").textContent = tag;
+            c.querySelector(".nt-msg").textContent = text;
+            wrap.appendChild(c);
+            return c;
+          });
+          builders.push((tl) => {
+            const F = 1 / 30;
+            const onFrame = (t) => Math.round(t * 30) / 30;
+            // stack depths: front card, first stack edge (34 px lip), second edge, gone
+            const DEPTH = [
+              { y: 0,  scale: 1,    opacity: 1 },
+              { y: 34, scale: 0.94, opacity: 0.72 },
+              { y: 62, scale: 0.88, opacity: 0.42 },
+              { y: 82, scale: 0.84, opacity: 0 }
+            ];
+            cards.forEach((c) => gsap.set(c, { transformOrigin: "50% 100%", x: 0, y: -60, scale: 1, opacity: 0 }));
+            // a 2-cycle haptic nudge (±6 px), frame-aligned so every rendered frame lands on a peak
+            const nudge = (el, t0) => {
+              let t = onFrame(t0), prev = 0;
+              [6, -6, 6, -6, 0].forEach((x) => { tl.fromTo(el, { x: prev }, { x: x, duration: F, ease: "power2.inOut", immediateRender: false }, t); t += F; prev = x; });
+            };
+            // the first banner drops in from the top edge
+            tl.fromTo(cards[0], { opacity: 0, y: -90, scale: 0.97 }, { opacity: 1, y: 0, scale: 1, duration: 0.5, ease: "expo.out", immediateRender: false }, T.in);
+            nudge(cards[0], T.in + 0.42);
+            for (let k = 1; k < cards.length; k++) {
+              const t2 = onFrame(T.second + (k - 1) * T.next);
+              // the current front card clears its content just before the new banner lands,
+              // so its text is gone on the frame the new card first appears
+              // (frame-aligned: its last visible frame is t2, the new card's first is t2 + 1 frame, so no frame is empty or doubled)
+              tl.fromTo(cards[k - 1].querySelectorAll(".nt-av, .nt-main"), { opacity: 1 }, { opacity: 0, duration: 3 * F, ease: "none", immediateRender: false }, t2 - 2 * F);
+              // every older card steps one level back into the stack
+              for (let j = 0; j < k; j++) {
+                const from = Math.min(k - 1 - j, 3), to = Math.min(k - j, 3);
+                if (from === to) continue;
+                tl.fromTo(cards[j], { ...DEPTH[from] }, { ...DEPTH[to], duration: 0.38, ease: "expo.out", immediateRender: false }, t2);
+                if (from === 0) tl.fromTo(cards[j].querySelector(".nt-veil"), { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power2.out", immediateRender: false }, t2);
+              }
+              // the new banner drops in on top
+              tl.fromTo(cards[k], { opacity: 0, y: -60 }, { opacity: 1, y: 0, duration: 0.38, ease: "expo.out", immediateRender: false }, t2);
+              nudge(cards[k], t2 + 0.3);
+            }
+            tl.fromTo(wrap, { opacity: 1, y: 0 }, { opacity: 0, y: -70, duration: 0.38, ease: "power3.in", immediateRender: false }, T.out);
+          });
+        }
+
+        // ---------------- Variant 1: thread ----------------
+        if (vKey === "1") {
+          $("#phone").classList.remove("hidden");
+          $("#hdAv").replaceWith(avatar());
+          $("#hdName").textContent = C.name;
+          $("#hdSub").textContent = C.subtitle;
+          $("#sbTime").textContent = V.statusTime;
+          $("#sbCarrier").textContent = C.carrier || "";
+          $("#chip").textContent = V.stamp;
+          $("#ph").textContent = V.placeholder;
+          const msgs = $("#msgs");
+          const rows = V.messages.map((m, i) => {
+            const next = V.messages[i + 1], prev = V.messages[i - 1];
+            const row = document.createElement("div");
+            row.className = "row " + m.from + (!next || next.from !== m.from ? " tail" : "") + (prev && prev.from !== m.from ? " gap" : "");
+            const b = document.createElement("div"); b.className = "bub"; b.textContent = m.text; row.appendChild(b);
+            let typing = null;
+            if (m.from === "them") { typing = document.createElement("div"); typing.className = "typing"; typing.innerHTML = "<i></i><i></i><i></i>"; row.appendChild(typing); }
+            msgs.appendChild(row);
+            let dlv = null;
+            if (m.from === "me" && V.delivered && !V.messages.slice(i + 1).some((x) => x.from === "me")) {
+              dlv = document.createElement("div"); dlv.className = "dlv lbl"; dlv.textContent = V.delivered; msgs.appendChild(dlv);
+            }
+            return { m, row, b, typing, dlv };
+          });
+          // a trailing "typing..." row so the last beat keeps breathing until the exit
+          let tail = null;
+          if (V.typingAfter) {
+            const row = document.createElement("div"); row.className = "row them";
+            tail = document.createElement("div"); tail.className = "typing"; tail.innerHTML = "<i></i><i></i><i></i>";
+            row.appendChild(tail); msgs.appendChild(row);
+          }
+
+          builders.push((tl) => {
+            const K = window.KitMotion;
+            gsap.set("#phone", { opacity: 0, y: 260 });
+            gsap.set("#chip", { opacity: 0 });
+            rows.forEach((r) => { gsap.set(r.b, { opacity: 0 }); if (r.typing) gsap.set(r.typing, { opacity: 0, scale: 0.6, transformOrigin: "0% 100%" }); if (r.dlv) gsap.set(r.dlv, { opacity: 0 }); });
+            gsap.set("#send", { scale: 0, opacity: 0 });
+
+            // the handset rises into frame
+            tl.fromTo("#phone", { opacity: 0, y: 260, rotation: 3 }, { opacity: 1, y: 0, rotation: 0, duration: 0.6, ease: "expo.out", immediateRender: false }, T.in);
+            K.fadeUp(tl, "#chip", T.in + 0.1, { distance: 10 });
+
+            const dots = (el, t0, t1) => {
+              const ds = el.querySelectorAll("i");
+              K.drive(tl, t0, t1 - t0, (p) => {
+                const tt = (t1 - t0) * p;
+                ds.forEach((d, i) => {
+                  const s = 0.5 + 0.5 * Math.sin((tt * 2.6 - i * 0.2) * 2 * Math.PI - Math.PI / 2);
+                  d.style.opacity = (0.35 + 0.6 * s).toFixed(3);
+                  d.style.transform = "translateY(" + (-5 * s).toFixed(2) + "px)";
+                });
+              });
+            };
+
+            let t = T.typingAt;
+            rows.forEach((r, i) => {
+              if (r.m.from === "them") {
+                const tIn = t, tMsg = t + T.typing;
+                tl.fromTo(r.typing, { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.2, ease: "back.out(1.4)", immediateRender: false }, tIn);
+                dots(r.typing, tIn, tMsg);
+                tl.fromTo(r.typing, { opacity: 1 }, { opacity: 0, duration: 0.08, ease: "power1.out", immediateRender: false }, tMsg);
+                tl.fromTo(r.b, { opacity: 0, scale: 0.86, y: 8, transformOrigin: "0% 100%" }, { opacity: 1, scale: 1, y: 0, duration: 0.3, ease: "back.out(1.2)", immediateRender: false }, tMsg);
+                t = tMsg + T.read;
+              } else {
+                const tType = t;
+                tl.fromTo("#send", { scale: 0, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.26, ease: "back.out(1.6)", immediateRender: false }, tType + 0.02);
+                const tSend = tType + (r.m.text.length - 1) / T.cps + 0.28;   // typeText's last key lands at tType + (n-1)/cps
+                K.typeText(tl, "#draft", r.m.text, tType, { cps: T.cps, caretUntil: tSend });
+                tl.fromTo("#phWrap", { opacity: 1 }, { opacity: 0, duration: 0.01, ease: "none", immediateRender: false }, tType);
+                // press send; the draft leaves the field and lands as a bubble
+                tl.fromTo("#send", { scale: 1 }, { scale: 0.86, duration: 0.07, ease: "power2.out", immediateRender: false }, tSend - 0.08);
+                tl.fromTo("#send", { scale: 0.86, opacity: 1 }, { scale: 0, opacity: 0, duration: 0.22, ease: "power2.in", immediateRender: false }, tSend);
+                tl.fromTo("#draftWrap", { opacity: 1 }, { opacity: 0, duration: 0.08, ease: "none", immediateRender: false }, tSend);
+                tl.fromTo("#phWrap", { opacity: 0 }, { opacity: 1, duration: 0.2, ease: "none", immediateRender: false }, tSend + 0.15);
+                tl.fromTo(r.b, { opacity: 0, scale: 0.9, y: 90, transformOrigin: "100% 100%" }, { opacity: 1, scale: 1, y: 0, duration: 0.42, ease: "expo.out", immediateRender: false }, tSend);
+                if (r.dlv) tl.fromTo(r.dlv, { opacity: 0 }, { opacity: 1, duration: 0.25, ease: "power1.out", immediateRender: false }, tSend + 0.4);
+                t = tSend + 0.62;
+              }
+            });
+
+            if (tail) {
+              const tIn = t + 0.35;
+              gsap.set(tail, { opacity: 0, scale: 0.6, transformOrigin: "0% 100%" });
+              tl.fromTo(tail, { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.2, ease: "back.out(1.4)", immediateRender: false }, tIn);
+              dots(tail, tIn, T.out + 0.42);
+            }
+
+            // the handset drops away to loop clean
+            tl.fromTo("#phone", { opacity: 1, y: 0 }, { opacity: 0, y: 220, duration: 0.42, ease: "power3.in", immediateRender: false }, T.out);
+          });
+        }
+
+        document.fonts.ready.then(() => {
+          const tl = gsap.timeline({ paused: true });
+          builders.forEach((b) => b(tl));
+          tl.set({}, {}, T.end);
+          window.__timelines = window.__timelines || {};
+          window.__timelines["main"] = tl;
+          tl.seek(0);
+        });
+      })();
+    </script>
+  </body>
+</html>

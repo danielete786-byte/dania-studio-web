@@ -1,0 +1,419 @@
+<!doctype html>
+<!-- GTA 6 component #16 "Arrow pointer" (craft v2) — 1080x1920 (9:16), 30 fps, 5.0 s.
+     Points the viewer's eye at one thing in the shot, with a short label.
+       Variant 0 "Curved arrow": a sunset brush-stroke arrow that writes itself from a wide-caps label onto the detail.
+       Variant 1 "Pointer + dot": a sunset light-dot lands on the detail, a white L-leader runs to a big Inter label.
+     Targets follow the subject: each beat has a track of [mediaTime, x, y] keys (template-tracked off the 4K shots),
+     smoothed with a Hermite spline and corrected for the camera push.
+     Variables: variant "0"/"1"; bg "plate" (sample footage) / "none" (transparent overlay: pointer holds its "still" spot).
+     Safe zones: all text, tips and dots inside x 72–936, y 236–1480. -->
+<html lang="en" data-composition-variables='[
+  {"id":"variant","type":"enum","label":"Variant","default":"0","options":[{"value":"0","label":"Curved arrow"},{"value":"1","label":"Pointer + dot"}]},
+  {"id":"bg","type":"enum","label":"Background","default":"plate","options":[{"value":"plate","label":"Sample footage"},{"value":"none","label":"Transparent"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link rel="stylesheet" href="assets/fonts/fonts.css" />
+    <link rel="stylesheet" href="assets/kit/look/look.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="assets/kit/look/look.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: transparent; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; font-family: "Inter", sans-serif; color: #fff;
+        -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; }
+      #shake, #push, #ov { position: absolute; inset: 0; }
+      .shot { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+
+      /* legibility comes from placement first (dark windshield / lower third), then these soft scrims */
+      .scrim { position: absolute; pointer-events: none; opacity: 0; }
+      /* v1 spotlight: the frame dims around the dot, so the detail is lit (light instead of a box) */
+      #spot { position: absolute; inset: 0; pointer-events: none; opacity: 0; }
+      .scrim.low { left: 0; right: 0; top: 960px; height: 960px;
+        background: linear-gradient(180deg, rgba(5,5,9,0) 0%, rgba(5,5,9,.30) 30%, rgba(5,5,9,.62) 58%, rgba(5,5,9,.80) 100%); }
+      .scrim.spot { left: -260px; top: 80px; width: 1180px; height: 820px;
+        background: radial-gradient(ellipse 50% 50% at 42% 50%, rgba(5,5,9,.58) 0%, rgba(5,5,9,.30) 52%, rgba(5,5,9,0) 100%); }
+
+      /* pointer ink: one SVG for both variants */
+      #ink { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; overflow: visible; }
+
+      /* labels */
+      .lab { position: absolute; left: 0; top: 0; visibility: hidden; white-space: nowrap; }
+      .lab .kick { display: block; }
+      /* v0: the cinematic edit face, wide caps */
+      .lab.v0 .kick { font-size: 30px; color: rgba(255,255,255,.9); }
+      .lab.v0 .hero { display: block; margin-top: 18px; text-shadow: 0 2px 3px rgba(0,0,0,.30), 0 8px 26px rgba(0,0,0,.42), 0 18px 60px rgba(0,0,0,.35); }
+      /* v1: Inter display, tight and big */
+      .lab.v1 .kick { font-size: 27px; color: rgba(255,255,255,.88); }
+      .lab.v1 .line { display: block; text-shadow: 0 2px 3px rgba(0,0,0,.30), 0 8px 26px rgba(0,0,0,.42), 0 18px 60px rgba(0,0,0,.35); }
+      .lab.v1 .kick + .line { margin-top: 14px; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="5" data-width="1080" data-height="1920">
+      <div id="shake">
+        <div id="push">
+          <!-- variant 0: palm-shirt man (s004) then the highway flyover (s011) -->
+          <video id="v0a" class="clip shot" src="assets/shots/s004-palm-shirt-truck-v.mp4" muted playsinline
+            data-start="0" data-duration="3" data-media-start="0.2" data-track-index="0"></video>
+          <video id="v0b" class="clip shot" src="assets/shots/s011-vice-highway-v.mp4" muted playsinline
+            data-start="3" data-duration="2" data-media-start="1.6" data-track-index="0"></video>
+          <!-- variant 1: Muscle Beach bench (s012) then the palm-shirt man (s004) -->
+          <video id="v1a" class="clip shot" src="assets/shots/s012-muscle-beach-v.mp4" muted playsinline
+            data-start="0" data-duration="2.3" data-media-start="0" data-track-index="2"></video>
+          <video id="v1b" class="clip shot" src="assets/shots/s004-palm-shirt-truck-v.mp4" muted playsinline
+            data-start="2.3" data-duration="2.7" data-media-start="0.2" data-track-index="2"></video>
+        </div>
+        <div id="ov" class="clip" data-start="0" data-duration="5" data-track-index="1">
+          <div id="spot"></div>
+          <div id="scrims"></div>
+          <svg id="ink" viewBox="0 0 1080 1920" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <radialGradient id="dotCore" cx="0.42" cy="0.38" r="0.62">
+                <stop offset="0" stop-color="#FFF4E6" /><stop offset="0.32" stop-color="#FEB747" />
+                <stop offset="0.72" stop-color="#FE8E4E" /><stop offset="1" stop-color="#F84FA4" />
+              </radialGradient>
+            </defs>
+            <g id="beats"></g>
+          </svg>
+          <div id="labels"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      /* ------------------------------------------------------------------
+         CONFIG: everything a creator edits.
+         Coordinates are 1080x1920 frame pixels. A track is [[mediaTime, x, y], ...] in the beat's shot
+         (one key = a fixed spot). Beat times are seconds on this composition. "still" is the spot used with
+         bg "none" (no footage to follow). Every tip and dot is clamped into "safe".
+         ------------------------------------------------------------------ */
+      const CONFIG = {
+        duration: 5.0,
+        safe: { left: 72, right: 936, top: 236, bottom: 1480 },
+        pushOrigin: [540, 864],                       // camera push pivots here (50% 45%)
+        sunset: ["#F84FA4", "#FE78A6", "#FE8E4E", "#FEB747"],
+        tracks: {
+          // s004: the palm-tree print on his left chest (template-tracked off the shirt button, offset -108,-127)
+          palm: [[0.2,425,870],[0.3,470,880],[0.4,504,887],[0.5,527,898],[0.6,564,914],[0.7,571,927],[0.8,577,938],[0.9,586,930],
+                 [1.0,596,927],[1.1,609,940],[1.2,611,952],[1.3,604,974],[1.4,601,993],[1.5,611,999],[1.6,632,993],[1.7,662,983],
+                 [1.8,684,978],[1.9,706,975],[2.0,714,990],[2.1,718,1014],[2.2,718,1027],[2.3,714,1035],[2.4,712,1035],[2.5,701,1045],
+                 [2.6,685,1049],[2.7,677,1046],[2.8,668,1045],[2.9,644,1047],[3.0,626,1057],[3.1,606,1048],[3.2,601,1031]],
+          // s012: just left of the "GAINZ" logo on the bumper plate (tracked off the plate hub, offset -150,-25)
+          plate: [[0.0,355,675],[0.1,352,673],[0.2,348,680],[0.3,346,697],[0.4,341,729],[0.5,335,770],[0.6,327,818],[0.7,321,858],
+                  [0.8,313,916],[0.9,308,949],[1.0,301,987],[1.1,296,1014],[1.2,291,1038],[1.3,288,1056],[1.4,289,1060],[1.5,292,1051],
+                  [1.6,297,1036],[1.7,308,1000],[1.8,316,949],[1.9,324,904],[2.0,344,832],[2.1,359,787],[2.2,380,719],[2.3,393,681],[2.4,409,647]],
+          // s011: a fixed spot in the sky on the jet's glide path; its main gear crosses it at media 2.27 s
+          sky: [[1.6,522,452]]
+        },
+        variants: {
+          // ---------- Variant 0: curved arrow. A sunset brush stroke writes itself from the label onto the detail. ----------
+          "0": {
+            style: "arrow",
+            shots: [ { id: "v0a", start: 0, dur: 3.0, media: 0.2, push: 1.06 },
+                     { id: "v0b", start: 3.0, dur: 2.0, media: 1.6, push: 1.05 } ],
+            strokeTail: 7, strokeHead: 22,          // tapered brush: px at the tail -> px at the head
+            head: [74, 34],                          // arrowhead length, half-width (px)
+            hit: 3.667,                              // payoff: the jet's gear meets the arrow tip
+            beats: [
+              { in: 0.16, out: 2.94, shot: 0, track: "palm", gap: 26, still: [560, 930],
+                kicker: "Look at the", hero: "Shirt", size: 160,
+                label: { x: 72, y: 318 }, scrim: "spot",
+                tail: [262, 562], bend: 0.34 },
+              { in: 3.05, out: 4.96, shot: 1, track: "sky", gap: 6, still: [522, 452],
+                kicker: "Now", hero: "Look up", size: 130,
+                label: { x: 72, y: 1226 }, scrim: "low",
+                tail: [736, 1194], c1: [750, 880], c2: [680, 610] }   // climbs the gap between the signs
+            ]
+          },
+          // ---------- Variant 1: pointer + dot. A light-dot lands, an L-leader runs to a big Inter label. ----------
+          "1": {
+            style: "pointer",
+            shots: [ { id: "v1a", start: 0, dur: 2.3, media: 0.0, push: 1.05 },
+                     { id: "v1b", start: 2.3, dur: 2.7, media: 0.2, push: 1.06 } ],
+            leader: 5,                               // leader weight (px)
+            dot: 19,                                 // dot radius (px)
+            spot: 0.40,                              // spotlight: how much the frame dims around the dot (plate only)
+            hit: 3.2,                                // payoff: the second label is complete, on the second shot
+            beats: [
+              { in: 0.14, out: 2.24, shot: 0, track: "plate", still: [340, 760],
+                kicker: "On the plates", lines: ["Gainz"], size: 250,
+                label: { x: 72, y: 1178, side: "below" }, scrim: "low" },
+              { in: 2.36, out: 4.96, shot: 1, track: "palm", still: [560, 930],
+                kicker: "On the shirt", lines: ["Palm", "print"], size: 180,
+                label: { x: 72, y: 296, side: "above" }, scrim: "spot" }
+            ]
+          }
+        }
+      };
+
+      (function () {
+        const VARS = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+        const vKey = CONFIG.variants[String(VARS.variant)] ? String(VARS.variant) : "0";
+        const plate = VARS.bg !== "none";
+        const V = CONFIG.variants[vKey], S = CONFIG.safe, D = CONFIG.duration;
+        const NS = "http://www.w3.org/2000/svg";
+        const $ = (s) => document.querySelector(s);
+
+        // footage: only this variant's shots, and none at all for the transparent overlay
+        document.querySelectorAll("video.shot").forEach((v) => {
+          const mine = V.shots.some((s) => s.id === v.id);
+          if (!plate || !mine) v.style.display = "none";
+        });
+
+        // ---------- helpers: pure functions of time (seek-safe) ----------
+        const E = (n) => gsap.parseEase(n);
+        const eOut3 = E("power3.out"), eIn2 = E("power2.in"), eExpo = E("expo.out"), eOut2 = E("power2.out"),
+              eBack = E("back.out(2.2)"), eIO = E("power2.inOut");
+        const clamp01 = (x) => Math.max(0, Math.min(1, x));
+        const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+        const win = (t, a, d) => clamp01((t - a) / d);
+        const lerp = (a, b, k) => a + (b - a) * k;
+        const f1 = (n) => n.toFixed(1);
+        function el(tag, attrs, parent) { const n = document.createElementNS(NS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); parent.appendChild(n); return n; }
+
+        // camera push per shot (linear, like an editor's slow push); also used to map tracked points to the screen
+        const shotAt = (t) => { let s = V.shots[0]; V.shots.forEach((x) => { if (t >= x.start - 1e-6) s = x; }); return s; };
+        const pushScale = (t) => { const s = shotAt(t); return plate ? lerp(1, s.push, clamp01((t - s.start) / s.dur)) : 1; };
+        const [OX, OY] = CONFIG.pushOrigin;
+        // Hermite spline through track keys (time-aware tangents)
+        function spline(tr, m) {
+          const n = tr.length;
+          if (n === 1 || m <= tr[0][0]) return [tr[0][1], tr[0][2]];
+          if (m >= tr[n - 1][0]) return [tr[n - 1][1], tr[n - 1][2]];
+          let i = 0; while (i < n - 2 && m > tr[i + 1][0]) i++;
+          const a = tr[i], b = tr[i + 1], h = b[0] - a[0], u = (m - a[0]) / h;
+          const tan = (j, c) => { const p = tr[Math.max(0, j - 1)], q = tr[Math.min(n - 1, j + 1)]; return (q[c] - p[c]) / ((q[0] - p[0]) || 1); };
+          const u2 = u * u, u3 = u2 * u, h00 = 2 * u3 - 3 * u2 + 1, h10 = u3 - 2 * u2 + u, h01 = -2 * u3 + 3 * u2, h11 = u3 - u2;
+          return [h00 * a[1] + h10 * h * tan(i, 1) + h01 * b[1] + h11 * h * tan(i + 1, 1),
+                  h00 * a[2] + h10 * h * tan(i, 2) + h01 * b[2] + h11 * h * tan(i + 1, 2)];
+        }
+        // where a beat's target is on screen at comp time t (push-corrected, safe-clamped)
+        function target(b, t) {
+          if (!plate) return b.still.slice();
+          const sh = V.shots[b.shot], m = sh.media + (t - sh.start);
+          let [x, y] = spline(CONFIG.tracks[b.track], m);
+          const s = pushScale(t); x = OX + (x - OX) * s; y = OY + (y - OY) * s;
+          return [clamp(x, S.left, S.right), clamp(y, S.top, S.bottom)];
+        }
+
+        // ---------- labels + scrims (built once) ----------
+        const scrimEls = {};
+        ["spot", "low"].forEach((k) => { const d = document.createElement("div"); d.className = "scrim " + k; $("#scrims").appendChild(d); scrimEls[k] = d; });
+        V.beats.forEach((b, i) => {
+          const lab = document.createElement("div");
+          lab.className = "lab v" + vKey; lab.id = "lab" + i;
+          lab.style.left = b.label.x + "px"; lab.style.top = b.label.y + "px";
+          const k = document.createElement("span"); k.className = "kick " + (vKey === "0" ? "t-label-wide" : "t-label"); k.id = "k" + i; k.textContent = b.kicker;
+          lab.appendChild(k);
+          if (vKey === "0") {
+            const h = document.createElement("span"); h.className = "hero t-wide"; h.id = "h" + i; h.textContent = b.hero;
+            h.style.fontSize = b.size + "px"; h.style.fontWeight = 800; lab.appendChild(h);
+          } else {
+            b.lines.forEach((ln, j) => {
+              const l = document.createElement("span"); l.className = "line t-display"; l.id = "h" + i + "_" + j; l.textContent = ln;
+              l.style.fontSize = b.size + "px"; lab.appendChild(l);
+            });
+          }
+          $("#labels").appendChild(lab);
+          b.el = lab;
+        });
+
+        const g = $("#beats");
+        let draw = () => {};
+
+        // ================= VARIANT 0: curved sunset brush arrow =================
+        if (V.style === "arrow") {
+          const defs = $("#ink defs");
+          const WT = V.strokeTail, WH = V.strokeHead, [HL, HW] = V.head;
+          V.beats.forEach((b, i) => {
+            const grad = el("linearGradient", { id: "sun" + i, gradientUnits: "userSpaceOnUse" }, defs);
+            CONFIG.sunset.forEach((c, j) => el("stop", { offset: [0, 0.34, 0.7, 1][j], "stop-color": c }, grad));
+            const shine = el("linearGradient", { id: "shine" + i, gradientUnits: "userSpaceOnUse" }, defs);
+            b.shStops = [0, 1, 2].map((j) => el("stop", { offset: 0, "stop-color": "#FFFFFF", "stop-opacity": j === 1 ? 0.95 : 0 }, shine));
+            b.grp = el("g", {}, g);
+            b.arc = el("path", { fill: "url(#sun" + i + ")" }, b.grp);
+            b.arcShine = el("path", { fill: "url(#shine" + i + ")" }, b.grp);
+            b.head = el("path", { fill: CONFIG.sunset[3], stroke: CONFIG.sunset[3], "stroke-width": 3, "stroke-linejoin": "round" }, b.grp);
+            b.grad = grad; b.shine = shine;
+          });
+          // cubic Bezier q = [x0,y0,c1x,c1y,c2x,c2y,x3,y3]
+          const bez = (q, u) => { const a = 1 - u, b0 = a * a * a, b1 = 3 * a * a * u, b2 = 3 * a * u * u, b3 = u * u * u;
+            return [b0 * q[0] + b1 * q[2] + b2 * q[4] + b3 * q[6], b0 * q[1] + b1 * q[3] + b2 * q[5] + b3 * q[7]]; };
+          const bezD = (q, u) => { const a = 1 - u, d0 = 3 * a * a, d1 = 6 * a * u, d2 = 3 * u * u;
+            return [d0 * (q[2] - q[0]) + d1 * (q[4] - q[2]) + d2 * (q[6] - q[4]), d0 * (q[3] - q[1]) + d1 * (q[5] - q[3]) + d2 * (q[7] - q[5])]; };
+          // filled, tapered outline of the piece [f0, f1] (fractions of arc length); width by absolute position (thin tail, full head)
+          function taper(q, fa, fb, w0, w1) {
+            const N = 120, us = [0], ls = [0]; let prev = bez(q, 0), L = 0;
+            for (let i = 1; i <= N; i++) { const p = bez(q, i / N); L += Math.hypot(p[0] - prev[0], p[1] - prev[1]); us.push(i / N); ls.push(L); prev = p; }
+            const a = fa * L, bb = fb * L; if (bb - a < 0.5) return "";
+            const uAt = (s) => { let i = 1; while (i < N && ls[i] < s) i++; const k = (s - ls[i - 1]) / ((ls[i] - ls[i - 1]) || 1); return us[i - 1] + (us[i] - us[i - 1]) * clamp01(k); };
+            const K = Math.max(2, Math.ceil((bb - a) / 6)), lp = [], rp = []; let rA = 0, rB = 0;
+            for (let k = 0; k <= K; k++) {
+              const s = a + (bb - a) * k / K, u = uAt(s), p = bez(q, u), d = bezD(q, u), dl = Math.hypot(d[0], d[1]) || 1;
+              const w = lerp(w0, w1, Math.pow(s / L, 0.8)) / 2, nx = -d[1] / dl, ny = d[0] / dl;
+              lp.push(p[0] + nx * w, p[1] + ny * w); rp.push(p[0] - nx * w, p[1] - ny * w);
+              if (k === 0) rA = w; if (k === K) rB = w;
+            }
+            const f = (x, y) => f1(x) + "," + f1(y);
+            let path = "M" + f(lp[0], lp[1]);
+            for (let k = 1; k <= K; k++) path += "L" + f(lp[2 * k], lp[2 * k + 1]);
+            path += `A${rB.toFixed(2)},${rB.toFixed(2)} 0 0 0 ${f(rp[2 * K], rp[2 * K + 1])}`;
+            for (let k = K - 1; k >= 0; k--) path += "L" + f(rp[2 * k], rp[2 * k + 1]);
+            return path + `A${rA.toFixed(2)},${rA.toFixed(2)} 0 0 0 ${f(lp[0], lp[1])}Z`;
+          }
+
+          draw = (t) => {
+            V.beats.forEach((b) => {
+              const live = t >= b.in - 1e-3 && t <= b.out + 1e-3;
+              if (!live) { b.arc.setAttribute("d", ""); b.arcShine.setAttribute("d", ""); b.head.setAttribute("d", ""); return; }
+              const [px0, py0] = target(b, t);
+              const tx = b.tail[0], ty = b.tail[1];
+              // stop "gap" px short of the target, along the chord: the head points AT the detail, never sits on it
+              let dx = px0 - tx, dy = py0 - ty; const L0 = Math.hypot(dx, dy) || 1;
+              const px = px0 - dx / L0 * b.gap, py = py0 - dy / L0 * b.gap;
+              dx = px - tx; dy = py - ty; const L = Math.hypot(dx, dy) || 1;
+              const nx = -dy / L, ny = dx / L, off = (b.bend || 0) * L;
+              let c1x = tx + dx * 0.18 + nx * off, c1y = ty + dy * 0.18 + ny * off;
+              let c2x = tx + dx * 0.72 + nx * off * 0.62, c2y = ty + dy * 0.72 + ny * off * 0.62;
+              if (b.c1) { c1x = b.c1[0]; c1y = b.c1[1]; }       // optional hand-placed control points
+              if (b.c2) { c2x = b.c2[0]; c2y = b.c2[1]; }
+              let ux = px - c2x, uy = py - c2y; const ul = Math.hypot(ux, uy) || 1; ux /= ul; uy /= ul;
+              // the stroke ends inside the head
+              const ex = px - ux * HL * 0.55, ey = py - uy * HL * 0.55;
+              const q = [tx, ty, c1x, c1y, c2x, c2y, ex, ey];
+              // draw-on (0.40 s, expo.out) / retract into the tip on exit (0.34 s, power2.in)
+              const p = eExpo(win(t, b.in, 0.40));
+              const r = eIn2(win(t, b.out - 0.34, 0.34));
+              const dpath = p > 0 ? taper(q, r, p, WT, WH) : "";
+              b.arc.setAttribute("d", dpath); b.arcShine.setAttribute("d", dpath);
+              b.grad.setAttribute("x1", f1(tx)); b.grad.setAttribute("y1", f1(ty)); b.grad.setAttribute("x2", f1(px)); b.grad.setAttribute("y2", f1(py));
+              b.shine.setAttribute("x1", f1(tx)); b.shine.setAttribute("y1", f1(ty)); b.shine.setAttribute("x2", f1(px)); b.shine.setAttribute("y2", f1(py));
+              // head: grows as the stroke arrives (overshoot 1.18 -> 1), flares at the payoff, shrinks on exit
+              const ga = win(t, b.in + 0.16, 0.12), gb = win(t, b.in + 0.28, 0.16);
+              let hs = gb > 0 ? lerp(1.18, 1, eOut2(gb)) : 1.18 * eOut3(ga);
+              const isHit = V.hit >= b.in && V.hit <= b.out;
+              const hk = isHit ? win(t, V.hit, 0.42) : 0;
+              const flare = hk > 0 && hk < 1 ? Math.sin(Math.PI * Math.min(1, hk * 1.6)) * (1 - hk) : 0;
+              hs *= 1 + 0.32 * flare;
+              hs *= 1 - clamp01((r - 0.80) / 0.20);
+              if (hs > 0.02) {
+                const l = HL * hs, w = HW * hs, bx = px - ux * l, by = py - uy * l, mx = px - ux * l * 0.64, my = py - uy * l * 0.64;
+                const vx = -uy, vy = ux;
+                b.head.setAttribute("d", `M${f1(px)},${f1(py)}L${f1(bx + vx * w)},${f1(by + vy * w)}L${f1(mx)},${f1(my)}L${f1(bx - vx * w)},${f1(by - vy * w)}Z`);
+              } else b.head.setAttribute("d", "");
+              // light: bloom matched to the sunset stroke, pulses at the payoff; plus a soft contact shadow
+              const glow = 1 + 1.4 * flare;
+              b.grp.style.filter = `drop-shadow(0 3px 5px rgba(0,0,0,.38)) drop-shadow(0 0 ${f1(7 * glow)}px rgba(254,142,78,${(0.62).toFixed(2)})) drop-shadow(0 0 ${f1(22 * glow)}px rgba(248,79,164,${Math.min(0.8, 0.34 * glow).toFixed(2)}))`;
+              // specular sweep along the stroke, tail -> tip, right after the stroke lands (and again at the payoff)
+              const sw0 = win(t, b.in + 0.30, 0.55), sw1 = isHit ? win(t, V.hit, 0.5) : 0;
+              const sw = sw1 > 0 && sw1 < 1 ? sw1 : sw0;
+              const s = lerp(-0.2, 1.2, eIO(sw)), on = sw > 0 && sw < 1;
+              b.shStops[0].setAttribute("offset", clamp01(s - 0.14)); b.shStops[1].setAttribute("offset", clamp01(s)); b.shStops[2].setAttribute("offset", clamp01(s + 0.14));
+              b.shStops[1].setAttribute("stop-opacity", on ? 0.9 : 0);
+            });
+          };
+        }
+
+        // ================= VARIANT 1: light-dot + L-leader + big label =================
+        if (V.style === "pointer") {
+          const R = V.dot, LW = V.leader;
+          V.beats.forEach((b) => {
+            b.grp = el("g", {}, g);
+            b.lead = el("polyline", { fill: "none", stroke: "#FFFFFF", "stroke-width": LW, "stroke-linecap": "round", "stroke-linejoin": "round", points: "" }, b.grp);
+            b.halo = el("circle", { r: 0, fill: "rgba(254,142,78,.30)" }, b.grp);
+            b.core = el("circle", { r: 0, fill: "url(#dotCore)", stroke: "#FFFFFF", "stroke-width": 3 }, b.grp);
+            b.grp.style.filter = "drop-shadow(0 2px 3px rgba(0,0,0,.40)) drop-shadow(0 6px 16px rgba(0,0,0,.30))";
+            b.core.style.filter = "drop-shadow(0 0 10px rgba(254,142,78,.85)) drop-shadow(0 0 26px rgba(248,79,164,.45))";
+          });
+          const spot = $("#spot");
+          draw = (t) => {
+            let sp = 0, sx = 540, sy0 = 960;
+            V.beats.forEach((b) => {
+              const live = t >= b.in - 1e-3 && t <= b.out + 1e-3;
+              if (!live) { b.halo.setAttribute("r", 0); b.core.setAttribute("r", 0); b.lead.setAttribute("points", ""); return; }
+              const [px, py] = target(b, t);
+              const isHit = V.hit >= b.in && V.hit <= b.out;
+              // dot: pops on its target (back.out), flares at the payoff, shrinks last on exit
+              const dIn = eBack(win(t, b.in, 0.32));
+              const dOut = 1 - eIn2(win(t, b.out - 0.12, 0.12));
+              const hk = isHit ? win(t, V.hit, 0.45) : 0;
+              const flare = hk > 0 && hk < 1 ? Math.sin(Math.PI * Math.min(1, hk * 1.8)) * (1 - hk) : 0;
+              const ds = Math.max(0, dIn * dOut);
+              b.core.setAttribute("cx", f1(px)); b.core.setAttribute("cy", f1(py)); b.core.setAttribute("r", (R * ds * (1 + 0.25 * flare)).toFixed(2));
+              b.halo.setAttribute("cx", f1(px)); b.halo.setAttribute("cy", f1(py)); b.halo.setAttribute("r", (R * 2.3 * ds * (1 + 0.9 * flare)).toFixed(2));
+              b.halo.setAttribute("fill", `rgba(254,142,78,${(0.26 + 0.34 * flare).toFixed(3)})`);
+              // L-leader: plumb line from the dot's edge to the label's rule, then the rule runs to the label column
+              const lab = b.el, lh = lab.offsetHeight;
+              const ruleY = b.label.side === "above" ? b.label.y + lh + 22 : b.label.y - 18;
+              const x0 = b.label.x + 2;
+              const dir = ruleY > py ? 1 : -1;
+              const sy = py + dir * (R + 7);
+              const seg1 = Math.max(0, Math.abs(ruleY - sy)), seg2 = Math.max(0, px - x0), total = seg1 + seg2;
+              const lp = eOut3(win(t, b.in + 0.12, 0.34));
+              const lr = eIn2(win(t, b.out - 0.24, 0.13));
+              const vis = total * lp * (1 - lr);
+              const pts = [[px, sy]];
+              if (vis <= seg1) pts.push([px, sy + dir * vis]);
+              else { pts.push([px, ruleY]); pts.push([px - (vis - seg1), ruleY]); }
+              b.lead.setAttribute("points", vis > 0.5 && ds > 0.02 ? pts.map((q) => f1(q[0]) + "," + f1(q[1])).join(" ") : "");
+              // spotlight follows the dot: in with the dot, opens a little at the payoff, out before the cut
+              sp = eOut2(win(t, b.in, 0.36)) * (1 - eIn2(win(t, b.out - 0.30, 0.28))); sx = px; sy0 = py;
+              b.spotR = 170 * (1 + 0.35 * flare);
+            });
+            const live = V.beats.find((b) => t >= b.in - 1e-3 && t <= b.out + 1e-3);
+            if (plate && sp > 0.001 && live) {
+              const r0 = live.spotR, a = V.spot;
+              spot.style.background = `radial-gradient(circle at ${f1(sx)}px ${f1(sy0)}px, rgba(5,5,9,0) 0px, rgba(5,5,9,0) ${f1(r0)}px, rgba(5,5,9,${(a * 0.55).toFixed(3)}) ${f1(r0 + 160)}px, rgba(5,5,9,${a}) ${f1(r0 + 420)}px)`;
+              spot.style.opacity = sp.toFixed(3);
+            } else spot.style.opacity = 0;
+          };
+        }
+
+        // ---------- one paused timeline ----------
+        document.fonts.ready.then(() => {
+          const tl = gsap.timeline({ paused: true });
+          // camera push + pointer geometry: one per-frame driver (seek-safe getter/setter proxy)
+          Look.drive(tl, 0, D, (p) => {
+            const t = p * D;
+            if (plate) gsap.set("#push", { scale: pushScale(t), transformOrigin: "50% 45%" });
+            draw(t);
+          });
+
+          // labels: masked rises in, blur out; scrims ride with their beat
+          V.beats.forEach((b, i) => {
+            const lab = b.el;
+            gsap.set(lab, { visibility: "hidden" });
+            tl.set(lab, { visibility: "visible" }, b.in);
+            tl.set(lab, { visibility: "hidden" }, b.out);
+            const tIn = vKey === "0" ? b.in + 0.12 : b.in + 0.24;     // pointer first: v0 type rises as the stroke lands; v1 once the leader reaches the rule
+            Look.reveal(tl, "#k" + i, tIn, { by: "chars", stagger: 0.014, dur: 0.5 });
+            if (vKey === "0") Look.reveal(tl, "#h" + i, tIn + 0.06, { by: "chars", stagger: 0.026, dur: 0.54 });
+            else b.lines.forEach((_, j) => Look.reveal(tl, "#h" + i + "_" + j, tIn + 0.08 + j * 0.08, { by: "words", stagger: 0.08, dur: 0.62 }));
+            Look.exit(tl, lab, b.out - 0.36, { to: "blur", dur: 0.28, blur: 14, scale: 1.03 });
+            const sc = scrimEls[b.scrim];
+            tl.fromTo(sc, { opacity: 0 }, { opacity: plate ? 1 : 0.7, duration: 0.4, ease: "power2.out", immediateRender: false }, b.in);
+            tl.to(sc, { opacity: 0, duration: 0.3, ease: "power2.in" }, b.out - 0.3);
+          });
+
+          // payoff: the hit lands when the hero is complete
+          const hb = V.beats.findIndex((b) => V.hit >= b.in && V.hit <= b.out);
+          if (plate) {
+            Look.impact(tl, V.hit, { shake: "#shake", amp: 8, flash: 0, zoom: 1.03 });
+            Look.expose(tl, V.hit, { target: "#push", peak: 1.6, dur: 0.34 });
+            Look.leak(tl, V.hit - 0.05, 1.25, { colors: ["#FE8E4E", "#F84FA4"], y: vKey === "0" ? 0.22 : 0.3, opacity: 0.32 });
+          }
+          if (vKey === "0") Look.chroma(tl, "#h" + hb, V.hit, 0.18, { px: 5 });
+          else Look.chroma(tl, "#h" + hb + "_0", V.hit, 0.18, { px: 4 });
+
+          Look.install(tl, { duration: D, grain: 0.15, vignette: 0.45, enabled: plate });
+          tl.set({}, {}, D);
+          window.__timelines = window.__timelines || {};
+          window.__timelines["main"] = tl;
+          tl.seek(0);
+        });
+      })();
+    </script>
+  </body>
+</html>

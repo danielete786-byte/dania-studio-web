@@ -1,0 +1,521 @@
+<!doctype html>
+<!-- GTA 6 component #25 "Trailer views race" (stat-bars, Comparisons) — 1080x1920, 30 fps, 5.0 s.
+     Variables: variant "0" Bars (smoked-glass card, three bars grow on one shared clock, ranking true on every frame) / "1" Big number vs (two hero numerals head to head),
+     bg "plate" (sample GTA VI footage underneath) / "none" (transparent overlay).
+     Numerals are per-digit odometers: every digit is a masked strip that rolls vertically with a vertical motion blur while it moves.
+     Safe zones: all text inside x 72–936, y 230–1480. -->
+<html lang="en" data-composition-variables='[
+  {"id":"variant","type":"enum","label":"Variant","default":"0","options":[{"value":"0","label":"Bars"},{"value":"1","label":"Big number vs"}]},
+  {"id":"bg","type":"enum","label":"Background","default":"plate","options":[{"value":"plate","label":"Sample footage"},{"value":"none","label":"Transparent"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link rel="stylesheet" href="assets/fonts/fonts.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="assets/kit/motion/motion.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: transparent; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; font-family: "Inter", sans-serif;
+        -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; font-feature-settings: "tnum" 1, "ss01" 1; }
+      .plate { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      #ov { position: absolute; inset: 0; }
+      :root {
+        --ink: #0B0B0E; --paper: #FFFFFF;
+        --smoke: rgba(20,20,28,0.76);
+        --hair: rgba(255,255,255,0.14);
+        --sunset: linear-gradient(90deg, #F84FA4 0%, #FE8E4E 55%, #FEB747 100%);
+        --shadow-type: 0 2px 2px rgba(0,0,0,.35), 0 6px 24px rgba(0,0,0,.45);
+        --shadow-card: inset 0 1px 0 rgba(255,255,255,.16), 0 1px 2px rgba(0,0,0,.28), 0 30px 80px -24px rgba(0,0,0,.7);
+      }
+      .cond { font-family: "Barlow Condensed", "Inter", sans-serif; text-transform: uppercase; font-variant-numeric: tabular-nums; }
+      .group { position: absolute; inset: 0; display: none; }
+
+      /* ---------- Odometer (shared) ---------- */
+      .odo { display: inline-flex; align-items: center; flex: none; font-kerning: none; letter-spacing: 0; white-space: nowrap; }
+      .odo .cell { position: relative; flex: none; }
+      .odo .cell.roll { overflow: hidden;
+        -webkit-mask-image: linear-gradient(180deg, rgba(0,0,0,0) 0%, #000 24%, #000 76%, rgba(0,0,0,0) 100%);
+                mask-image: linear-gradient(180deg, rgba(0,0,0,0) 0%, #000 24%, #000 76%, rgba(0,0,0,0) 100%); }
+      .odo .strip { position: absolute; left: 0; top: 0; width: 100%; }
+      .odo .g { display: block; text-align: center; }
+      .odo .cell.fix .g { position: absolute; left: 0; top: 0; width: 100%; }
+
+      /* ---------- Variant 0: Bars ---------- */
+      #card { position: absolute; left: 72px; top: 452px; width: 864px; padding: 46px 44px 40px; border-radius: 36px;
+        background: var(--smoke); -webkit-backdrop-filter: blur(22px) saturate(1.1); backdrop-filter: blur(22px) saturate(1.1);
+        box-shadow: var(--shadow-card); color: #fff; }
+      #card::after { content: ""; position: absolute; inset: 0; border-radius: 36px; border: 1px solid rgba(255,255,255,.09); pointer-events: none; }
+      #card .eyebrow { font-size: 30px; line-height: 36px; font-weight: 600; letter-spacing: .28em; text-transform: uppercase; color: rgba(255,255,255,.74); white-space: nowrap; }
+      #card .eyebrow b { font-weight: 600; color: #fff; }
+      .rows { margin-top: 30px; display: flex; flex-direction: column; gap: 36px; }
+      .rowtop { display: flex; align-items: flex-start; justify-content: space-between; }
+      .lab { font-size: 52px; line-height: 1; font-weight: 800; letter-spacing: .03em; white-space: nowrap; }
+      .date { font-family: "Inter", sans-serif; font-size: 30px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase;
+        color: rgba(255,255,255,.74); margin-left: 16px; }
+      .val { display: flex; line-height: 1; font-size: 52px; font-weight: 800; color: #fff; }
+      .row.top .val { font-size: 128px; }
+      .row.top .lab { display: flex; flex-direction: column; align-items: flex-start; }
+      .row.top .lab .date { display: block; margin: 12px 0 0; line-height: 1; }
+      .track { position: relative; margin-top: 14px; height: 36px; border-radius: 18px; background: rgba(255,255,255,.08);
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,.05); overflow: hidden; }
+      .fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; border-radius: 18px; background: #fff; overflow: hidden; }
+      .fill.lead { background: var(--sunset); background-size: 776px 100%; background-repeat: no-repeat; }
+      .sheen { position: absolute; top: 0; bottom: 0; left: 0; width: 220px;
+        background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.55) 50%, rgba(255,255,255,0) 100%); opacity: 0; }
+      /* payoff pill: Barlow 800 caps (the card's numeral voice). 30 px Barlow caps match the 30 px Inter caps' cap height, so the frame keeps 3 sizes */
+      .pill { display: inline-flex; align-items: center; gap: 9px; height: 52px; padding: 0 20px; border-radius: 26px;
+        background: rgba(255,255,255,.10); box-shadow: inset 0 1px 0 rgba(255,255,255,.14), inset 0 0 0 1px rgba(255,255,255,.10);
+        font-size: 30px; line-height: 1; font-weight: 800; letter-spacing: .02em; white-space: nowrap; }
+      .pill b { font-weight: 800; color: #fff; }
+      .pill span { font-weight: 800; color: rgba(255,255,255,.78); }
+      .tri { width: 0; height: 0; border-left: 8px solid transparent; border-right: 8px solid transparent; border-bottom: 12px solid #fff; margin-top: -2px; }
+      /* footer = the .date voice: Inter 600 caps, wide tracking */
+      .foot { margin-top: 34px; padding-top: 22px; border-top: 1px solid var(--hair); font-size: 30px; line-height: 36px; font-weight: 600;
+        color: rgba(255,255,255,.74); letter-spacing: .12em; text-transform: uppercase; white-space: nowrap;
+        display: flex; align-items: center; justify-content: space-between; min-height: 52px; box-sizing: content-box; }
+
+      /* ---------- Variant 1: Big number vs ---------- */
+      #scrim { position: absolute; left: -120px; top: 160px; width: 1320px; height: 1400px;
+        background: radial-gradient(ellipse 50% 50% at 50% 50%, rgba(8,6,12,.60) 0%, rgba(8,6,12,.36) 52%, rgba(8,6,12,0) 100%); }
+      /* transparent overlay: a lighter, tighter scrim so bright clips don't get a grey smudge; the type shadows carry legibility */
+      #scrim.light { left: 40px; top: 310px; width: 1000px; height: 900px;
+        background: radial-gradient(ellipse 50% 50% at 50% 50%, rgba(8,6,12,.36) 0%, rgba(8,6,12,.2) 52%, rgba(8,6,12,0) 100%); }
+      #vs { position: absolute; left: 72px; width: 864px; top: 318px; color: #fff; text-align: center; }
+      #vs .eyebrow { font-size: 28px; line-height: 34px; font-weight: 600; letter-spacing: .3em; text-transform: uppercase; white-space: nowrap;
+        color: rgba(255,255,255,.8); text-shadow: var(--shadow-type); }
+      .side { margin-top: 30px; }
+      .sidelab { display: flex; align-items: baseline; justify-content: center; text-shadow: var(--shadow-type); }
+      .sidelab .lab { font-size: 52px; }
+      .sidelab .date { font-size: 28px; letter-spacing: .14em; color: rgba(255,255,255,.76); }
+      .numwrap { position: relative; margin: 6px auto 0; height: 214px; display: flex; justify-content: center; align-items: center;
+        filter: drop-shadow(0 2px 2px rgba(0,0,0,.35)) drop-shadow(0 8px 26px rgba(0,0,0,.5)); }
+      .num { display: flex; line-height: 1; font-size: 248px; font-weight: 900; color: #fff; }
+      #wrapB { height: 170px; }
+      #numB { font-size: 196px; color: rgba(255,255,255,.92); }
+      #numAg { position: absolute; left: 50%; top: 0; }
+      #numAs { position: absolute; left: 50%; top: 0; }
+      #numAs .g { background-image: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.62) 50%, rgba(255,255,255,0) 100%);
+        background-repeat: no-repeat; -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent; }
+      #numAg .g { background: var(--sunset); background-repeat: no-repeat; -webkit-background-clip: text; background-clip: text;
+        color: transparent; -webkit-text-fill-color: transparent; }
+      .vsrow { margin: 26px auto 0; width: 640px; display: flex; align-items: center; gap: 28px; }
+      .vsrow .rule { flex: 1; height: 1.5px; background: rgba(255,255,255,.42); box-shadow: 0 1px 6px rgba(0,0,0,.35); }
+      .vsrow .chip { width: 84px; height: 84px; border-radius: 42px; display: flex; align-items: center; justify-content: center;
+        background: var(--smoke); -webkit-backdrop-filter: blur(20px) saturate(1.4); backdrop-filter: blur(20px) saturate(1.4);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.18), inset 0 0 0 1px rgba(255,255,255,.12), 0 10px 30px -8px rgba(0,0,0,.6);
+        font-size: 28px; font-weight: 800; letter-spacing: .08em; padding-left: .08em; }
+      #lead { margin: 40px auto 0; display: inline-flex; align-items: center; gap: 16px; height: 88px; padding: 0 40px; border-radius: 44px;
+        background: var(--smoke); -webkit-backdrop-filter: blur(20px) saturate(1.4); backdrop-filter: blur(20px) saturate(1.4);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.18), inset 0 0 0 1px rgba(255,255,255,.12), 0 1px 2px rgba(0,0,0,.28), 0 18px 40px -14px rgba(0,0,0,.65);
+        font-size: 52px; line-height: 1; white-space: nowrap; }
+      #lead b { font-weight: 800; letter-spacing: .02em; color: #fff; }
+      #lead span { font-weight: 700; color: rgba(255,255,255,.74); letter-spacing: .03em; }
+      #lead .tri { border-left-width: 12px; border-right-width: 12px; border-bottom-width: 18px; margin-top: -4px; }
+    </style>
+  </head>
+  <body>
+    <!-- vertical-only motion blur for rolling digits (stdDeviation "0 k": blur along the roll, never sideways) -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs id="vblurs"></defs></svg>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="5" data-width="1080" data-height="1920">
+      <!-- sample footage: one continuous shot per variant, no cut under the graphic -->
+      <!-- v0: p05 truck yard, source 0–5.0 s at 1.0x (its first cut is at 5.03 s) -->
+      <video id="plateA" class="clip plate" src="assets/plates/p05-truck-yard-v.mp4" muted playsinline
+        data-start="0" data-duration="5" data-media-start="0" data-track-index="0"></video>
+      <!-- v1: p04 drive-by mural, source 0–4.4 s at 0.88x (its first cut is at 4.43 s) -->
+      <video id="plateB" class="clip plate" src="assets/plates/p04-driveby-mural-v.mp4" muted playsinline
+        data-start="0" data-duration="5" data-media-start="0" data-playback-rate="0.88" data-track-index="0"></video>
+
+      <div id="ov" class="clip" data-start="0" data-duration="5" data-track-index="1">
+        <!-- Variant 0: Bars -->
+        <div class="group" id="g0">
+          <div id="card">
+            <div class="eyebrow" id="c-eyebrow"></div>
+            <div class="rows" id="rows"></div>
+            <div class="foot"><span id="c-foot"></span><div class="pill cond" id="pill"><b></b><span></span></div></div>
+          </div>
+        </div>
+        <!-- Variant 1: Big number vs -->
+        <div class="group" id="g1">
+          <div id="scrim"></div>
+          <div id="vs">
+            <div class="eyebrow" id="vs-eyebrow"></div>
+            <div class="side" id="sideA">
+              <div class="sidelab"><span class="lab cond" id="labA"></span><span class="date" id="dateA"></span></div>
+              <div class="numwrap cond" id="wrapA"><div class="num" id="numA"></div><div class="num" id="numAg"></div><div class="num" id="numAs" aria-hidden="true" data-layout-allow-occlusion></div></div>
+            </div>
+            <div class="vsrow" id="vsrow"><div class="rule"></div><div class="chip cond">VS</div><div class="rule"></div></div>
+            <div class="side" id="sideB">
+              <div class="sidelab"><span class="lab cond" id="labB"></span><span class="date" id="dateB"></span></div>
+              <div class="numwrap cond" id="wrapB"><div class="num" id="numB"></div></div>
+            </div>
+            <div id="lead" class="cond"><div class="tri"></div><b id="leadNum"></b><span id="leadTxt"></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const CONFIG = {
+        // Shared content (real numbers: Rockstar Games YouTube channel, checked 2026-11-18 — see research/gta6/FACTS.md)
+        eyebrow: ["GTA 6 trailers", "YouTube views"],   // v0 header: [bright part, dim part] joined by " · " (v1 shows both)
+        source: "as of Nov 18, 2026",                    // v0 footer
+        unit: "M",          // suffix after the number
+        decimals: 1,
+        items: [
+          { label: "Trailer 1",      date: "Dec 2023", value: 305.4 },
+          { label: "Trailer 2",      date: "May 2025", value: 189.6 },
+          { label: "Launch Trailer", date: "Oct 2026", value: 82.0 }
+        ],
+        variants: {
+          // "Bars": three bars grow on one shared clock, so the ranking (and every bar ratio) is true on every frame.
+          "0": { plate: "assets/plates/p05-truck-yard-v.mp4", gapWord: "ahead of" },
+          // "Big number vs": items[a] vs items[b] on the same shared clock; the leader lands with the sunset sweep.
+          "1": { plate: "assets/plates/p04-driveby-mural-v.mp4", a: 0, b: 1, leadSuffix: "views ahead" }
+        },
+        // in: entrance · count/land: ONE shared clock for every counter, value_i(t) = total_i * ease((t - count) / (land - count)),
+        // so the ranking and the bar ratios are true on every frame; land = the payoff · out: exit starts (0.35 s fade) · end: composition end
+        // sheen: v1's slow sunset sheen across the winning numeral during the hold [start, duration]
+        timing: { in: 0.1, count: 0.3, land: 1.8, ease: "power3.out", sheen: [3.0, 1.2], out: 4.6, end: 5.0 },
+        maxBlur: 6          // px of vertical motion blur on a fast-rolling digit (scaled down for small numerals)
+      };
+
+      (function () {
+        const VARS = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+        const vKey = CONFIG.variants[String(VARS.variant)] ? String(VARS.variant) : "0";
+        const showPlate = VARS.bg !== "none";
+        const V = CONFIG.variants[vKey], T = CONFIG.timing;
+        const $ = (s) => document.querySelector(s);
+        const fmt = (x) => x.toFixed(CONFIG.decimals) + CONFIG.unit;
+        const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+        const SCALE = Math.pow(10, CONFIG.decimals);
+
+        document.querySelectorAll("video.plate").forEach((v) => {
+          if (!showPlate || v.getAttribute("src") !== V.plate) v.style.display = "none";
+        });
+        $("#g" + vKey).style.display = "block";
+
+        // vertical blur filters vb1..vb8
+        const defs = $("#vblurs");
+        for (let k = 1; k <= 8; k++) {
+          defs.insertAdjacentHTML("beforeend", '<filter id="vb' + k + '" x="0" y="-20%" width="100%" height="140%" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="0 ' + k + '"/></filter>');
+        }
+
+        // seek-safe per-frame driver (getter/setter tween on linear progress, works with suppressEvents seeks)
+        function drive(tl, at, dur, fn) {
+          let v = 0;
+          const proxy = { p: function (x) { if (!arguments.length) return v; v = x; fn(x); } };
+          tl.fromTo(proxy, { p: 0 }, { p: 1, duration: dur, ease: "none", immediateRender: false }, at);
+        }
+
+        // ---------- Odometer ----------
+        // Builds a fixed-slot numeral for `final` inside `host`: one rolling cell per digit, static cells for "." and the unit.
+        // Leading cells start at 0 width and open (time-based tween) when the count first reaches their place value.
+        function makeOdo(host, final, opts) {
+          opts = opts || {};
+          const cs = getComputedStyle(host);
+          const size = parseFloat(cs.fontSize), weight = cs.fontWeight;
+          const H = Math.round(size * 1.3);         // cell height (glyph + room for the roll and mask fade)
+          const L = opts.box || Math.round(size * 0.86); // layout box height the odometer occupies
+          const maxBlur = Math.max(1, Math.min(CONFIG.maxBlur, Math.round(size * 0.026)));
+          host.innerHTML = "";
+          const odo = document.createElement("div");
+          odo.className = "odo";
+          odo.style.height = L + "px";
+          host.appendChild(odo);
+          // measure advances in this exact font
+          const probe = document.createElement("span");
+          probe.style.cssText = "position:absolute;visibility:hidden;white-space:pre;letter-spacing:0;font-kerning:none;line-height:" + H + "px;display:inline-block";
+          odo.appendChild(probe);
+          const adv = (s) => { probe.textContent = s; return probe.getBoundingClientRect().width; };
+          const trackPx = Math.round(size * 0.014 * 100) / 100;   // a hair of tracking: Barlow Black digits nearly touch at 248 px
+          const dW = Math.ceil((adv("0") + trackPx) * 100) / 100;
+          probe.innerHTML = '0<i style="display:inline-block;width:0;height:0;vertical-align:baseline"></i>';
+          const base = probe.querySelector("i").getBoundingClientRect().top - probe.getBoundingClientRect().top;
+          odo.removeChild(probe);
+          const ctx = document.createElement("canvas").getContext("2d");
+          ctx.font = weight + " " + size + "px " + cs.fontFamily;
+          const m = ctx.measureText("0");
+          const glyphMid = base - (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2;
+          const shift = H / 2 - glyphMid;            // centres the digit glyph in its cell (so the mask fade is symmetric)
+
+          const intDigits = String(Math.floor(final)).length;
+          const cells = [];
+          const unitPlace = SCALE;                    // place value of the units digit, in 10^-decimals steps
+          const addStatic = (txt) => {
+            const c = document.createElement("div"); c.className = "cell fix";
+            c.style.width = Math.ceil((adv2(txt) + trackPx) * 100) / 100 + "px"; c.style.height = H + "px";
+            c.innerHTML = '<span class="g"></span>';
+            const g = c.firstChild; g.textContent = txt; g.style.height = H + "px"; g.style.lineHeight = H + "px";
+            g.style.transform = "translateY(" + shift.toFixed(2) + "px)";
+            odo.appendChild(c); cells.push({ el: c, fixed: true, w: parseFloat(c.style.width) });
+          };
+          function adv2(s) { const p = document.createElement("span"); p.style.cssText = probe.style.cssText; p.textContent = s; odo.appendChild(p); const w = p.getBoundingClientRect().width; odo.removeChild(p); return w; }
+          const addDigit = (P) => {
+            const c = document.createElement("div"); c.className = "cell roll";
+            c.style.width = dW + "px"; c.style.height = H + "px";
+            const s = document.createElement("div"); s.className = "strip";
+            // the off-digits sit above/below the masked cell by design (that is the odometer)
+            s.setAttribute("data-layout-allow-overflow", ""); s.setAttribute("data-layout-allow-occlusion", "");
+            c.setAttribute("data-layout-allow-overflow", ""); c.setAttribute("data-layout-allow-occlusion", "");
+            for (let k = 0; k <= 10; k++) {
+              const g = document.createElement("span"); g.className = "g";
+              g.setAttribute("data-layout-allow-occlusion", ""); g.setAttribute("data-layout-allow-overflow", "");
+              g.textContent = String(k % 10); g.style.height = H + "px"; g.style.lineHeight = H + "px";
+              s.appendChild(g);
+            }
+            c.appendChild(s); odo.appendChild(c);
+            cells.push({ el: c, strip: s, zero: s.firstChild, P: P, w: dW, leading: P > unitPlace, lastF: -1 });
+          };
+          for (let i = 0; i < intDigits; i++) addDigit(Math.pow(10, intDigits - 1 - i) * SCALE);
+          if (CONFIG.decimals > 0) {
+            addStatic(".");
+            for (let j = 0; j < CONFIG.decimals; j++) addDigit(Math.pow(10, CONFIG.decimals - 1 - j));
+          }
+          if (CONFIG.unit) addStatic(CONFIG.unit);
+          const width = cells.reduce((a, c) => a + c.w, 0);
+
+          // value in display units (e.g. millions), velocity in display units per second
+          function set(value, vel) {
+            const n = Math.max(0, Math.round(value * SCALE * 1e6) / 1e6), dn = Math.abs(vel) * SCALE;
+            cells.forEach((c) => {
+              if (c.fixed) return;
+              const P = c.P;
+              let pos, carrySpd;
+              if (P === 1) { pos = n % 10; carrySpd = dn; }
+              else {
+                // true odometer: a wheel only turns while every wheel below it reads 9 and the last one is rolling to 0
+                const lower = n % P, thr = P - 1;
+                const carry = lower > thr ? (lower - thr) : 0;
+                pos = (Math.floor(n / P) % 10) + carry;
+                carrySpd = carry > 0 ? dn : 0;
+              }
+              const avg = dn / P;                                    // digits per second, averaged
+              const perFrame = Math.max(carrySpd, avg >= 15 ? avg : 0) / 30;
+              // spinning faster than ~1 digit a frame: a camera would only see a smear, so hold the wheel on a whole digit
+              // and let the blur carry the motion (no half-digits sliding over the bar at random offsets)
+              if (perFrame >= 1) pos = Math.round(pos);
+              else if (perFrame > 0.5) { const r = Math.round(pos), k = (1 - perFrame) * 2; pos = r + (pos - r) * k; }
+              const f = Math.min(maxBlur, Math.round(perFrame * H * 0.25));
+              c.strip.style.transform = "translateY(" + (shift - pos * H).toFixed(2) + "px)";
+              if (f !== c.lastF) { c.strip.style.filter = f > 0 ? "url(#vb" + f + ")" : "none"; c.lastF = f; }
+              // a leading cell's "0" only shows once a higher place is non-zero (no "083.7M")
+              if (c.leading) c.zero.style.opacity = n >= P * 10 - 1e-6 ? 1 : 0;
+            });
+          }
+          // leading cells start closed; open() schedules each to open just before the count first reaches its place.
+          // opts.reserve keeps every slot at full width from the start (the numeral never moves sideways; an unreached leading
+          // place is simply blank), used where the numeral is centred (v1).
+          if (!opts.reserve) cells.forEach((c) => { if (c.leading) c.el.style.width = "0px"; });
+          function open(tl, timeAt) {
+            if (opts.reserve) return;
+            cells.forEach((c) => {
+              if (!c.leading) return;
+              const tc = timeAt(c.P / SCALE);
+              if (tc == null) return;
+              // fully open just BEFORE the count reaches this place: the slot grows while it is still blank (no clipped
+              // sliver of the new digit), then the digit rolls into a full-width cell
+              tl.fromTo(c.el, { width: 0 }, { width: c.w, duration: 0.18, ease: "power2.inOut", immediateRender: false }, Math.max(0, tc - 0.2));
+            });
+          }
+          // static copy at the final value (for the gradient wipe in v1)
+          function staticClone(dest) {
+            dest.innerHTML = "";
+            const o = odo.cloneNode(true);
+            let x = 0;
+            const str = fmt(final).split("");
+            Array.from(o.children).forEach((c, i) => {
+              c.className = "cell fix";
+              c.style.width = cells[i].w + "px";
+              c.innerHTML = '<span class="g"></span>';
+              const g = c.firstChild; g.textContent = str[i]; g.style.height = H + "px"; g.style.lineHeight = H + "px";
+              g.style.transform = "translateY(" + shift.toFixed(2) + "px)";
+              g.style.backgroundSize = width + "px 100%"; g.style.backgroundPosition = (-x) + "px 0";
+              x += cells[i].w;
+            });
+            dest.appendChild(o);
+            o._xs = cells.map((c, i) => cells.slice(0, i).reduce((a, d) => a + d.w, 0));   // each cell's x offset (for the sheen)
+            o._w = width;
+            return o;
+          }
+          set(0, 0);
+          return { el: odo, set, open, staticClone, width, H, L, baseline: base + shift - (H - L) / 2 };
+        }
+
+        // a counter: value(t) = total * ease((t - t0) / dur); velocity from the ease's derivative
+        function counter(total, t0, dur, easeName) {
+          const e = gsap.parseEase(easeName);
+          const val = (u) => total * e(Math.min(1, Math.max(0, u)));
+          return {
+            total, t0, dur,
+            at: (u) => (u >= 1 ? total : val(u)),
+            vel: (u) => { const h = 0.002, a = Math.max(0, u - h), b = Math.min(1, u + h); return (val(b) - val(a)) / ((b - a) * dur); },
+            timeAt: (x) => { if (x > total) return null; let lo = 0, hi = 1; for (let k = 0; k < 40; k++) { const mid = (lo + hi) / 2; if (val(mid) < x) lo = mid; else hi = mid; } return t0 + hi * dur; }
+          };
+        }
+        // one shared clock: same start, same ease, same landing -> every value is the same fraction of its total on every frame
+        const counterFor = (item) => counter(item.value, T.count, T.land - T.count, T.ease);
+
+        if (vKey === "0") {
+          $("#c-eyebrow").innerHTML = "<b>" + esc(CONFIG.eyebrow[0]) + "</b> · " + esc(CONFIG.eyebrow[1]);
+          $("#c-foot").textContent = CONFIG.source;
+          const items = CONFIG.items.slice().sort((a, b) => b.value - a.value);
+          // margin pill lives in the footer row (right side): no hole is reserved under the bars during the race
+          if (items.length > 1) {
+            $("#pill b").textContent = "+" + fmt(items[0].value - items[1].value);
+            $("#pill span").textContent = V.gapWord + " " + items[1].label;
+          } else $("#pill").style.display = "none";
+          const rowsEl = $("#rows");
+          items.forEach((it, i) => {
+            const r = document.createElement("div");
+            r.className = "row" + (i === 0 ? " top" : "");
+            r.innerHTML = '<div class="rowtop"><div class="lab cond"></div><div class="val cond"></div></div>' +
+              '<div class="track"><div class="fill' + (i === 0 ? ' lead' : '') + '">' + (i === 0 ? '<div class="sheen" data-layout-allow-overflow></div>' : '') + '</div></div>';
+            r.querySelector(".lab").innerHTML = '<span class="ln">' + esc(it.label) + '</span><span class="date"></span>';
+            r.querySelector(".date").textContent = it.date;
+            rowsEl.appendChild(r);
+          });
+        } else {
+          const A = CONFIG.items[V.a], B = CONFIG.items[V.b];
+          $("#vs-eyebrow").textContent = CONFIG.eyebrow.join(" · ");
+          $("#labA").textContent = A.label; $("#dateA").textContent = A.date;
+          $("#labB").textContent = B.label; $("#dateB").textContent = B.date;
+          $("#leadNum").textContent = "+" + fmt(Math.abs(A.value - B.value));
+          $("#leadTxt").textContent = V.leadSuffix;
+          if (!showPlate) $("#scrim").classList.add("light");
+        }
+
+        // load every weight the odometers measure before measuring (fonts.ready alone resolves before an unused weight is requested)
+        const famOf = (el) => getComputedStyle(el).fontFamily;   // read from the stylesheet, so the families stay declared in one place
+        const COND = famOf(document.querySelector(".cond") || document.body), SANS = famOf(document.getElementById("root"));
+        const fontLoads = [[900, COND], [800, COND], [600, SANS], [800, SANS]]
+          .map(([w, f]) => document.fonts.load(w + " 100px " + f, "0123456789.M").catch(() => null));
+        Promise.all(fontLoads).then(() => document.fonts.ready).then(() => {
+          const tl = gsap.timeline({ paused: true });
+
+          if (vKey === "0") {
+            const items = CONFIG.items.slice().sort((a, b) => b.value - a.value);
+            const rows = Array.from(document.querySelectorAll("#rows .row"));
+            const max = items[0].value;
+            const trackW = rows[0].querySelector(".track").clientWidth;
+            const R = rows.map((r, i) => {
+              const valEl = r.querySelector(".val"), lab = r.querySelector(".lab");
+              const odo = makeOdo(valEl, items[i].value, { box: Math.round(parseFloat(getComputedStyle(valEl).fontSize) * (i === 0 ? 0.8 : 0.86)) });
+              // baseline-align the label with the numeral
+              const mk = document.createElement("i"); mk.style.cssText = "display:inline-block;width:0;height:0;vertical-align:baseline";
+              const line = lab.querySelector(".date") || lab;   // the hero row stacks label over date: align the date's baseline
+              line.appendChild(mk);
+              const labBase = mk.getBoundingClientRect().top - lab.getBoundingClientRect().top;
+              line.removeChild(mk);
+              const d = odo.baseline - labBase;
+              if (d > 0) lab.style.marginTop = d.toFixed(1) + "px"; else valEl.style.marginTop = (-d).toFixed(1) + "px";
+              return { fill: r.querySelector(".fill"), val: valEl, lab, odo, c: counterFor(items[i]) };
+            });
+            R.forEach((r) => { r.fill.style.width = "0px"; });
+            R[0].fill.style.backgroundSize = trackW + "px 100%";   // the sunset is fixed to the track: it reveals pink -> amber as the bar grows
+
+            // entrance: the whole card lands as one unit
+            gsap.set("#card", { opacity: 0, y: 40, scale: 0.97, transformOrigin: "50% 60%" });
+            tl.fromTo("#card", { y: 40, opacity: 0, scale: 0.97 }, { y: 0, opacity: 1, scale: 1, duration: 0.42, ease: "expo.out", immediateRender: false }, T.in);
+
+            // the race: all start together; the smaller ones surge early and land first,
+            // the leader starts slow, overtakes both and keeps climbing alone to the payoff
+            R.forEach((r) => {
+              const c = r.c;
+              gsap.set(r.val, { opacity: 0 });
+              tl.fromTo(r.val, { opacity: 0 }, { opacity: 1, duration: 0.14, ease: "power1.out", immediateRender: false }, c.t0);
+              r.odo.open(tl, c.timeAt);
+              drive(tl, c.t0, c.dur, (u) => {
+                const x = c.at(u);
+                r.fill.style.width = (x / max * trackW).toFixed(2) + "px";
+                r.odo.set(x, u >= 1 ? 0 : c.vel(u));
+              });
+            });
+
+            // payoff: the leader's value settles with a pop, one sheen sweep, the others step back, the margin pill opens in
+            const pay = T.land;
+            gsap.set(R[0].val, { transformOrigin: "100% 80%" });
+            tl.fromTo(R[0].val, { scale: 1.08 }, { scale: 1, duration: 0.36, ease: "power3.out", immediateRender: false }, pay);
+            const sheen = document.querySelector(".sheen");
+            tl.fromTo(sheen, { x: -240, opacity: 1 }, { x: trackW + 40, opacity: 1, duration: 0.7, ease: "power2.inOut", immediateRender: false }, pay - 0.04);
+            tl.set(sheen, { opacity: 0 }, pay + 0.68);
+            R.slice(1).forEach((r) => {
+              // ranked, not disabled: white fill at .38 on the .08 track, label and value at .80
+              tl.to(r.fill, { opacity: 0.38, duration: 0.35, ease: "power2.out" }, pay + 0.05);
+              tl.to([r.val, r.lab], { opacity: 0.8, duration: 0.35, ease: "power2.out" }, pay + 0.05);
+            });
+            if (items.length > 1) {
+              gsap.set("#pill", { opacity: 0, scale: 0.86, transformOrigin: "100% 50%" });
+              tl.fromTo("#pill", { opacity: 0, scale: 0.86 }, { opacity: 1, scale: 1, duration: 0.3, ease: "back.out(1.5)", immediateRender: false }, pay + 0.16);
+            }
+
+            // hold: the card drifts a few px so the frame never sits dead under the footage
+            tl.to("#card", { y: -8, duration: T.out - (pay + 0.6), ease: "sine.inOut" }, pay + 0.6);
+
+            // exit (last 0.4 s, clean for a loop)
+            tl.to("#card", { y: 16, opacity: 0, duration: 0.35, ease: "power2.in" }, T.out);
+          } else {
+            const A = CONFIG.items[V.a], B = CONFIG.items[V.b];
+            const cA = counterFor(A), cB = counterFor(B);
+            const oA = makeOdo($("#numA"), A.value, { box: 214, reserve: true });
+            const oB = makeOdo($("#numB"), B.value, { box: 170, reserve: true });
+            const gA = oA.staticClone($("#numAg"));
+            const sA = oA.staticClone($("#numAs"));
+            gsap.set(["#numAg", "#numAs"], { xPercent: -50, opacity: 0 });
+
+            const parts = ["#vs-eyebrow", "#sideA", "#vsrow", "#sideB"];
+            gsap.set(parts, { opacity: 0, y: 28 });
+            gsap.set("#scrim", { opacity: 0 });
+            gsap.set("#lead", { opacity: 0, scale: 0.86, transformOrigin: "50% 50%" });
+            tl.fromTo("#scrim", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out", immediateRender: false }, T.in - 0.05);
+            parts.forEach((s, i) => {
+              tl.fromTo(s, { opacity: 0, y: 28 }, { opacity: 1, y: 0, duration: 0.42, ease: "expo.out", immediateRender: false }, T.in + i * 0.05);
+            });
+
+            // the race: both numerals roll on the same clock, so the leader leads on every frame and both land together.
+            // Each fades in as its count starts (no "0.0M vs 0.0M").
+            gsap.set(["#wrapA", "#wrapB"], { opacity: 0 });
+            [[oA, cA, "#wrapA"], [oB, cB, "#wrapB"]].forEach(([o, c, w]) => {
+              tl.fromTo(w, { opacity: 0 }, { opacity: 1, duration: 0.14, ease: "power1.out", immediateRender: false }, c.t0);
+              o.open(tl, c.timeAt);
+              drive(tl, c.t0, c.dur, (u) => o.set(c.at(u), u >= 1 ? 0 : c.vel(u)));
+            });
+
+            // payoff: sunset sweeps across the leading numeral, then the margin chip pops
+            const pay = T.land;
+            const wLead = "#wrapA";   // items[a] is the leader (it takes the sunset)
+            gsap.set(wLead, { transformOrigin: "50% 60%" });
+            tl.set("#numAg", { opacity: 1 }, pay - 0.04);
+            tl.fromTo(gA, { clipPath: "inset(-30% 100% -30% 0%)" }, { clipPath: "inset(-30% 0% -30% 0%)", duration: 0.45, ease: "power2.inOut", immediateRender: false }, pay - 0.04);
+            gsap.set(gA, { clipPath: "inset(-30% 100% -30% 0%)" });
+            tl.fromTo(wLead, { scale: 1.06 }, { scale: 1, duration: 0.4, ease: "power3.out", immediateRender: false }, pay - 0.04);
+            tl.set("#numA", { opacity: 0 }, pay + 0.42);
+            tl.fromTo("#lead", { opacity: 0, scale: 0.86 }, { opacity: 1, scale: 1, duration: 0.35, ease: "back.out(1.5)", immediateRender: false }, pay + 0.3);
+
+            // hold beat: one slow sunset sheen (a soft white band clipped to the glyphs) crosses the winning numeral once
+            const SH = Math.round(sA._w * 0.38), sGl = Array.from(sA.querySelectorAll(".g")), sEase = gsap.parseEase("power2.inOut");
+            const sheenAt = (xb) => sGl.forEach((g, i) => { g.style.backgroundSize = SH + "px 100%"; g.style.backgroundPosition = (xb - sA._xs[i]).toFixed(1) + "px 0"; });
+            sheenAt(-SH);
+            tl.set("#numAs", { opacity: 1 }, T.sheen[0]);
+            drive(tl, T.sheen[0], T.sheen[1], (u) => sheenAt(-SH + sEase(u) * (sA._w + SH)));
+            tl.set("#numAs", { opacity: 0 }, T.sheen[0] + T.sheen[1]);
+
+            // hold: a slow push so the frame never sits dead
+            gsap.set("#vs", { transformOrigin: "50% 45%" });
+            tl.to("#vs", { scale: 1.018, duration: T.out - (pay + 0.5), ease: "sine.inOut" }, pay + 0.5);
+
+            // exit (last 0.4 s, clean for a loop)
+            tl.to(["#vs", "#scrim"], { opacity: 0, duration: 0.35, ease: "power2.in" }, T.out);
+            tl.to("#vs", { y: -16, duration: 0.35, ease: "power2.in" }, T.out);
+          }
+
+          tl.set({}, {}, T.end);
+          window.__timelines = window.__timelines || {};
+          window.__timelines["main"] = tl;
+          tl.seek(0);
+        });
+      })();
+    </script>
+  </body>
+</html>

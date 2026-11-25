@@ -1,0 +1,523 @@
+<!doctype html>
+<!-- GTA 6 component #42 — Pre-load progress. 1080x1920 (9:16), 30 fps, 5.0 s.
+     A neutral, unbranded launcher-style download card for "Grand Theft Auto VI" that opens at 97%, ticks
+     98% -> 99% -> (a held 99) -> 100%, lands "Ready to play" at 2.75 s (numeral slam + light sweep), then Play is
+     pressed (a controller-style press, no mouse cursor: the game is console-only at launch) and the card drops away.
+     Variables: variant "0" = Bar (smoked-glass card, top third, bar morphs into a Play button)
+                variant "1" = Ring (ink-navy glass launcher panel pinned at the top, circular ring, Play pill lights up)
+                bg "plate" (sample GTA VI footage underneath) / "none" (transparent overlay).
+     Safe zones: both cards are 768 px wide including the 1 px edge (x 156–924) and stay inside x 144–936 at the
+     end of the 1.025 push-in; tops sit at y 352 (Bar) and y 230 (Ring). The optional cursor (off by default) stays inside the cards. -->
+<html lang="en" data-composition-variables='[
+  {"id":"variant","type":"enum","label":"Variant","default":"0","options":[{"value":"0","label":"Bar"},{"value":"1","label":"Ring"}]},
+  {"id":"bg","type":"enum","label":"Background","default":"plate","options":[{"value":"plate","label":"Sample footage"},{"value":"none","label":"Transparent"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link rel="stylesheet" href="assets/fonts/fonts.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="assets/kit/motion/motion.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: transparent; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; font-family: "Inter", sans-serif; color: #fff;
+        -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; font-feature-settings: "tnum" 1, "ss01" 1; }
+      .plate { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      #ov { position: absolute; inset: 0; }
+      :root {
+        --ink: #0B0B0E; --navy: #1F202B;
+        --sunset: linear-gradient(90deg, #F84FA4 0%, #FE8E4E 58%, #FEB747 100%);
+        --soft-sunset: linear-gradient(160deg, #9C7AA8 0%, #D689A1 30%, #FAA08D 58%, #FCB680 80%, #FFC88F 100%);
+        --mute: rgba(255,255,255,.62);
+        --hair: rgba(255,255,255,.14);
+        --shadow-card: 0 1px 2px rgba(0,0,0,.35), 0 40px 110px -30px rgba(0,0,0,.75);
+      }
+      /* a soft scrim so the card sits on the footage like a launcher screen (plate mode only) */
+      #scrim { position: absolute; inset: 0; background:
+        radial-gradient(120% 70% at 50% 34%, rgba(5,5,10,.0) 0%, rgba(5,5,10,.38) 100%); }
+
+      /* ---------- shared type: 28 / 44 / hero numeral ---------- */
+      .lbl { font-weight: 600; font-size: 28px; letter-spacing: .14em; text-transform: uppercase; line-height: 1; white-space: nowrap; }
+      .title { font-weight: 700; font-size: 44px; letter-spacing: -0.022em; line-height: 1.08; white-space: nowrap; }
+      .sub { font-weight: 500; font-size: 28px; letter-spacing: -0.005em; color: var(--mute); line-height: 1.2; white-space: nowrap; }
+      .num { font-family: "Barlow Condensed", "Inter", sans-serif; font-weight: 800; letter-spacing: 0.005em; }
+      .check { width: 34px; height: 34px; flex: none; }
+      .check path { fill: none; stroke: #fff; stroke-width: 3.4; stroke-linecap: round; stroke-linejoin: round; }
+      .play { width: 30px; height: 34px; flex: none; }
+
+      /* the tile: our own "GTA 6" in Barlow on the soft sunset backdrop (no logo) */
+      .head { display: flex; align-items: center; gap: 30px; }
+      .tile { width: 136px; height: 136px; border-radius: 28px; flex: none; display: flex; align-items: center; justify-content: center;
+        background: var(--soft-sunset);
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,.22), inset 0 1px 0 rgba(255,255,255,.35), 0 6px 18px -8px rgba(0,0,0,.6); }
+      .tile span { font-family: "Barlow Condensed", sans-serif; font-weight: 800; font-size: 44px; letter-spacing: .04em; color: var(--navy); }
+      .head-txt { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+      .head-txt .lbl { color: var(--mute); }
+      /* the kicker swaps PRE-LOAD -> INSTALLED at done (two spans stacked in one grid cell) */
+      #barKicker { display: grid; }
+      #barKicker > span { grid-area: 1 / 1; }
+
+      /* ---------- percent odometer ----------
+         The digits roll inside a soft-masked slot whose line pitch (--lh) is taller than the glyphs, so the outgoing
+         value has fully left (and faded) before the incoming one settles. The % is static, outside the rolling stack. */
+      .pct { display: flex; align-items: flex-start; }
+      .slot { position: relative; overflow: hidden; height: var(--lh); flex: none;
+        -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 var(--mk), #000 calc(100% - var(--mk)), transparent 100%);
+        mask-image: linear-gradient(180deg, transparent 0, #000 var(--mk), #000 calc(100% - var(--mk)), transparent 100%); }
+      .stack-in { position: absolute; left: 0; right: 0; top: 0; }
+      .stack-in > div { display: flex; justify-content: flex-end; white-space: nowrap; height: var(--lh); line-height: var(--lh); font-size: var(--fs); }
+      .pc { font-family: "Barlow Condensed", sans-serif; font-weight: 700; font-size: 44px; line-height: 1; margin: var(--pc-top) 0 0 var(--pc-ml); }
+      /* the date line swaps to the ready line at done (two spans stacked in one grid cell) */
+      .sub { display: grid; }
+      .sub > span { grid-area: 1 / 1; }
+      .mono { font-family: "JetBrains Mono", monospace; font-weight: 500; letter-spacing: -0.03em; }
+
+      /* ---------- the cursor: a plain generic arrow, positioned by its tip ---------- */
+      .cursor { position: absolute; left: 0; top: 0; width: 40px; height: 58px; margin: -3.5px 0 0 -3.5px; opacity: 0;
+        transform-origin: 3.5px 3.5px; filter: drop-shadow(0 3px 2px rgba(0,0,0,.35)) drop-shadow(0 8px 16px rgba(0,0,0,.35)); }
+      .cursor svg { width: 40px; height: 58px; display: block; overflow: visible; }
+      .cursor path { fill: #fff; stroke: #0B0B0E; stroke-width: 1.5; stroke-linejoin: round; }
+
+      /* ---------- Variant 0: Bar ---------- */
+      #barPush { position: absolute; left: 157px; top: 352px; width: 766px; }
+      #barCard { position: relative; width: 766px; border-radius: 36px; padding: 44px 48px 46px;
+        background: rgba(14,14,20,.86); -webkit-backdrop-filter: blur(20px) saturate(1.1); backdrop-filter: blur(20px) saturate(1.1);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 0 0 1px rgba(255,255,255,.10), var(--shadow-card); }
+      .rule { height: 1px; background: var(--hair); }
+      #barCard .rule { margin: 34px 0 0; }
+      .srow { position: relative; display: flex; align-items: flex-start; justify-content: flex-end; margin-top: -14px; }
+      #barPct { --lh: 216px; --fs: 190px; --mk: 13%; --pc-top: 40px; --pc-ml: 2px; }
+      /* the status label's cap baseline sits on the numeral baseline (measured: --st-top) */
+      .bstatus { position: absolute; left: 0; top: 157px; height: 34px; width: 380px; }
+      .bstatus > div { position: absolute; left: 0; top: 0; display: flex; align-items: center; gap: 14px; height: 34px; }
+      /* the payoff is the loudest line on the card: 44 px Inter 700, its baseline on the numeral baseline (top -15 = 184 - 157 - 42) */
+      #barSt1 { top: -15px; height: 52px; gap: 12px; font-size: 44px; font-weight: 700; letter-spacing: -0.022em; text-transform: none; }
+      #barSt1 .check { width: 40px; height: 40px; }
+      .bslot { position: relative; height: 96px; margin-top: -4px; }
+      #bar { position: absolute; left: 0; right: 0; top: 0; height: 24px; border-radius: 999px; overflow: hidden; background: rgba(255,255,255,.16); }
+      #barFill { position: absolute; left: 0; top: 0; bottom: 0; width: 0%; border-radius: 999px; background: var(--sunset); overflow: hidden; }
+      /* live hold: a 140 px highlight sweeps across the fill every 0.9 s (positioned from the timeline in render) */
+      #barShine { position: absolute; left: 0; top: 0; bottom: 0; width: 140px; opacity: 0;
+        background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.35) 50%, rgba(255,255,255,0) 100%); }
+      /* a bright leading edge so each tick visibly moves the end of the fill; its glow breathes .6 -> 1 at 1.2 Hz */
+      #barTip { position: absolute; right: 0; top: 0; bottom: 0; width: 46px; border-radius: 999px;
+        background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.55) 78%, rgba(255,255,255,.9) 100%); }
+      /* the 100% light sweep (and the later ready sheen) across the whole bar / Play button */
+      #barSweep { position: absolute; left: 0; top: 0; bottom: 0; width: 240px; opacity: 0;
+        background: linear-gradient(90deg, rgba(255,246,234,0) 0%, rgba(255,246,234,.62) 50%, rgba(255,246,234,0) 100%); }
+      /* controller-style press: a quick inner highlight flash, no cursor */
+      #barPress { position: absolute; inset: 0; border-radius: 999px; opacity: 0;
+        background: rgba(255,255,255,.14); box-shadow: inset 0 0 0 2px rgba(255,255,255,.9); }
+      #barCta { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 18px; opacity: 0;
+        color: var(--ink); font-weight: 700; font-size: 44px; letter-spacing: -0.02em; }
+      #barGlow { position: absolute; left: -6px; right: -6px; top: -6px; height: 36px; border-radius: 999px; opacity: 0;
+        background: var(--sunset); filter: blur(14px); }
+      .meta { position: absolute; left: 0; right: 0; top: 50px; display: flex; justify-content: space-between;
+        font-family: "JetBrains Mono", monospace; font-weight: 500; font-size: 28px; letter-spacing: -0.01em; color: var(--mute); white-space: nowrap; }
+
+      /* ---------- Variant 1: Ring ---------- */
+      #ringPush { position: absolute; left: 157px; top: 230px; width: 766px; transform-origin: 50% 0%; }
+      #ringCard { position: relative; width: 766px; border-radius: 36px; padding: 40px;
+        background: rgba(31,32,43,.86); -webkit-backdrop-filter: blur(20px) saturate(1.4); backdrop-filter: blur(20px) saturate(1.4);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.14), 0 0 0 1px rgba(255,255,255,.08), var(--shadow-card); }
+      #ringCard .rule { margin: 28px 0 24px; }
+      .rwrap { position: relative; width: 426px; height: 426px; margin: 0 auto; }
+      .rwrap > svg { position: absolute; inset: 0; width: 426px; height: 426px; overflow: visible; }
+      .rinner { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+      /* light that rides the ring stroke (r 187–213): a conic band masked to the annulus, rotated from the timeline */
+      .rlight { position: absolute; inset: 0; border-radius: 50%; opacity: 0;
+        -webkit-mask-image: radial-gradient(circle, transparent 186.5px, #000 187.5px, #000 212.5px, transparent 213.5px);
+        mask-image: radial-gradient(circle, transparent 186.5px, #000 187.5px, #000 212.5px, transparent 213.5px); }
+      /* live hold: a 24° comet highlight runs along the filled arc every 0.9 s */
+      #ringComet { background: conic-gradient(from -24deg, rgba(255,255,255,0) 0deg, rgba(255,255,255,.5) 21deg, rgba(255,255,255,0) 24deg, rgba(255,255,255,0) 360deg); }
+      /* the 100% light sweep: one 120° band laps the closed ring in 0.35 s */
+      #ringSweep { background: conic-gradient(from -120deg, rgba(255,246,234,0) 0deg, rgba(255,246,234,.72) 114deg, rgba(255,246,234,0) 120deg, rgba(255,246,234,0) 360deg); }
+      #ringPct { --lh: 206px; --fs: 180px; --mk: 13%; --pc-top: 38px; --pc-ml: 2px; transform: translate(var(--nx), -9px); --nx: 6px; }
+      .rstatus { position: relative; height: 56px; margin-top: 16px; }
+      .rstatus > div { position: absolute; left: 0; right: 0; top: 0; height: 56px; display: flex; align-items: center; justify-content: center; gap: 16px; }
+      /* while downloading: a readable 44 px status with a live ETA (same slot size as the ready line) */
+      #ringSt0 { color: rgba(255,255,255,.66); font-weight: 500; font-size: 44px; letter-spacing: -0.02em; text-transform: none; }
+      #ringSt1 { font-weight: 700; font-size: 44px; letter-spacing: -0.022em; text-transform: none; }
+      #ringSt1 .check { width: 40px; height: 40px; }
+      .rpill { position: relative; height: 96px; margin-top: 20px; border-radius: 999px; overflow: hidden; }
+      .rpill .face { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 18px;
+        font-weight: 700; font-size: 44px; letter-spacing: -0.02em; }
+      /* while downloading: only a faint empty slot (no label, no greyed-out button) */
+      #pillTrack { position: absolute; inset: 0; border-radius: 999px; background: rgba(255,255,255,.035); box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); }
+      /* ready: a solid paper pill (white = done, like the check), so the ring stays the frame's only sunset accent */
+      #pillLit { position: absolute; inset: 0; border-radius: 999px; background: #fff; opacity: 0; }
+      /* controller-style press: a quick ink tint + inner edge flash on the paper pill */
+      #pillPress { position: absolute; inset: 0; border-radius: 999px; opacity: 0;
+        background: rgba(11,11,14,.08); box-shadow: inset 0 0 0 2px rgba(11,11,14,.22); }
+      #pillOn { color: var(--ink); opacity: 0; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="5.0" data-width="1080" data-height="1920">
+      <!-- sample footage: one framework-owned muted video; the script hides it when bg is "none" or when its src is not the variant's plate -->
+      <video id="plateA" class="clip plate" src="assets/plates/p01-keys-sign-v.mp4" muted playsinline data-start="0" data-duration="5.0" data-track-index="0"></video>
+
+      <div id="ov" class="clip" data-start="0" data-duration="5.0" data-track-index="1">
+        <div id="scrim"></div>
+
+        <!-- ===== Variant 0: Bar ===== -->
+        <div id="barPush">
+          <div id="barCard">
+            <div class="head" id="barHead">
+              <div class="tile"><span id="barTile"></span></div>
+              <div class="head-txt">
+                <div class="lbl" id="barKicker"><span id="barKickA"></span><span id="barKickB" style="opacity:0"></span></div>
+                <div class="title" id="barTitle"></div>
+                <div class="sub" id="barSub"><span id="barSubA"></span><span id="barSubB" style="opacity:0"></span></div>
+              </div>
+            </div>
+            <div class="rule"></div>
+            <div class="srow" id="barRow">
+              <div class="bstatus" id="barStatus">
+                <div class="lbl" id="barSt0"></div>
+                <div class="lbl" id="barSt1" style="opacity:0">
+                  <svg class="check" viewBox="0 0 34 34"><path id="barCheck" d="M8 17.5l6 6L26.5 10.5" /></svg>
+                  <span id="barDone"></span>
+                </div>
+              </div>
+              <div class="pct" id="barPct">
+                <div class="slot" id="barSlot"><div class="stack-in num" id="barStack" data-layout-allow-overflow data-layout-allow-occlusion data-layout-allow-overlap></div></div>
+                <div class="pc">%</div>
+              </div>
+            </div>
+            <div class="bslot" id="bslot">
+              <div id="barGlow"></div>
+              <div id="bar">
+                <div id="barFill"><div id="barShine" data-layout-allow-overflow></div><div id="barTip"></div></div>
+                <div id="barSweep" data-layout-allow-overflow></div>
+                <div id="barPress"></div>
+                <div id="barCta" data-layout-allow-overflow>
+                  <svg class="play" viewBox="0 0 30 34"><path d="M3 3.2v27.6c0 1.6 1.7 2.5 3 1.7l22.4-13.8c1.3-.8 1.3-2.6 0-3.4L6 1.5C4.7.7 3 1.6 3 3.2z" fill="#0B0B0E"/></svg>
+                  <span id="barCtaTxt"></span>
+                </div>
+              </div>
+              <div class="meta" id="barMeta"><span id="barSpeed"></span><span id="barEta"></span></div>
+            </div>
+          </div>
+          <div class="cursor" id="barCursor"><svg viewBox="0 0 23 33.5"><path d="M2 2v25.6l6.1-5.9 4.3 10.1 4.6-2-4.3-9.9h8.6z" /></svg></div>
+        </div>
+
+        <!-- ===== Variant 1: Ring ===== -->
+        <div id="ringPush">
+          <div id="ringCard">
+            <div class="head" id="ringHead">
+              <div class="tile"><span id="ringTile"></span></div>
+              <div class="head-txt">
+                <div class="title" id="ringTitle"></div>
+                <div class="sub" id="ringSub"><span id="ringSubA"></span><span id="ringSubB" style="opacity:0"></span></div>
+              </div>
+            </div>
+            <div class="rule"></div>
+            <div class="rwrap" id="rwrap">
+              <svg viewBox="0 0 426 426">
+                <defs>
+                  <linearGradient id="sunG" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0" stop-color="#F84FA4"/><stop offset=".58" stop-color="#FE8E4E"/><stop offset="1" stop-color="#FEB747"/>
+                  </linearGradient>
+                </defs>
+                <circle cx="213" cy="213" r="200" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="26" />
+                <circle id="ringArc" cx="213" cy="213" r="200" fill="none" stroke="url(#sunG)" stroke-width="26" stroke-linecap="round"
+                  transform="rotate(-90 213 213)" />
+              </svg>
+              <div class="rlight" id="ringComet"></div>
+              <div class="rlight" id="ringSweep"></div>
+              <div class="rinner" id="ringInner">
+                <div class="pct" id="ringPct">
+                  <div class="slot" id="ringSlot"><div class="stack-in num" id="ringStack" data-layout-allow-overflow data-layout-allow-occlusion data-layout-allow-overlap></div></div>
+                  <div class="pc">%</div>
+                </div>
+              </div>
+            </div>
+            <div class="rstatus" id="ringStatus">
+              <div class="lbl" id="ringSt0"><span id="ringStTxt"></span><span>·</span><span class="mono" id="ringEta"></span><span id="ringLeft">left</span></div>
+              <div class="lbl" id="ringSt1" style="opacity:0">
+                <svg class="check" viewBox="0 0 34 34"><path id="ringCheck" d="M8 17.5l6 6L26.5 10.5" /></svg>
+                <span id="ringDone"></span>
+              </div>
+            </div>
+            <div class="rpill" id="ringPill">
+              <div id="pillTrack"></div>
+              <div id="pillLit"></div>
+              <div id="pillPress"></div>
+              <div class="face" id="pillOn">
+                <svg class="play" viewBox="0 0 30 34"><path d="M3 3.2v27.6c0 1.6 1.7 2.5 3 1.7l22.4-13.8c1.3-.8 1.3-2.6 0-3.4L6 1.5C4.7.7 3 1.6 3 3.2z" fill="#0B0B0E"/></svg>
+                <span id="pillOnTxt"></span>
+              </div>
+            </div>
+          </div>
+          <div class="cursor" id="ringCursor"><svg viewBox="0 0 23 33.5"><path d="M2 2v25.6l6.1-5.9 4.3 10.1 4.6-2-4.3-9.9h8.6z" /></svg></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const CONFIG = {
+        // the game on the card; written in our own type, no logo, no store or console branding
+        game: { title: "Grand Theft Auto VI", tile: "GTA 6" },
+        // percent states: the card enters already showing the first value, then each later value ticks in at timing.ticks[i]
+        progress: [97, 98, 99, 100],
+        variants: {
+          "0": {
+            name: "Bar",
+            plate: "assets/plates/p01-keys-sign-v.mp4",
+            kicker: "Pre-load",
+            kickerDone: "Installed",  // the kicker swaps to this at 100%, so it agrees with "Available now"
+            sub: "Unlocks Nov 19, 2026",
+            subDone: "Available now",   // the date line swaps to this at 100%, so it never contradicts the Play button
+            status: "Installing",
+            done: "Ready to play",
+            cta: "Play",
+            speedMBs: 112.4,      // demo download speed shown in the meta row
+            etaStart: 3,          // seconds left shown on entrance; counts down to 0:00 as the last tick lands
+            // optional mouse cursor (off: GTA 6 launches on PS5 / Xbox Series only). Tip position in card pixels.
+            cursor: { show: false, rest: [640, 508], click: [576, 478] }
+          },
+          "1": {
+            name: "Ring",
+            plate: "assets/plates/p01-keys-sign-v.mp4",
+            sub: "Launches November 19, 2026",
+            subDone: "Available now",
+            status: "Downloading",    // shown as "Downloading · 0:03 left"; the ETA counts down to 0:00 as the last tick lands
+            etaStart: 3,
+            done: "Ready to play",
+            cta: "Play",
+            cursor: { show: false, rest: [650, 850], click: [576, 800] }
+          }
+        },
+        // in: card entrance · ticks: when 98 / 99 / 100 roll in · step: fill ease per tick · live: highlight cycle while downloading
+        // done: 100% lands (numeral slam, light sweep, status swap, Play state) · glint: one ready sheen across Play / the ring
+        // click: Play is pressed (scale 1 -> .96 -> 1 + inner flash) · move: optional cursor glide · out: card drops away · end: clip end
+        timing: { in: 0.12, ticks: [0.42, 1.3, 2.5], step: 0.42, live: 0.9, done: 2.75, glint: 3.45, click: 4.36,
+                  move: [3.7, 4.2], out: 4.55, end: 5.0 }
+      };
+
+      (function () {
+        const VARS = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+        const vKey = CONFIG.variants[String(VARS.variant)] ? String(VARS.variant) : "0";
+        const showPlate = VARS.bg !== "none";
+        const V = CONFIG.variants[vKey], T = CONFIG.timing, P = CONFIG.progress, G = CONFIG.game;
+        const $ = (s) => document.querySelector(s);
+        const isBar = vKey === "0";
+        const lastTick = T.ticks[T.ticks.length - 1];
+        const useCursor = !!(V.cursor && V.cursor.show);
+
+        document.querySelectorAll("video.plate").forEach((v) => {
+          if (!showPlate || v.getAttribute("src") !== V.plate) v.style.display = "none";
+        });
+        if (!showPlate) $("#scrim").style.display = "none";
+        $(isBar ? "#ringPush" : "#barPush").style.display = "none";
+
+        // ---- content ----
+        const pre = isBar ? "#bar" : "#ring";
+        const stackEl = $(pre + "Stack"), slotEl = $(pre + "Slot");
+        P.forEach((n) => {
+          const d = document.createElement("div"), a = document.createElement("span");
+          a.textContent = String(n);
+          [d, a].forEach((e) => { e.setAttribute("data-layout-allow-occlusion", ""); e.setAttribute("data-layout-allow-overlap", ""); });
+          d.appendChild(a); stackEl.appendChild(d);
+        });
+        $(pre + "Tile").textContent = G.tile;
+        $(pre + "Title").textContent = G.title;
+        $(pre + "SubA").textContent = V.sub;
+        $(pre + "SubB").textContent = V.subDone || V.sub;
+        if (isBar) $("#barSt0").textContent = V.status; else $("#ringStTxt").textContent = V.status;
+        $(pre + "Done").textContent = V.done;
+        if (isBar) {
+          // tracked caps, but the hyphen and the letter before it keep tight spacing so "PRE-LOAD" doesn't read "P R E - L O A D"
+          const kicker = (el, txt) => String(txt || "").split(/(.-)/).forEach((part) => {
+            if (!part) return;
+            const sp = document.createElement("span"); sp.textContent = part;
+            if (/^.-$/.test(part)) sp.style.letterSpacing = "0.02em";
+            el.appendChild(sp);
+          });
+          kicker($("#barKickA"), V.kicker);
+          kicker($("#barKickB"), V.kickerDone || V.kicker);
+          $("#barCtaTxt").textContent = V.cta;
+        } else {
+          $("#pillOnTxt").textContent = V.cta;
+        }
+        const cur = $(pre + "Cursor");
+        if (!useCursor) cur.style.display = "none";
+
+        // ---- deterministic model (pure functions of time) ----
+        const eStep = gsap.parseEase("power4.out"), eGlide = gsap.parseEase("power3.inOut"), eSweep = gsap.parseEase("power1.inOut");
+        function fillAt(t) {
+          let v = P[0];
+          T.ticks.forEach((t0, i) => { if (t >= t0) v = P[i] + (P[i + 1] - P[i]) * eStep(Math.min(1, (t - t0) / T.step)); });
+          return v;
+        }
+        // ring arc: round caps add one stroke width, so the drawn length is scaled to close exactly at 100%
+        const R = 200, SW = 26, C = 2 * Math.PI * R, BAR_W = 670;
+        const fillEl = $("#barFill"), arc = $("#ringArc"), shine = $("#barShine"), tip = $("#barTip"), comet = $("#ringComet");
+        let lastSpd = "", lastEta = "";
+        // live highlight: one pass every T.live seconds while downloading, soft in/out at both ends, gone once 100 lands
+        const liveFrom = T.in + 0.2;
+        function liveAt(t) {
+          if (t < liveFrom) return { p: 0, o: 0 };
+          const p = ((t - liveFrom) % T.live) / T.live;
+          const env = Math.max(0, Math.min(1, p / 0.14, (1 - p) / 0.14));
+          const gate = Math.max(0, Math.min(1, (t - liveFrom) / 0.2, 1 - (t - lastTick) / 0.16));
+          return { p: eSweep(p), o: env * gate };
+        }
+        function cursorAt(t) {
+          // optional cursor: idles with a few px of hand drift, then glides on a shallow arc to Play
+          const c = V.cursor, k = Math.max(0, Math.min(1, (t - T.move[0]) / (T.move[1] - T.move[0]))), e = eGlide(k);
+          const still = 1 - e;
+          const dx = still * (3.2 * Math.sin(t * 1.7) + 1.6 * Math.sin(t * 3.1 + 0.6));
+          const dy = still * (2.4 * Math.sin(t * 1.3 + 1.1) + 1.2 * Math.sin(t * 2.7));
+          return [c.rest[0] + (c.click[0] - c.rest[0]) * e + dx, c.rest[1] + (c.click[1] - c.rest[1]) * e - Math.sin(Math.PI * e) * 34 + dy];
+        }
+        function render(t) {
+          const f = fillAt(t), L = liveAt(t);
+          if (isBar) {
+            fillEl.style.width = f.toFixed(3) + "%";
+            // the 140 px highlight crosses the filled part only (it is clipped by the fill)
+            const fpx = BAR_W * f / 100;
+            shine.style.transform = "translateX(" + (-140 + (fpx + 140) * L.p).toFixed(1) + "px)";
+            shine.style.opacity = L.o.toFixed(3);
+            // the leading-edge glow breathes .6 -> 1 at 1.2 Hz, then fades as the bar closes
+            const tipGate = Math.max(0, Math.min(1, 1 - (t - (lastTick + 0.1)) / 0.25));
+            tip.style.opacity = ((0.8 + 0.2 * Math.sin(2 * Math.PI * 1.2 * t)) * tipGate).toFixed(3);
+          } else {
+            // once closed, draw the plain circle so the two round caps leave no notch at 12 o'clock
+            arc.style.strokeDasharray = f > 99.9 ? "none" : ((C - SW) * f / 100).toFixed(2) + " " + C.toFixed(2);
+            // the 24° comet rides the filled arc (head from 24° to the arc's end), then one slow lap of the closed ring as a ready glint
+            const endDeg = 360 * ((C - SW) * f / 100) / C;
+            let a = 24 + (endDeg - 24) * L.p, o = L.o;
+            const g = (t - T.glint) / 0.9;
+            if (g >= 0 && g <= 1) { a = 24 + 360 * eSweep(g); o = Math.max(0, Math.min(1, g / 0.14, (1 - g) / 0.14)) * 0.8; }
+            comet.style.transform = "rotate(" + a.toFixed(2) + "deg)";
+            comet.style.opacity = o.toFixed(3);
+          }
+          // ETA counts down in real time from the entrance to the last tick
+          const k = Math.max(0, Math.min(1, (t - T.in) / (lastTick - T.in)));
+          const eta = "0:" + String(Math.max(0, Math.ceil(V.etaStart * (1 - k) - 1e-6))).padStart(2, "0");
+          if (isBar) {
+            const spd = (V.speedMBs + 5.2 * Math.sin(t * 2.1) + 2.1 * Math.sin(t * 5.3 + 1)).toFixed(1) + " MB/s";
+            if (spd !== lastSpd) { $("#barSpeed").textContent = spd; lastSpd = spd; }
+            if (eta !== lastEta) { $("#barEta").textContent = eta + " left"; lastEta = eta; }
+          } else if (eta !== lastEta) { $("#ringEta").textContent = eta; lastEta = eta; }
+          if (useCursor) {
+            const p = cursorAt(t);
+            gsap.set(cur, { x: p[0], y: p[1] });
+          }
+        }
+        render(0);
+
+        document.fonts.ready.then(() => {
+          const K = window.KitMotion;
+          const tl = gsap.timeline({ paused: true });
+          const push = pre + "Push", card = pre + "Card";
+
+          // odometer slot width follows the value, so the static % slides over when 100 needs a third digit
+          const widths = Array.from(stackEl.children).map((d) => Math.ceil(d.firstChild.getBoundingClientRect().width) + 2);
+          gsap.set(slotEl, { width: widths[0] });
+
+          // master driver: fill / ring arc, live highlights, speed, ETA and the optional cursor are a pure function of time
+          K.drive(tl, 0, T.end, (p) => render(p * T.end), "linear");
+
+          // entrance: card rises through a soft blur already at 97%, then a slow "camera" push-in for the hold
+          tl.fromTo(card, { opacity: 0, y: 36, scale: 0.965, filter: "blur(8px)" },
+            { opacity: 1, y: 0, scale: 1, filter: "blur(0px)", duration: 0.45, ease: "expo.out", immediateRender: true }, T.in);
+          tl.set(card, { filter: "none" }, T.in + 0.46);
+          tl.fromTo(push, { scale: 1 }, { scale: 1.025, duration: T.out - T.in, ease: "sine.inOut", immediateRender: true }, T.in);
+          if (useCursor) tl.fromTo(cur, { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power2.out", immediateRender: true }, T.in + 0.12);
+
+          // percent odometer: each new value rolls up from below through the soft mask
+          const lineH = parseFloat(getComputedStyle(slotEl).height);
+          const lines = Array.from(stackEl.children);
+          T.ticks.forEach((t0, i) => {
+            tl.fromTo(stackEl, { y: -lineH * i }, { y: -lineH * (i + 1), duration: 0.36, ease: "expo.out", immediateRender: false }, t0);
+            // the outgoing value also fades as it leaves, so nothing of it lingers at the top of the slot
+            tl.fromTo(lines[i], { opacity: 1 }, { opacity: 0, duration: 0.05, ease: "power1.in", immediateRender: false }, t0);
+            tl.fromTo(lines[i + 1], { opacity: 0 }, { opacity: 1, duration: 0.12, ease: "power1.out", immediateRender: false }, t0);
+            if (widths[i + 1] !== widths[i])
+              tl.fromTo(slotEl, { width: widths[i] }, { width: widths[i + 1], duration: 0.36, ease: "expo.out", immediateRender: false }, t0);
+          });
+
+          // completion: the bar's glow pulses as the fill closes
+          const tClose = lastTick + 0.1;
+          if (isBar) {
+            tl.fromTo("#barGlow", { opacity: 0 }, { opacity: 0.75, duration: 0.18, ease: "power2.out", immediateRender: false }, tClose);
+            tl.to("#barGlow", { opacity: 0, duration: 0.6, ease: "power2.out" }, tClose + 0.2);
+          }
+
+          // ---- the 100% beat (T.done): the numeral slams 1.12 -> 1 in 3 frames and one light sweep crosses the bar / laps the ring ----
+          // the slam starts on a frame boundary (30 fps) so one rendered frame really shows the 1.12 peak
+          const pctEl = isBar ? "#barPct" : "#ringInner", slamAt = Math.round(T.done * 30) / 30 - 0.001;
+          tl.fromTo(pctEl, { scale: 1.12 }, { scale: 1, duration: 0.1, ease: "power3.out", immediateRender: false, transformOrigin: "50% 55%" }, slamAt);
+          if (isBar) {
+            tl.fromTo("#barSweep", { x: -240, opacity: 1 }, { x: BAR_W, duration: 0.35, ease: "power1.inOut", immediateRender: false }, T.done);
+            tl.set("#barSweep", { opacity: 0 }, T.done + 0.36);
+          } else {
+            tl.fromTo("#ringSweep", { rotation: 0 }, { rotation: 360, duration: 0.35, ease: "power1.inOut", immediateRender: false }, T.done);
+            tl.fromTo("#ringSweep", { opacity: 0 }, { opacity: 1, duration: 0.07, ease: "power1.out", immediateRender: false }, T.done);
+            tl.to("#ringSweep", { opacity: 0, duration: 0.13, ease: "power1.in" }, T.done + 0.22);
+          }
+
+          // status swap and drawn check; the ready label starts only after the old one has fully gone (no double exposure)
+          const st0 = pre + "St0", st1 = pre + "St1", chk = pre + "Check";
+          const len = $(chk).getTotalLength();
+          gsap.set(chk, { strokeDasharray: len, strokeDashoffset: len });
+          tl.fromTo(st0, { opacity: 1, y: 0 }, { opacity: 0, y: -8, duration: 0.15, ease: "power2.in", immediateRender: false }, T.done);
+          tl.fromTo(st1, { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.32, ease: "expo.out", immediateRender: false }, T.done + 0.16);
+          tl.fromTo(chk, { strokeDashoffset: len }, { strokeDashoffset: 0, duration: 0.25, ease: "power3.out", immediateRender: false }, T.done + 0.22);
+          // the date line becomes "Available now" (and the Bar kicker "INSTALLED") on the same beat
+          const swaps = [[pre + "SubA", pre + "SubB"]];
+          if (isBar) swaps.push(["#barKickA", "#barKickB"]);
+          swaps.forEach(([a, b]) => {
+            tl.fromTo(a, { opacity: 1 }, { opacity: 0, duration: 0.15, ease: "power2.in", immediateRender: false }, T.done);
+            tl.fromTo(b, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.32, ease: "expo.out", immediateRender: false }, T.done + 0.16);
+          });
+
+          // the Play state
+          const btn = isBar ? "#bar" : "#ringPill", press = isBar ? "#barPress" : "#pillPress";
+          if (isBar) {
+            // the finished bar grows into the Play button
+            tl.fromTo("#barMeta", { opacity: 1 }, { opacity: 0, duration: 0.12, ease: "power2.in", immediateRender: false }, T.done - 0.02);
+            tl.fromTo("#bar", { height: 24 }, { height: 96, duration: 0.42, ease: "expo.out", immediateRender: false }, T.done + 0.1);
+            tl.fromTo("#barCta", { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.3, ease: "expo.out", immediateRender: false }, T.done + 0.26);
+            // one ready sheen across the Play button keeps the hold alive
+            tl.fromTo("#barSweep", { x: -240, opacity: 0.6 }, { x: BAR_W, duration: 0.7, ease: "power1.inOut", immediateRender: false }, T.glint);
+            tl.set("#barSweep", { opacity: 0 }, T.glint + 0.71);
+          } else {
+            // ring payoff: the ring pops 1 -> 1.04 -> 1 and the empty slot lights up as a paper Play button (crossfade + settle)
+            tl.fromTo("#rwrap", { scale: 1 }, { scale: 1.04, duration: 0.1, ease: "power2.out", immediateRender: false }, T.done);
+            tl.to("#rwrap", { scale: 1, duration: 0.3, ease: "power3.out" }, T.done + 0.1);
+            tl.fromTo("#pillTrack", { opacity: 1 }, { opacity: 0, duration: 0.1, ease: "power2.in", immediateRender: false }, T.done + 0.04);
+            // the paper lights in ~2 frames so it never sits half-faded (a half-faded white pill reads as a grey disabled button)
+            tl.fromTo("#pillLit", { opacity: 0 }, { opacity: 1, duration: 0.07, ease: "power2.out", immediateRender: false }, T.done + 0.06);
+            tl.fromTo("#ringPill", { scale: 0.97 }, { scale: 1, duration: 0.22, ease: "power2.out", immediateRender: false }, T.done + 0.06);
+            tl.fromTo("#pillOn", { opacity: 0, y: 6 }, { opacity: 1, y: 0, duration: 0.24, ease: "power2.out", immediateRender: false }, T.done + 0.13);
+          }
+
+          // the press: Play scales 1 -> .96 -> 1 over 140 ms with an inner highlight flash (a controller press, no cursor needed)
+          tl.fromTo(btn, { scale: 1 }, { scale: 0.96, duration: 0.06, ease: "power2.in", immediateRender: false }, T.click);
+          tl.to(btn, { scale: 1, duration: 0.08, ease: "power2.out" }, T.click + 0.06);
+          tl.fromTo(press, { opacity: 0 }, { opacity: 1, duration: 0.04, ease: "power1.out", immediateRender: false }, T.click);
+          tl.to(press, { opacity: 0, duration: 0.2, ease: "power2.out" }, T.click + 0.08);
+          if (useCursor) {
+            tl.fromTo(cur, { scale: 1 }, { scale: 0.86, duration: 0.06, ease: "power2.in", immediateRender: false }, T.click);
+            tl.to(cur, { scale: 1, duration: 0.12, ease: "power2.out" }, T.click + 0.06);
+          }
+
+          // exit: the card drops away (scale 1 -> .97, opacity 0, expo.in) right after the press
+          const leaving = useCursor ? [card, cur] : [card];
+          tl.to(leaving, { opacity: 0, duration: 0.35, ease: "expo.in" }, T.out);
+          tl.to(card, { scale: 0.97, duration: 0.35, ease: "expo.in" }, T.out);
+          tl.set({}, {}, T.end);
+          window.__timelines = window.__timelines || {};
+          window.__timelines["main"] = tl;
+          tl.seek(0);
+        });
+      })();
+    </script>
+
+  </body>
+</html>

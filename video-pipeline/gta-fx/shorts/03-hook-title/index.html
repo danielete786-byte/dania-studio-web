@@ -1,0 +1,749 @@
+<!doctype html>
+<!-- GTA 6 component #3: Hook title (craft v2). 1080x1920 (9:16), 30 fps, 7 s.
+     The opening hook of a short, in the top third, one keyword accented. It lands on the edit's first cut.
+     Variables: variant "0" Boxed lines (TikTok-style merged text slabs with room around each line: a 72 px lead-in tab over
+                                        two ~196 px lines; the stack is an object (lit top edge, contact shadow); the keyword's
+                                        slab slams 1.12 -> 1 on the cut as it ignites with the sunset, its light screened onto
+                                        the footage and bounced onto the paper, and it re-hits on every later cut) /
+                "1" Official caps (Rockstar-style wide caps set left in the sky of full-bleed footage; the whole hook reads
+                                   by 0.5 s and MISSED lands on the 0.4 s cut with an anamorphic light streak; its bloom
+                                   is screened onto the footage, so its light falls on the image);
+                bg "plate" (4K trailer shots cut on rhythm + Look finishing) / "none" (transparent overlay, type only).
+     Safe zone: all type sits inside x 96-936, y 230-760 (plus the v1 source stamp at y 1384-1423), including the hold
+     push and the slam settle. -->
+<html lang="en" data-composition-variables='[
+  {"id":"variant","type":"enum","label":"Variant","default":"0","options":[{"value":"0","label":"Boxed lines"},{"value":"1","label":"Official caps"}]},
+  {"id":"bg","type":"enum","label":"Background","default":"plate","options":[{"value":"plate","label":"Sample footage"},{"value":"none","label":"Transparent"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link rel="stylesheet" href="assets/fonts/fonts.css" />
+    <link rel="stylesheet" href="assets/kit/look/look.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="assets/kit/look/look.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: transparent; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; font-family: "Inter", sans-serif; color: #fff;
+        -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; }
+      /* footage stage: full frame for both variants (v2 r07: the letterbox is gone) */
+      /* z-index 0 makes the stage its own stacking context: the flash, leak and vignette inside it light the footage only, never the type */
+      #stage { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; overflow: hidden; z-index: 0; }
+      #shake, #push { position: absolute; inset: 0; }
+      .shot { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      #ov { position: absolute; inset: 0; z-index: 10; }
+      #scrim { position: absolute; left: 0; top: 0; width: 1080px; height: 1300px; opacity: 0; }
+      /* Official caps sky grade: a plum-black top smoke, weighted to the left where the lockup sits. r08: capped so the
+         combined darkening peaks at about .45 (the r07 .74 turned every sky grey); the type's lift shadows do the rest */
+      #scrim.sky { background:
+        radial-gradient(ellipse 60% 16% at 38% 30%, rgba(6,4,16,.2) 0%, rgba(6,4,16,.1) 55%, rgba(6,4,16,0) 100%),
+        linear-gradient(180deg, rgba(6,4,16,.45) 0%, rgba(6,4,16,.34) 16%, rgba(6,4,16,.24) 30%, rgba(6,4,16,.12) 46%, rgba(6,4,16,0) 66%); }
+      /* MISSED's anamorphic streak: a lens artefact on the payoff cut, so it sits ABOVE everything, screen-blended */
+      #flare { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; z-index: 12; pointer-events: none;
+        mix-blend-mode: screen; opacity: 0; overflow: hidden; }
+      #flare .st { position: absolute; left: 0; top: 0; transform-origin: 50% 50%; }
+      #flare .glow { opacity: 1; }
+      #hook { position: absolute; left: 0; top: 0; width: 1080px; }
+      /* MISSED's light: a copy of the keyword's glyphs carrying the bloom, ABOVE the stage and BELOW the type, screened
+         so the pink light falls on the footage (the type layer is its own stacking context, so it can't blend itself) */
+      #light { position: absolute; inset: 0; z-index: 5; pointer-events: none; opacity: 0; }
+      #light .lh, #light .lw { position: absolute; inset: 0; }
+      #light .lt { position: absolute; white-space: nowrap; }
+      #light .lk-mask { overflow: visible; }
+
+      /* ---------- Variant 0: Boxed lines (merged text slabs, each hugging its line) ---------- */
+      .row { position: absolute; left: 0; top: 0; }
+      .punch { position: relative; transform-origin: 50% 50%; }
+      .slab { position: relative; overflow: hidden; }
+      /* warm paper (matched to the Leonida sunset light). The stack's one contact shadow is on #hook (drop-shadow), so it
+         follows the merged outline, fillets included */
+      .slab.paper { background: linear-gradient(180deg, #FFFAF3 0%, #F6EEE4 100%); }
+      /* night paper: the same slab under street light, faded in on the night cut so the stack doesn't glare */
+      .slab .night { position: absolute; inset: 0; opacity: 0; background: linear-gradient(180deg, #E8E3DA 0%, #DED8CE 100%); }
+      /* TikTok-style concave fillet where a narrower slab meets a wider one (paper, with a night layer) */
+      .fil { position: absolute; opacity: 0; }
+      .fil i { position: absolute; inset: 0; }
+      /* the keyword slab is the light source: the sunset fills the slab itself on the cut (wipe) with a hot light edge
+         riding the wipe front; the light stays INSIDE the slab (inset glow), and a sheen crosses it */
+      .slab .sunfill { position: absolute; inset: 0; box-shadow: inset 0 0 40px rgba(254,183,71,.35); }
+      .slab .edge { position: absolute; left: 0; top: 0; height: 100%; opacity: 0; mix-blend-mode: screen;
+        background: linear-gradient(90deg, rgba(255,214,170,0) 0%, rgba(255,226,196,.55) 55%, rgba(255,250,240,1) 84%, rgba(255,255,255,0) 100%); }
+      .slab .lit { position: absolute; left: 0; top: 0; width: 100%; height: 1px; }
+      .slab .glint { position: absolute; left: 0; top: 0; height: 100%;
+        background: linear-gradient(105deg, rgba(255,255,255,0) 40%, rgba(255,255,255,.5) 50%, rgba(255,255,255,0) 60%); }
+      .txt { position: absolute; left: 0; top: 0; white-space: nowrap; font-family: "Inter", sans-serif; font-weight: 800;
+        letter-spacing: -0.042em; font-feature-settings: "kern" 1, "ss01" 1, "cv11" 1; }
+      .txt .in { display: inline-block; position: relative; }
+      .txt .bl { display: inline-block; width: 0; height: 0; vertical-align: baseline; }
+
+      /* ---------- Variant 1: Official caps (left-aligned lockup in the sky) ---------- */
+      .caps { text-align: left; }
+      .caps .kick { display: inline-block; font-family: "Archivo", "Inter", sans-serif; font-stretch: 125%; font-weight: 600;
+        text-transform: uppercase; white-space: nowrap; line-height: 1.2; color: #fff;
+        text-shadow: 2px 0 0 rgba(238,8,242,.85), 0 0 12px rgba(255,255,255,.3), 0 0 34px rgba(238,8,242,.28), 0 2px 10px rgba(0,0,0,.35); }
+      .hl { display: block; white-space: nowrap; font-family: "Archivo", "Inter", sans-serif; font-stretch: 125%; font-weight: 800;
+        text-transform: uppercase; letter-spacing: .015em; line-height: .92; }
+      .caps #l1 { filter: drop-shadow(0 2px 3px rgba(0,0,0,.22)) drop-shadow(0 8px 26px rgba(0,0,0,.42)); }   /* lift only: MISSED is the one line that glows */
+      .caps #l2wrap { display: block; }
+      .caps #l2 { display: inline-block; filter: drop-shadow(0 2px 4px rgba(0,0,0,.26)); }   /* contact only, so its own light isn't shadowed out */
+      /* source stamp under the lockup: the trailer and the timecode of the shot on screen, rolling on each cut.
+         One face (Archivo wide 600) for the whole row, with tabular figures so the time doesn't jitter. */
+      .stamps { display: flex; align-items: center; gap: 18px; transform-origin: 0% 50%; }
+      .stamps .r { display: block; width: 48px; height: 2px; background: rgba(255,255,255,.86); flex: none; }
+      .stamps .tc { position: relative; display: block; overflow: hidden; }
+      .stamps .it { position: absolute; left: 0; top: 0; white-space: nowrap; font-family: "Archivo", "Inter", sans-serif; font-stretch: 125%;
+        font-weight: 600; text-transform: uppercase; color: #fff; font-variant-numeric: tabular-nums lining-nums;
+        font-feature-settings: "tnum" 1, "lnum" 1; text-shadow: 0 1px 2px rgba(0,0,0,.4), 0 3px 14px rgba(0,0,0,.55); }
+      .stamps .it .src { color: rgba(255,255,255,.8); }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="7" data-width="1080" data-height="1920">
+      <div id="stage">
+        <div id="shake"><div id="push">
+          <!-- Boxed lines (r09): vertical 4K shots, full frame, bright all the way through, cut on the hook's beats (1.1 payoff,
+               3.4 and 5.5 re-hits). The payoff shot holds 2.3 s: the 1.87 s sunset dock runs at 0.79x (source 0.02-1.83).
+               The near-black s014 night tail is gone: the hook ends on Trailer 2's opening shot, a Keys stilt house under
+               open blue sky (assets/clips/s001-stilt-house-v.mp4: cut from the 4K master like the shot library, same grade,
+               framed right so the title sits in the sky). -->
+          <video id="v0a" class="clip shot v0" src="assets/shots/s011-vice-highway-v.mp4" muted playsinline data-start="0" data-duration="1.1" data-media-start="0.3" data-track-index="0"></video>
+          <video id="v0b" class="clip shot v0" src="assets/shots/s027-sunset-dock-v.mp4" muted playsinline data-start="1.1" data-duration="2.3" data-media-start="0.02" data-playback-rate="0.79" data-track-index="0"></video>
+          <video id="v0c" class="clip shot v0" src="assets/shots/s012-muscle-beach-v.mp4" muted playsinline data-start="3.4" data-duration="2.1" data-media-start="0.5" data-track-index="0"></video>
+          <video id="v0d" class="clip shot v0" src="assets/clips/s001-stilt-house-v.mp4" muted playsinline data-start="5.5" data-duration="1.5" data-media-start="0" data-track-index="0"></video>
+          <!-- Official caps (r08): bright day to golden hour, every shot with open sky top-left for the lockup (checked frame
+               by frame). Highway (Trailer 2) / CUT 0.4 payoff: skydive over Vice City (Features Trailer) / 1.9 "The Keys"
+               sign under power lines (Launch Trailer; in at 0.3 as the trailer clears, out at 0.9 before the sign's top edge
+               rises to MISSED) / 2.5 jetski under open blue sky (Trailer 2; out at 0.65, before the riders' heads reach
+               the lockup) / 3.15 muscle beach palms (Trailer 2) / 5.5 sunset pier (Trailer 2) -->
+          <video id="v1a" class="clip shot v1" src="assets/shots/s011-vice-highway-v.mp4" muted playsinline data-start="0" data-duration="0.4" data-media-start="1.3" data-track-index="2"></video>
+          <video id="v1b" class="clip shot v1" src="assets/shots/s135-skydive-city-v.mp4" muted playsinline data-start="0.4" data-duration="1.5" data-media-start="0" data-track-index="2"></video>
+          <video id="v1c" class="clip shot v1" src="assets/shots/s074-keys-sign-v.mp4" muted playsinline data-start="1.9" data-duration="0.6" data-media-start="0.3" data-track-index="2"></video>
+          <video id="v1d" class="clip shot v1" src="assets/shots/s064-jetski-v.mp4" muted playsinline data-start="2.5" data-duration="0.65" data-media-start="0" data-track-index="2"></video>
+          <video id="v1e" class="clip shot v1" src="assets/shots/s012-muscle-beach-v.mp4" muted playsinline data-start="3.15" data-duration="2.35" data-media-start="0.3" data-track-index="2"></video>
+          <video id="v1f" class="clip shot v1" src="assets/shots/s026-sunset-pier-v.mp4" muted playsinline data-start="5.5" data-duration="1.5" data-media-start="0" data-track-index="2"></video>
+        </div></div>
+      </div>
+      <div id="light"><div class="lh"><div class="lw"></div></div></div>
+      <div id="flare"></div>
+      <div id="ov" class="clip" data-start="0" data-duration="7" data-track-index="1">
+        <div id="scrim"></div>
+        <div id="hook"></div>
+      </div>
+    </div>
+
+    <script>
+      /* ===================== CONFIG: all content, styling and timing for both variants ===================== */
+      const CONFIG = {
+        duration: 7,
+        accent: "linear-gradient(100deg, #F84FA4 0%, #FE78A6 24%, #FE8E4E 62%, #FEB747 100%)",   // Leonida sunset, keyword only
+        variants: {
+          // Boxed lines: the TikTok text-box format, made an object (r09). Warm paper slabs with room around the ink, a
+          // lit top edge and one soft contact shadow under the merged stack. On the first cut the keyword's slab SLAMS
+          // 1.12 -> 1 as it fills with the Leonida sunset and becomes the light source: its pink/amber bloom is screened
+          // onto the footage, it bounces onto the paper next to it, and it re-hits on every later cut. Shots: <video class="v0">.
+          "0": {
+            style: "boxed",
+            shots: ["s011-vice-highway", "s027-sunset-dock", "s012-muscle-beach", "clips/s001-stilt-house"],
+            lines: [
+              { text: "GTA 6 details", size: 72, padX: 26, padY: 14 },   // the lead-in: a small tab on top of the stack
+              { text: "nobody", size: 200 },
+              { text: "noticed", size: 200 }
+            ],
+            keyword: "nobody",          // the line whose slab ignites in sunset ("" = no accent)
+            maxWidth: 772,              // a slab never gets wider than this: a long line shrinks from its size to fit, and at
+                                        // 772 the stack stays inside x 936 through the hold push (Inter 800 display)
+            top: 232,                   // y of the first slab
+            centerX: 540,
+            padX: 40, padY: 24,         // every slab gives its line room: 40 px each side of the INK, 24 px above the
+                                        // cap/ascender and below the baseline (or the descender); a line can override both
+            radius: 14,                 // corner radius; where a narrower slab meets a wider one the inner corner gets a concave
+            snap: 4,                    // fillet (TikTok's merged text background). Neighbours closer than snap x radius snap equal.
+            inkText: "#0B0B0E",         // type on every slab, paper and sunset
+            shadow: [0, 24, 48, 0.38],  // the stack's soft contact shadow: [x, y, blur, alpha] in plum-black (10,4,20)
+            contact: [0, 2, 4, 0.18],   // plus a tight one where the stack meets the image
+            edge: 0.6,                  // 1 px lit top edge on every slab (white alpha)
+            slam: 1.12, slamDur: 0.32,  // the keyword slab lands 1.12 -> 1 (expo.out) on the cut
+            impact: { flash: 0.5, zoom: 1.04, amp: 9, color: "#FFF0DE" },   // footage hit on the cut (plate only)
+            // the lit slab's light, screened onto the footage (plate) around the slab: pink on the left, amber on the right.
+            // peak on the cut, settling to "hold"; re-hits lift it to "rehit". strength scales every layer.
+            bloom: { colors: ["#F84FA4", "#FEB747"], strength: 1.3, hold: 0.55, rehit: 0.95, none: 0.5,
+              // plus a plain pink bloom (Look.bloom's layers, normal blend) on the payoff shot only: on the bright sunset
+              // sky a screened light barely shows, so this one paints the pink onto it; it leaves on the "until" cut
+              tint: { color: "#F84FA4", strength: 0.45, until: 3.4 } },
+            bounce: 0.2,                // the lit slab's light on the paper above and below it (0 = off)
+            holdPush: 1.02,             // the whole stack pushes in linearly across the hold
+            grain: 0.14,
+            // night: from this cut on, the paper takes the street light (dimmer, cooler) and a deeper shadow; null = off.
+            // r09: the sample has no night shot any more, so it's off (set { at: <your night cut>, shadowAlpha: 0.5 }).
+            night: null,
+            timing: { in: 0.0, stagger: 0.11, hit: 1.1, ignite: 1.08, sheen: 1.38, rehits: [3.4, 5.5], leak: 1.1, leakDur: 1.2, out: 6.3 }
+          },
+          // Official caps: Rockstar's own card language (wide caps, a tracked kicker with the magenta offset), set
+          // LEFT in the sky of full-bleed footage like Rockstar's own date and feature cards. MISSED's pink bloom is
+          // screened onto the image. Shots: the <video class="v1"> tags.
+          "1": {
+            style: "caps",
+            shots: ["s011-vice-highway", "s135-skydive-city", "s074-keys-sign", "s064-jetski", "s012-muscle-beach", "s026-sunset-pier"],
+            kicker: "GTA 6 · Every trailer",     // the sample shots come from Trailer 2, the Features and the Launch Trailer (see stamps)
+            kickerSize: 30, kickerTrack: 0.34,   // same 30 px as the stamp row: the frame keeps three sizes, one family
+            lines: ["What you", "missed"],       // line 2 is the hero keyword line
+            keyword: "missed",
+            left: 96,                             // left edge of the lockup (ink-aligned)
+            width: 784,                           // both hero lines' INK is fitted to this measure, so the right edge squares off
+            maxSize: 160,                         // and MISSED (about 153 px) is the hero: as wide as WHAT YOU, half again as tall
+            top: 262,                             // y of the kicker (the lockup ends at y ~550, above the skydiver's head)
+            gapKick: 24, gapLines: 4,
+            slam: 1.06,                           // MISSED slams in from its left edge (1.06 keeps the right edge inside x 936)
+            // MISSED's light, screened onto the footage. Each glyph's bloom takes the colour of its own part of the sunset
+            // fill (pink M -> amber D); "color" is the fallback. Screened onto the graded sky, Look.bloom .55 only moved
+            // the footage by about +5 in red, so the light layer runs at 1.15.
+            bloom: { color: "#F84FA4", strength: 1.15, matchFill: true },
+            // the payoff light: an anamorphic streak through MISSED on the cut (plate only); peak opacity, length, colours
+            // r09: it TRAVELS (x from travel[0] to travel[1] in travelDur), rides "above" px over MISSED's cap line (not
+            // through its x-height, where it read as a strike-through) and is gone by "gone" s
+            flare: { peak: 0.9, length: 1500, colors: ["#F84FA4", "#FFF4EA", "#FEB747"], above: 18, travel: [-260, 200], travelDur: 0.22, gone: 0.95 },
+            scrim: 1, scrimNone: 0.45,            // sky grade over footage / top smoke baked into a transparent export (0 = none)
+            // r09: an extra top smoke (.lk-scrim-top) on the two palest skies only (s011, s135), down to y "to", off at "until"
+            topScrim: { alpha: 0.35, to: 640, until: 1.9 },
+            grain: 0.12,
+            // source stamps, one per sample shot from the payoff on: [trailer, time, cut]. The row enters on the first
+            // cut; each roll fires 0.07 s BEFORE its cut so the new source is in on the cut's first frame.
+            // Times are each shot's source time (gta6/_shared/shots/shots.json) + its data-media-start.
+            // The row sits bottom-left (y 1384) over a soft bottom smoke, clear of every subject.
+            // "spot": a soft plum-black ellipse behind the row (peak alpha), so the 30 px label reads over white spray too
+            stamps: { size: 30, track: 0.3, top: 1384, smoke: 0.62, spot: 0.5, showNone: false, lead: 0.07,
+              items: [["Features trailer", "0:43", 0.4], ["Launch trailer", "0:02", 1.9], ["Trailer 2", "2:20", 2.5],
+                      ["Trailer 2", "0:38", 3.15], ["Trailer 2", "1:21", 5.5]] },
+            // sheen 0.86 -> 1.46: the light moment stays on the payoff, and the hold shows the clean sunset fill
+            timing: { kick: 0.0, l1: 0.06, l2: 0.28, hit: 0.4, sheen: 0.86, sheenDur: 0.6, leak: 1.75, out: 6.3 }
+          }
+        }
+      };
+
+      (function () {
+        const VARS = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+        const vKey = CONFIG.variants[String(VARS.variant)] ? String(VARS.variant) : "0";
+        const plate = VARS.bg !== "none";
+        const V = CONFIG.variants[vKey], T = V.timing, D = CONFIG.duration;
+        const root = document.getElementById("root"), stage = document.getElementById("stage"), hook = document.getElementById("hook");
+
+        document.querySelectorAll("video.shot").forEach((v) => {
+          if (!plate || !v.classList.contains("v" + vKey)) v.style.display = "none";
+        });
+        if (!plate) stage.style.display = "none";
+
+        // Build only once the faces that will PAINT are loaded (v1 lesson: the renderer injects its own Inter face, and
+        // fonts.ready can resolve before it loads, so layout was measured with a different face than the one drawn).
+        const stampText = V.stamps ? V.stamps.items.map((s) => s[0] + " " + s[1]).join(" ") : "";
+        const allText = [V.lines.map((l) => (typeof l === "string" ? l : l.text)).join(" "), V.kicker || "", stampText].join(" ");
+        const loads = ["800 100px Inter", "800 100px Archivo", "600 100px Archivo"].map((f) =>
+          document.fonts.load(f, allText + " " + allText.toUpperCase()).catch(() => []));
+        Promise.all(loads).then(() => document.fonts.ready).then(() => {
+          const tl = gsap.timeline({ paused: true });
+          // slow push on the footage
+          if (plate) Look.push(tl, "#push", 0, D, { from: 1.0, to: 1.06, origin: "50% 50%" });
+          if (V.style === "boxed") buildBoxed(tl); else buildCaps(tl);
+          const lk = Look.install(tl, { duration: D, grain: V.grain || 0.14, vignette: 0.5, enabled: plate });
+          if (lk) {
+            // The kit puts grain + vignette in one z-indexed wrapper. That wrapper is its own stacking context, so the
+            // grain's overlay blend sees an empty backdrop and composites as plain grey noise (r05 measured black at
+            // Y 33 and the paper slabs at #E0-#EB). Re-parented, the grain blends with the real frame, and the vignette
+            // darkens the footage only.
+            if (lk.grain) { lk.grain.style.zIndex = "90"; root.appendChild(lk.grain); }
+            if (lk.vignette) { lk.vignette.style.zIndex = "50"; stage.appendChild(lk.vignette); }
+          }
+          tl.set({}, {}, D);
+          window.__timelines = window.__timelines || {};
+          window.__timelines["main"] = tl;
+          tl.seek(0);
+        });
+
+        /* ------------------------------------------------------------------------------------------------ */
+        // the accent's colour at a fraction f (0..1) of its width, and "r,g,b" of a hex colour
+        const ACC = [[0, "#F84FA4"], [0.24, "#FE78A6"], [0.62, "#FE8E4E"], [1, "#FEB747"]];
+        const rgbArr = (hx) => hx.replace("#", "").match(/../g).map((q) => parseInt(q, 16));
+        const rgbStr = (hx) => rgbArr(hx).join(",");
+        const accentAt = (f) => {
+          f = Math.max(0, Math.min(1, f)); let i = 0; while (i < ACC.length - 2 && f > ACC[i + 1][0]) i++;
+          const [f0, c0] = ACC[i], [f1, c1] = ACC[i + 1], k = (f - f0) / (f1 - f0), a = rgbArr(c0), b = rgbArr(c1);
+          return "#" + a.map((v, j) => Math.round(v + (b[j] - v) * k).toString(16).padStart(2, "0")).join("");
+        };
+
+        function buildBoxed(tl) {
+          const light = document.getElementById("light");
+          document.getElementById("flare").style.display = "none";
+          const kw = (V.keyword || "").toLowerCase(), R = V.radius;
+          const rows = V.lines.map((L) => {
+            const isKey = kw && L.text.toLowerCase() === kw;
+            const row = document.createElement("div"); row.className = "row";
+            const punch = document.createElement("div"); punch.className = "punch";
+            const slab = document.createElement("div"); slab.className = "slab paper";
+            const night = document.createElement("div"); night.className = "night"; slab.appendChild(night);
+            let sunfill = null, glint = null, edge = null;
+            if (isKey) {
+              sunfill = document.createElement("div"); sunfill.className = "sunfill";
+              // r09: the lit slab has volume: a soft gloss from the top and a touch of shade at the bottom, over the sunset
+              sunfill.style.background = "linear-gradient(180deg, rgba(255,255,255,.16) 0%, rgba(255,255,255,0) 40%), " +
+                "linear-gradient(0deg, rgba(120,16,60,.12) 0%, rgba(120,16,60,0) 34%), " + CONFIG.accent;
+              glint = document.createElement("div"); glint.className = "glint"; sunfill.appendChild(glint); slab.appendChild(sunfill);
+              edge = document.createElement("div"); edge.className = "edge"; slab.appendChild(edge);
+              row.style.zIndex = "2";   // the lit slab sits on top, so its slam overlaps the paper above and below
+            }
+            // r09: a 1 px lit top edge on every slab (reads on the sunset slab; on the paper it's a hairline of light)
+            const lit = document.createElement("div"); lit.className = "lit";
+            lit.style.background = "linear-gradient(90deg, rgba(255,255,255," + (V.edge * 0.4).toFixed(2) + ") 0%, rgba(255,255,255," + V.edge + ") 22%, rgba(255,255,255," + V.edge + ") 78%, rgba(255,255,255," + (V.edge * 0.4).toFixed(2) + ") 100%)";
+            slab.appendChild(lit);
+            const txt = document.createElement("div"); txt.className = "txt";
+            const inn = document.createElement("span"); inn.className = "in";
+            const w = document.createElement("span"); w.className = "w"; w.textContent = L.text;
+            inn.appendChild(w);
+            const bl = document.createElement("i"); bl.className = "bl"; inn.appendChild(bl);
+            txt.appendChild(inn); slab.appendChild(txt); punch.appendChild(slab); row.appendChild(punch); hook.appendChild(row);
+            txt.style.color = V.inkText;
+            return { L, isKey, row, punch, slab, night, txt, inn, w, bl, sunfill, glint, edge, fils: [],
+              px: L.padX == null ? V.padX : L.padX, py: L.padY == null ? V.padY : L.padY };
+          });
+          // Each line is set at its OWN size (lead-in 72, keyword lines 200) and shrinks only if its slab would pass
+          // maxWidth. Each slab is measured from its line's real Inter INK (canvas, same face and tracking): px each side,
+          // py above the cap/ascender and below the baseline (or the descender when there is one).
+          const cv = document.createElement("canvas").getContext("2d");
+          const ink = (text, s) => {
+            cv.font = "800 " + s + "px Inter"; cv.letterSpacing = (-0.042 * s).toFixed(2) + "px";
+            const m = cv.measureText(text), l = -m.actualBoundingBoxLeft, r = m.actualBoundingBoxRight;
+            return { l, r, w: r - l };
+          };
+          rows.forEach((r) => {
+            const want = r.L.size || 200, fit = (V.maxWidth - 2 * r.px) / ink(r.L.text, 100).w * 100;
+            r.size = Math.floor(Math.min(want, fit) * 10) / 10;
+            const s = r.size;
+            r.k = ink(r.L.text, s);
+            cv.letterSpacing = "0px";
+            const capA = cv.measureText("H").actualBoundingBoxAscent;
+            const m = cv.measureText(r.L.text.replace(/[ij]/g, "l"));
+            r.a = Math.max(capA, m.actualBoundingBoxAscent);
+            r.d = m.actualBoundingBoxDescent > 0.08 * s ? m.actualBoundingBoxDescent : 0;
+            r.w = Math.round(r.k.w + 2 * r.px);
+            r.H = Math.round(r.a + r.d + 2 * r.py);
+          });
+          // TikTok's merged text background: neighbours whose widths differ by less than snap x radius become equal
+          // (no hairline steps); a real step gets square inner corners and a concave fillet.
+          for (let pass = 0; pass < rows.length; pass++) {
+            for (let i = 0; i < rows.length - 1; i++) {
+              const A = rows[i], B = rows[i + 1];
+              if (A.w !== B.w && Math.abs(A.w - B.w) < V.snap * R) { const mx = Math.max(A.w, B.w); A.w = mx; B.w = mx; }
+            }
+          }
+          hook.style.top = V.top + "px";
+          const keyRow = rows.find((r) => r.isKey), ki = rows.indexOf(keyRow);
+          const kLeft = keyRow ? Math.round(V.centerX - keyRow.w / 2) : 0;
+          const fbs = [];   // the lit slab's light on the paper fillets next to it
+          let y = 0;
+          rows.forEach((r, i) => {
+            const up = rows[i - 1], dn = rows[i + 1], W = r.w, H = r.H;
+            const tr = (!up || W > up.w) ? R : 0, br = (!dn || W > dn.w) ? R : 0;
+            const left = Math.round(V.centerX - W / 2);
+            r.slab.style.width = W + "px"; r.slab.style.height = H + "px";
+            r.slab.style.borderRadius = tr + "px " + tr + "px " + br + "px " + br + "px";
+            r.txt.style.fontSize = r.size + "px";
+            r.txt.style.left = ((W - r.k.w) / 2 - r.k.l).toFixed(2) + "px";   // ink centred in its slab
+            r.txt.style.height = H + "px"; r.txt.style.lineHeight = H + "px";
+            const base = r.bl.getBoundingClientRect().top - r.slab.getBoundingClientRect().top;
+            r.txt.style.top = (r.py + r.a - base).toFixed(2) + "px";       // baseline py below the ink top
+            r.row.style.left = left + "px"; r.row.style.top = y + "px";
+            r.left = left; r.top = y;
+            // BOUNCE (r09): the paper right above and below the lit slab catches its light, in the colour of the part of
+            // the sunset it faces (same gradient, same x), fading away from the shared edge
+            const nextToKey = keyRow && !r.isKey && Math.abs(i - ki) === 1 && V.bounce > 0;
+            if (nextToKey) {
+              const b = document.createElement("div"); b.className = "bounce";
+              const below = i > ki, bh = Math.min(H, 70);
+              b.style.cssText = "position:absolute;left:" + (kLeft - left) + "px;width:" + keyRow.w + "px;height:" + bh + "px;" +
+                (below ? "top:0;" : "bottom:0;") + "opacity:0;background:" + CONFIG.accent + ";" +
+                "-webkit-mask-image:linear-gradient(" + (below ? "180deg" : "0deg") + ", #000 0%, rgba(0,0,0,.4) 40%, rgba(0,0,0,0) 100%);" +
+                "mask-image:linear-gradient(" + (below ? "180deg" : "0deg") + ", #000 0%, rgba(0,0,0,.4) 40%, rgba(0,0,0,0) 100%);";
+              r.slab.insertBefore(b, r.lit = r.slab.querySelector(".lit")); r.bounce = b;
+            }
+            // fillets on the narrower slab's corners at a step (paper, with its own night and bounce layers)
+            const addFil = (side, edgeY, circ, nb) => {
+              const f = document.createElement("div"); f.className = "fil";
+              f.style.width = R + "px"; f.style.height = R + "px";
+              f.style.left = (side < 0 ? -R : W) + "px"; f.style.top = edgeY + "px";
+              const day = edgeY === 0 ? "#FFFAF3" : "#F6EEE4", nite = edgeY === 0 ? "#E8E3DA" : "#DED8CE";
+              const g = (c) => "radial-gradient(circle at " + circ + ", rgba(0,0,0,0) " + (R - 0.5) + "px, " + c + " " + R + "px)";
+              f.innerHTML = '<i></i><i class="fn" style="opacity:0"></i><i class="fb" style="opacity:0"></i>';
+              f.children[0].style.background = g(day); f.children[1].style.background = g(nite);
+              if (nb === keyRow && V.bounce > 0) {
+                const fx = (left + (side < 0 ? -R / 2 : W + R / 2) - kLeft) / keyRow.w;
+                f.children[2].style.background = g(accentAt(fx)); fbs.push(f.children[2]);
+              }
+              r.punch.appendChild(f); r.fils.push({ el: f, nb });
+            };
+            if (!r.isKey && up && W < up.w) { addFil(-1, 0, "0% 100%", up); addFil(1, 0, "100% 100%", up); }
+            if (!r.isKey && dn && W < dn.w) { addFil(-1, H - R, "0% 0%", dn); addFil(1, H - R, "100% 0%", dn); }
+            y += H - 1;   // 1 px overlap: the slabs meet with no seam, even under the hold push
+          });
+          const total = y + 1;
+          hook.style.height = total + "px";
+          hook.style.transformOrigin = V.centerX + "px " + (total / 2) + "px";
+          // the stack's shadows, on the merged outline (part of the object, so they stay in bg none): a tight contact
+          // where it meets the image and a soft plum-black one that lifts it off the footage
+          const ds = (s, a) => "drop-shadow(" + s[0] + "px " + s[1] + "px " + (s[2] / 2) + "px rgba(10,4,20," + a.toFixed(3) + "))";
+          const shadowAt = (a) => ds(V.contact, V.contact[3]) + " " + ds(V.shadow, a);
+          hook.style.filter = shadowAt(V.shadow[3]);
+
+          // THE LIGHT (r09): the lit slab's bloom lives in #light, between the footage and the type, screened on plate
+          // so its pink (left) and amber (right) spill onto the image around the slab. It copies the stack's transforms:
+          // .lh takes the hold push, .lw the slam and re-hits (same origins in page space).
+          let glow = null, tint = null;
+          const lh = light.querySelector(".lh"), lw = light.querySelector(".lw");
+          if (keyRow && V.bloom) {
+            const B = V.bloom, st = B.strength * (plate ? 1 : B.none), a = (x) => Math.min(1, x * st).toFixed(3);
+            const kr = keyRow.slab.getBoundingClientRect();
+            lh.style.transformOrigin = V.centerX + "px " + (V.top + total / 2) + "px";
+            lw.style.transformOrigin = (kr.left + kr.width / 2) + "px " + (kr.top + kr.height / 2) + "px";
+            glow = document.createElement("div");
+            glow.style.cssText = "position:absolute;left:" + kr.left + "px;top:" + kr.top + "px;width:" + kr.width + "px;height:" + kr.height + "px;border-radius:" + R + "px;";
+            glow.style.boxShadow = [
+              "0 0 14px rgba(255,222,206," + a(0.4) + ")",
+              "-30px 0 50px rgba(" + rgbStr(B.colors[0]) + "," + a(0.62) + ")",
+              "30px 0 50px rgba(" + rgbStr(B.colors[1]) + "," + a(0.55) + ")",
+              "0 0 120px rgba(" + rgbStr("#FE8E4E") + "," + a(0.3) + ")"
+            ].join(", ");
+            lw.appendChild(glow);
+            if (B.tint) {
+              // the payoff tint lives in the stack (under the slabs), so it takes the hold push; it joins the slam below
+              const tc = rgbStr(B.tint.color), ta = (x) => Math.min(1, x * B.tint.strength * (plate ? 1 : B.none)).toFixed(3);
+              tint = document.createElement("div");
+              tint.style.cssText = "position:absolute;left:" + keyRow.left + "px;top:" + keyRow.top + "px;width:" + keyRow.w + "px;height:" + keyRow.H + "px;border-radius:" + R + "px;transform-origin:50% 50%;";
+              tint.style.boxShadow = "0 0 14px rgba(" + tc + "," + ta(0.42) + "), 0 0 42px rgba(" + tc + "," + ta(0.28) + "), 0 0 110px rgba(" + tc + "," + ta(0.16) + ")";
+              hook.insertBefore(tint, hook.firstChild);
+              gsap.set(tint, { opacity: 0 });
+            }
+            light.style.opacity = "1";
+            if (plate) light.style.mixBlendMode = "screen";
+            gsap.set(glow, { opacity: 0 });
+          } else light.style.display = "none";
+
+          // ENTRANCE: each slab wipes in from the left on a straight edge while it travels (motion blur). Its line is
+          // inside the same wipe, so a slab is never seen empty, and it settles up from 50% below (the slab is the mask).
+          // 110 ms per slab. No opacity on paper. A fillet appears once the wider slab it joins has arrived.
+          const clipOpen = "inset(-60px -60px -60px -60px)";
+          rows.forEach((r, i) => {
+            const t = T.in + i * T.stagger, W = r.w;
+            const clipShut = "inset(-60px " + (W + 60) + "px -60px -60px)";
+            gsap.set(r.row, { clipPath: clipShut, x: -46 });
+            tl.fromTo(r.row, { clipPath: clipShut }, { clipPath: clipOpen, duration: 0.56, ease: "expo.out", immediateRender: false }, t);
+            tl.fromTo(r.row, { x: -46 }, { x: 0, duration: 0.62, ease: "expo.out", immediateRender: false }, t);
+            Look.mblur(tl, r.row, t, 0.3, { x: 20, ease: "power2.out" });
+            gsap.set(r.txt, { yPercent: 50 });
+            tl.fromTo(r.txt, { yPercent: 50 }, { yPercent: 0, duration: 0.6, ease: "expo.out", immediateRender: false }, t);
+          });
+          rows.forEach((r) => r.fils.forEach((f) => {
+            const tn = T.in + rows.indexOf(f.nb) * T.stagger;
+            tl.fromTo(f.el, { opacity: 0 }, { opacity: 1, duration: 0.12, ease: "power2.out", immediateRender: false }, Math.max(T.in + rows.indexOf(r) * T.stagger, tn) + 0.24);
+          }));
+
+          // PAYOFF on the cut to the sunset dock (r09): the keyword's slab SLAMS 1.12 -> 1 (expo.out, 0.32 s) as its paper
+          // fills with the Leonida sunset left to right (a clip wipe under the ink type, a hot light edge riding the
+          // front), with an RGB split. The footage takes a warm exposure flash, shake and punch-zoom, and one light leak
+          // sweeps across it. The slab's light comes up on the image and on the paper next to it; a sheen crosses it.
+          if (keyRow) {
+            const k = keyRow, h = T.hit, ig = T.ignite, W = k.w, EW = 120, S = V.slam || 1.12;
+            k.glint.style.width = W + "px";
+            k.edge.style.width = EW + "px";
+            gsap.set(k.sunfill, { clipPath: "inset(0% 100% 0% 0%)" });
+            tl.fromTo(k.sunfill, { clipPath: "inset(0% 100% 0% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.42, ease: "expo.out", immediateRender: false }, ig);
+            // the light edge: its hottest point (84% of its width) sits on the wipe front on every frame (same ease, same time)
+            gsap.set(k.edge, { x: -0.84 * EW, opacity: 0 });
+            tl.fromTo(k.edge, { x: -0.84 * EW }, { x: W - 0.84 * EW, duration: 0.42, ease: "expo.out", immediateRender: false }, ig);
+            tl.fromTo(k.edge, { opacity: 0 }, { opacity: 1, duration: 0.03, ease: "none", immediateRender: false }, ig);
+            // r09: gone by ig + 0.26, so the hot edge never parks as a white bar on the slab's right end
+            tl.fromTo(k.edge, { opacity: 1 }, { opacity: 0, duration: 0.16, ease: "power2.out", immediateRender: false }, ig + 0.1);
+            // the slam. The set sits a hair before the hit so a backward seek reverts it to 1 (seek-safe); no frame lands
+            // between the two
+            const slamT = [k.punch, lw].concat(tint ? [tint] : []);
+            tl.set(slamT, { scale: S }, h - 0.002);
+            tl.fromTo(slamT, { scale: S }, { scale: 1, duration: V.slamDur || 0.32, ease: "expo.out", immediateRender: false }, h);
+            Look.chroma(tl, k.punch, h, 0.34, { px: 16 });
+            if (plate) {
+              const I = V.impact || {};
+              Look.impact(tl, h, { shake: "#shake", amp: I.amp == null ? 9 : I.amp, flash: I.flash == null ? 0.5 : I.flash, flashColor: I.color || "#FFF0DE", zoom: I.zoom || 1.04, host: "#stage" });
+              Look.leak(tl, T.leak == null ? h : T.leak, T.leakDur || 1.2, { host: "#stage", colors: ["#FE8E4E", "#F84FA4"], y: 0.3, opacity: 0.5 });
+            }
+            if (glow) {
+              const B = V.bloom;
+              tl.fromTo(glow, { opacity: 0 }, { opacity: 1, duration: 0.08, ease: "power2.out", immediateRender: false }, h);
+              tl.fromTo(glow, { opacity: 1 }, { opacity: B.hold, duration: 0.9, ease: "power2.out", immediateRender: false }, h + 0.14);
+            }
+            if (tint) {
+              tl.fromTo(tint, { opacity: 0 }, { opacity: 1, duration: 0.12, ease: "power2.out", immediateRender: false }, h);
+              tl.fromTo(tint, { opacity: 1 }, { opacity: 0, duration: 0.12, ease: "power2.in", immediateRender: false }, V.bloom.tint.until - 0.06);
+            }
+            const bounces = rows.filter((r) => r.bounce).map((r) => r.bounce);
+            if (bounces.length) tl.fromTo(bounces, { opacity: 0 }, { opacity: V.bounce, duration: 0.3, ease: "power2.out", immediateRender: false }, h + 0.04);
+            if (fbs.length) tl.fromTo(fbs, { opacity: 0 }, { opacity: V.bounce * 0.95, duration: 0.3, ease: "power2.out", immediateRender: false }, h + 0.04);
+            gsap.set(k.glint, { x: -0.75 * W });
+            tl.fromTo(k.glint, { x: -0.75 * W }, { x: 0.75 * W, duration: 0.85, ease: "power2.inOut", immediateRender: false }, T.sheen);
+            // RE-HITS on every later cut: the lit slab pulses 1 -> 1.03 -> 1, its light lifts, and a quicker sheen crosses
+            // it, so the hold keeps the beat of the edit
+            (T.rehits || []).forEach((t) => {
+              tl.fromTo(slamT, { scale: 1 }, { scale: 1.03, duration: 0.06, ease: "power2.out", immediateRender: false }, t);
+              tl.fromTo(slamT, { scale: 1.03 }, { scale: 1, duration: 0.28, ease: "expo.out", immediateRender: false }, t + 0.06);
+              tl.fromTo(k.glint, { x: -0.75 * W }, { x: 0.75 * W, duration: 0.6, ease: "power2.inOut", immediateRender: false }, t + 0.02);
+              if (glow) {
+                tl.fromTo(glow, { opacity: V.bloom.hold }, { opacity: V.bloom.rehit, duration: 0.06, ease: "power2.out", immediateRender: false }, t);
+                tl.fromTo(glow, { opacity: V.bloom.rehit }, { opacity: V.bloom.hold, duration: 0.45, ease: "power2.out", immediateRender: false }, t + 0.06);
+              }
+            });
+          }
+          // NIGHT (off in the sample, null): from a night cut the paper (and its fillets) dims to street light and the
+          // contact shadow deepens, so the stack sits in a dark frame instead of glaring on it.
+          if (V.night && plate) {
+            const nights = rows.map((r) => r.night).concat(...rows.map((r) => r.fils.map((f) => f.el.querySelector(".fn"))));
+            tl.fromTo(nights, { opacity: 0 }, { opacity: 1, duration: 0.2, ease: "power2.out", immediateRender: false }, V.night.at);
+            const a0 = V.shadow[3], a1 = V.night.shadowAlpha;
+            Look.drive(tl, V.night.at, 0.2, (p) => { hook.style.filter = shadowAt(a0 + (a1 - a0) * p); });
+          }
+          // hold: the whole stack (and its light) pushes in linearly while the footage cuts underneath
+          tl.fromTo([hook, lh], { scale: 1 }, { scale: V.holdPush || 1.02, duration: T.out - 0.95, ease: "none", immediateRender: false }, 0.95);
+
+          // EXIT (mask-out): each slab wipes off to the right on a straight edge, carrying its line (which lifts as it
+          // goes), so no slab is ever left empty; top line first, 60 ms apart, accelerating, with motion blur on travel.
+          // The light goes first; the fillets go with the first slab that leaves.
+          if (glow) tl.fromTo(glow, { opacity: V.bloom.hold }, { opacity: 0, duration: 0.2, ease: "power2.in", immediateRender: false }, T.out);
+          const allFils = [].concat(...rows.map((r) => r.fils.map((f) => f.el)));
+          if (allFils.length) tl.fromTo(allFils, { opacity: 1 }, { opacity: 0, duration: 0.1, ease: "power2.in", immediateRender: false }, T.out + 0.04);
+          rows.forEach((r, i) => {
+            const t = T.out + i * 0.06, clipGone = "inset(-60px -60px -60px " + (r.w + 60) + "px)";
+            tl.fromTo(r.row, { clipPath: clipOpen }, { clipPath: clipGone, duration: 0.42, ease: "power3.in", immediateRender: false }, t);
+            tl.fromTo(r.row, { x: 0 }, { x: 44, duration: 0.42, ease: "power3.in", immediateRender: false }, t);
+            tl.fromTo(r.txt, { yPercent: 0 }, { yPercent: -40, duration: 0.42, ease: "power3.in", immediateRender: false }, t);
+            Look.mblur(tl, r.row, t + 0.12, 0.3, { x: 0, to: [18, 0], ease: "power2.in" });
+          });
+          window.__hookGeom = { rows: rows.map((r) => ({ text: r.L.text, size: r.size, w: r.w, H: r.H, left: r.left, top: V.top + r.top })), total };
+        }
+
+        /* ------------------------------------------------------------------------------------------------ */
+        function buildCaps(tl) {
+          const scrim = document.getElementById("scrim"), light = document.getElementById("light");
+          // plate: the sky grade sits IN the stage (above the footage, under the flash/leak/vignette and under MISSED's
+          // screened light); bg none: the softer top smoke is baked into the overlay
+          const scrimA = plate ? (V.scrim == null ? 1 : V.scrim) : (V.scrimNone || 0);
+          if (plate) { scrim.className = "sky"; stage.appendChild(scrim); }
+          else { scrim.className = "lk-scrim-top"; scrim.style.height = "1100px"; }
+          if (scrimA > 0) scrim.style.opacity = String(scrimA);
+          if (plate && V.topScrim) {
+            // r09: WHAT YOU over the pale haze of the highway and the skydive sky relied on its lift shadow alone
+            const ts = document.createElement("div"); ts.className = "lk-scrim-top";
+            ts.style.cssText = "position:absolute;left:0;top:0;width:1080px;height:" + V.topScrim.to + "px;opacity:" + V.topScrim.alpha;
+            stage.appendChild(ts);
+            tl.set(ts, { opacity: 0 }, V.topScrim.until);   // off on the cut out of s135
+          }
+
+          hook.className = "caps"; hook.style.top = V.top + "px"; hook.style.paddingLeft = V.left + "px";
+          const kick = document.createElement("div"); kick.className = "kick"; kick.id = "kick"; kick.textContent = V.kicker;
+          kick.style.fontSize = V.kickerSize + "px"; kick.style.letterSpacing = V.kickerTrack + "em";
+          const kwrap = document.createElement("div"); kwrap.appendChild(kick); hook.appendChild(kwrap);
+          const l1 = document.createElement("div"); l1.className = "hl"; l1.id = "l1"; l1.textContent = V.lines[0];
+          const l2wrap = document.createElement("div"); l2wrap.id = "l2wrap";
+          const l2 = document.createElement("div"); l2.className = "hl"; l2.id = "l2"; l2.textContent = V.lines[1];
+          l2wrap.appendChild(l2); hook.appendChild(l1); hook.appendChild(l2wrap);
+          l1.style.marginTop = V.gapKick + "px"; l2wrap.style.marginTop = V.gapLines + "px";
+          // LOCK THE MEASURE (r08): both hero lines are fitted by their INK (canvas, same face, width and tracking), so
+          // WHAT YOU and MISSED end on the same right edge and MISSED, the hero, is never the narrower line. r07 fitted
+          // the advance width, which left MISSED about 36 px short of WHAT YOU. Falls back to the DOM advance if the
+          // canvas can't draw the wide face.
+          const cv = document.createElement("canvas").getContext("2d");
+          const domWidth = (el) => { const r = document.createRange(); r.selectNodeContents(el); return r.getBoundingClientRect().width; };
+          const measure = (text, weight, size, trackEm, domW) => {
+            cv.font = weight + " " + size + "px Archivo"; if ("fontStretch" in cv) cv.fontStretch = "expanded";
+            // Look.reveal splits every char into its own inline-block, so the PAINTED line has no kerning (r08: kerned
+            // pairs AT, T-space, YO made WHAT YOU measure about 19 px narrower than it paints). Measure unkerned.
+            if ("fontKerning" in cv) cv.fontKerning = "none";
+            cv.letterSpacing = (trackEm * size).toFixed(2) + "px";
+            const m = cv.measureText(text.toUpperCase());
+            if (domW && Math.abs(m.width - domW) / domW > 0.04) return null;   // canvas isn't drawing the wide face: don't guess
+            return { left: -m.actualBoundingBoxLeft, ink: m.actualBoundingBoxRight + m.actualBoundingBoxLeft };
+          };
+          const fitTo = (el, text) => {
+            el.style.fontSize = "100px";
+            const k = measure(text, 800, 100, 0.015, domWidth(el));
+            const w100 = k ? k.ink : domWidth(el) - 0.015 * 100;
+            const s = Math.min(V.maxSize, Math.floor(V.width / w100 * 1000) / 10);
+            el.style.fontSize = s + "px"; return s;
+          };
+          const s1 = fitTo(l1, V.lines[0]), s2 = fitTo(l2, V.lines[1]);
+          // OPTICAL left edge: every line's INK starts at x = V.left (round G, diagonal W and straight M have different
+          // side bearings).
+          const bearing = (text, weight, size, trackEm, el) => { const k = measure(text, weight, size, trackEm, domWidth(el)); return k ? k.left : 0; };
+          kick.style.marginLeft = (-bearing(V.kicker, 600, V.kickerSize, V.kickerTrack, kick)).toFixed(2) + "px";
+          l1.style.marginLeft = (-bearing(V.lines[0], 800, s1, 0.015, l1)).toFixed(2) + "px";
+          l2.style.marginLeft = (-bearing(V.lines[1], 800, s2, 0.015, l2)).toFixed(2) + "px";
+          const stampRow = buildStampRow();
+
+          // split now (the reveals below), then read the geometry the light layer has to copy
+          // r08 timing: the WHOLE hook reads by 0.5 s. WHAT YOU rises from 0.06 s; MISSED rises from 0.28 s and lands
+          // on the 0.4 s cut (r07 showed only the kicker until 0.6 s and MISSED read at about 0.95 s)
+          Look.reveal(tl, l1, T.l1, { by: "chars", stagger: 0.018, dur: 0.42 });
+          const h = T.hit;
+          Look.reveal(tl, l2, T.l2, { by: "chars", stagger: 0.012, dur: 0.36 });
+          const hookR = hook.getBoundingClientRect(), wrapR = l2wrap.getBoundingClientRect(), l2R = l2.getBoundingClientRect();
+          const hookO = [V.left, hookR.height / 2], wrapO = [0, wrapR.height * 0.6];
+          hook.style.transformOrigin = hookO[0] + "px " + hookO[1] + "px";
+          l2wrap.style.transformOrigin = wrapO[0] + "px " + wrapO[1] + "px";
+
+          // MISSED's LIGHT: the same glyphs, same split, same transforms, in a layer between the stage and the type.
+          // Screen-blended on plate, so the pink bloom brightens the footage around the word like real light.
+          const lh = light.querySelector(".lh"), lw = light.querySelector(".lw");
+          lh.style.transformOrigin = (hookR.left + hookO[0]) + "px " + (hookR.top + hookO[1]) + "px";
+          lw.style.transformOrigin = (wrapR.left + wrapO[0]) + "px " + (wrapR.top + wrapO[1]) + "px";
+          const lt = document.createElement("div"); lt.className = "hl lt"; lt.textContent = V.lines[1];
+          lt.style.fontSize = s2 + "px"; lt.style.left = l2R.left + "px"; lt.style.top = l2R.top + "px"; lt.style.color = V.bloom.color;
+          lw.appendChild(lt);
+          Look.split(lt, { by: "chars", mask: true });
+          // each glyph's light takes the colour of its own part of the sunset fill (pink M ... amber D)
+          const stops = [[0, "#F84FA4"], [0.24, "#FE78A6"], [0.62, "#FE8E4E"], [1, "#FEB747"]];
+          const rgbOf = (hx) => hx.replace("#", "").match(/../g).map((q) => parseInt(q, 16));
+          const sample = (f) => {
+            f = Math.max(0, Math.min(1, f)); let i = 0; while (i < stops.length - 2 && f > stops[i + 1][0]) i++;
+            const [f0, c0] = stops[i], [f1, c1] = stops[i + 1], k = (f - f0) / (f1 - f0), a = rgbOf(c0), b = rgbOf(c1);
+            return "#" + a.map((v, j) => Math.round(v + (b[j] - v) * k).toString(16).padStart(2, "0")).join("");
+          };
+          const ltR = lt.getBoundingClientRect();
+          lt.querySelectorAll(".lk-c").forEach((c) => {
+            const r = c.getBoundingClientRect(), col = V.bloom.matchFill ? sample((r.left + r.width / 2 - ltR.left) / ltR.width) : V.bloom.color;
+            c.style.color = col; Look.bloom(c, { color: col, strength: V.bloom.strength, core: false });
+          });
+          if (plate) light.style.mixBlendMode = "screen";
+
+          // kicker focuses in from frame 0 (already half-lit and soft at t = 0, so the first frame carries type)
+          const kFrom = { opacity: 0.5, scale: 1.05, filter: "blur(6px)" };
+          kick.style.transformOrigin = "0% 50%";
+          gsap.set(kick, kFrom);
+          tl.fromTo(kick, kFrom, { opacity: 1, scale: 1, filter: "blur(0px)", duration: 0.6, ease: "expo.out", immediateRender: false }, T.kick);
+          tl.set(kick, { filter: "none" }, T.kick + 0.6);
+
+          // PAYOFF on the 0.4 s cut to the skydive over Vice City: MISSED rises through its masks while the line slams
+          // 1.06 -> 1 from its left edge, RGB split, exposure flash + shake on the footage and the anamorphic streak; then
+          // its light comes up on the sky and a sheen crosses the sunset fill
+          const SL = V.slam || 1.06;
+          gsap.set([l2wrap, lw], { scale: SL });
+          tl.fromTo([l2wrap, lw], { scale: SL }, { scale: 1, duration: 0.7, ease: "expo.out", immediateRender: false }, T.l2 + 0.04);
+          Look.chroma(tl, l2wrap, h, 0.36, { px: 16 });
+          if (plate) Look.impact(tl, h, { shake: "#shake", amp: 8, flash: 0.45, zoom: 1.04, host: "#stage" });
+          gsap.set(light, { opacity: 0 });
+          // the light comes up only once every glyph has landed and the RGB split has decayed (h + 0.36): earlier, its
+          // static copy of the glyphs showed as a faint ghost above the still-rising chars (r07 self-check at 0.95 s)
+          tl.fromTo(light, { opacity: 0 }, { opacity: 1, duration: 0.45, ease: "power2.out", immediateRender: false }, h + 0.36);
+          // THE LIGHT MOMENT: an anamorphic streak on the cut, the way a trailer title catches the lens. A thin hot core
+          // with a soft pink-to-amber glow (the word's own colours). r09: it rides 18 px over MISSED's cap line, travels
+          // across the word in 0.22 s and is gone by 0.95 s. Screen-blended above everything; plate only.
+          if (plate && V.flare) buildFlare(tl, l2R, h, s2);
+          Look.fill(l2, CONFIG.accent, { sheen: true });
+          Look.sheen(tl, l2, T.sheen, { dur: T.sheenDur || 0.85 });
+          // hold: the lockup pushes in from its left edge, the light layer with it
+          tl.fromTo([hook, lh], { scale: 1 }, { scale: 1.02, duration: T.out - 1.0, ease: "none", immediateRender: false }, 1.0);
+          if (plate) Look.leak(tl, T.leak, 1.3, { host: "#stage", colors: ["#FE8E4E", "#F84FA4"], y: 0.3, size: 1300, opacity: 0.4 });
+
+          // EXIT: the light goes first (so no glyph of it is ever seen bare), the kicker blurs out, the caps drop back up
+          // through their masks letter by letter, the stamp blurs out and the sky grade lifts
+          tl.fromTo(light, { opacity: 1 }, { opacity: 0, duration: 0.2, ease: "power2.in", immediateRender: false }, T.out - 0.05);
+          Look.exit(tl, kick, T.out, { to: "blur", dur: 0.38 });
+          const c1 = l1.querySelectorAll(".lk-c"), c2 = l2.querySelectorAll(".lk-c");
+          tl.fromTo(c1, { yPercent: 0 }, { yPercent: -118, duration: 0.36, ease: "power3.in", stagger: 0.014, immediateRender: false }, T.out + 0.04);
+          tl.fromTo(c2, { yPercent: 0 }, { yPercent: -118, duration: 0.38, ease: "power3.in", stagger: 0.016, immediateRender: false }, T.out + 0.1);
+          if (stampRow) animateStamps(tl, stampRow);
+          if (scrimA > 0) tl.fromTo(scrim, { opacity: scrimA }, { opacity: 0, duration: 0.5, ease: "power2.inOut", immediateRender: false }, T.out + 0.15);
+        }
+
+        /* Official caps: the anamorphic streak on the payoff cut */
+        function buildFlare(tl, l2R, h, s2) {
+          const F = V.flare, fl = document.getElementById("flare");
+          // r09: the streak rides F.above px over MISSED's cap line. The cap top is l2R's middle minus 0.366 x size
+          // (calibrated on the r08 render: line middle at y 498, M's cap top at y 442 for MISSED at about 153 px)
+          const capTop = l2R.top + l2R.height * 0.5 - 0.366 * s2;
+          const cy = capTop - (F.above == null ? 18 : F.above), cx = l2R.left + l2R.width * 0.45, L = F.length;
+          const [c0, c1, c2] = F.colors, rgb = (hx) => hx.replace("#", "").match(/../g).map((q) => parseInt(q, 16)).join(",");
+          const mk = (h0, bg, blur) => {
+            const e = document.createElement("div"); e.className = "st";
+            e.style.width = L + "px"; e.style.height = h0 + "px"; e.style.left = (cx - L / 2) + "px"; e.style.top = (cy - h0 / 2) + "px";
+            e.style.background = bg; if (blur) e.style.filter = "blur(" + blur + "px)"; fl.appendChild(e); return e;
+          };
+          // wide soft glow, then the hot core line, then a small hotspot where the light is strongest
+          const glow = mk(60, "radial-gradient(ellipse 50% 50% at 50% 50%, rgba(" + rgb(c2) + ",.42) 0%, rgba(" + rgb(c0) + ",.2) 40%, rgba(" + rgb(c0) + ",0) 72%)", 6);
+          const core = mk(5, "linear-gradient(90deg, rgba(" + rgb(c0) + ",0) 0%, rgba(" + rgb(c0) + ",.75) 22%, rgba(" + rgb(c1) + ",1) 50%, rgba(" + rgb(c2) + ",.75) 78%, rgba(" + rgb(c2) + ",0) 100%)", 1.2);
+          const spot = document.createElement("div"); spot.className = "st";
+          spot.style.cssText += ";width:200px;height:200px;left:" + (cx - 100) + "px;top:" + (cy - 100) + "px;background:radial-gradient(circle, rgba(" + rgb(c1) + ",.75) 0%, rgba(" + rgb(c2) + ",.28) 22%, rgba(" + rgb(c0) + ",0) 60%)";
+          fl.appendChild(spot);
+          const parts = [glow, core, spot], tr = F.travel || [-260, 200], td = F.travelDur || 0.22, gone = F.gone || 0.95;
+          gsap.set(fl, { opacity: 0 });
+          gsap.set([glow, core], { scaleX: 0.15, x: tr[0] }); gsap.set(spot, { scale: 0.4, x: tr[0] });
+          tl.fromTo(fl, { opacity: 0 }, { opacity: F.peak, duration: 0.04, ease: "none", immediateRender: false }, h);
+          tl.fromTo([glow, core], { scaleX: 0.15 }, { scaleX: 1, duration: 0.3, ease: "expo.out", immediateRender: false }, h);
+          tl.fromTo(spot, { scale: 0.4 }, { scale: 1, duration: 0.22, ease: "expo.out", immediateRender: false }, h);
+          // it travels across the word's top in td, then drifts on while it decays: it never parks on the type
+          tl.fromTo(parts, { x: tr[0] }, { x: tr[1], duration: td, ease: "power3.out", immediateRender: false }, h);
+          tl.fromTo(parts, { x: tr[1] }, { x: tr[1] + 120, duration: Math.max(0.05, gone - h - td), ease: "none", immediateRender: false }, h + td);
+          // full strength while it travels, then it eases out through the drift and is gone by F.gone
+          tl.fromTo(fl, { opacity: F.peak }, { opacity: 0, duration: Math.max(0.05, gone - h - 0.12), ease: "sine.inOut", immediateRender: false }, h + 0.12);
+        }
+
+        /* Official caps: the source stamp ("— FEATURES TRAILER · 0:43"), one item per shot from the payoff on */
+        function buildStampRow() {
+          const S = V.stamps;
+          if (!S || !S.items || !S.items.length || (!plate && !S.showNone)) return null;
+          const row = document.createElement("div"); row.className = "stamps";
+          row.style.position = "absolute"; row.style.left = V.left + "px"; row.style.top = S.top + "px";
+          document.getElementById("ov").appendChild(row);
+          if (plate && S.smoke > 0) {
+            const sm = document.createElement("div"); sm.className = "lk-scrim-bottom";
+            sm.style.cssText = "position:absolute;left:0;bottom:0;width:1080px;height:760px;opacity:" + S.smoke;
+            stage.appendChild(sm); row.__smoke = sm;
+          }
+          if (plate && S.spot > 0) {
+            // r08: the bottom smoke is only ~10% dark at the row's height, so over the jetski's white spray the label
+            // went grey-on-white. A soft ellipse sits behind the row itself (no edge: it's light, not a card).
+            const sp = document.createElement("div"), cy = S.top + Math.round(S.size * 0.65), a = S.spot;
+            sp.style.cssText = "position:absolute;left:0;top:0;width:1080px;height:1920px;pointer-events:none;background:radial-gradient(ellipse 600px 130px at " +
+              (V.left + 380) + "px " + cy + "px, rgba(6,4,16," + a + ") 0%, rgba(6,4,16," + (a * 0.55).toFixed(3) + ") 45%, rgba(6,4,16,0) 100%)";
+            stage.appendChild(sp); row.__spot = sp;
+          }
+          row.innerHTML = '<i class="r"></i><span class="tc"></span>';
+          const tc = row.querySelector(".tc");
+          const lineH = Math.round(S.size * 1.3);
+          tc.style.height = lineH + "px";
+          row.__items = S.items.map(([src, time]) => {
+            const e = document.createElement("span"); e.className = "it";
+            e.style.fontSize = S.size + "px"; e.style.lineHeight = lineH + "px"; e.style.letterSpacing = S.track + "em";
+            const a = document.createElement("span"); a.className = "src"; a.textContent = src;
+            const dot = document.createElement("span"); dot.className = "src"; dot.textContent = " · ";
+            const b = document.createElement("span"); b.className = "t"; b.textContent = time;
+            e.appendChild(a); e.appendChild(dot); e.appendChild(b); tc.appendChild(e); return e;
+          });
+          return row;
+        }
+        function animateStamps(tl, row) {
+          const S = V.stamps, items = row.__items, tc = row.querySelector(".tc"), lead = S.lead == null ? 0.07 : S.lead;
+          tc.style.width = Math.ceil(Math.max(...items.map((e) => e.getBoundingClientRect().width))) + "px";
+          items.forEach((e, i) => gsap.set(e, { yPercent: i === 0 ? 0 : 110 }));
+          // the row enters ON the first stamped cut (the payoff), so no frame shows a stamp over a shot it doesn't name
+          Look.enter(tl, row, S.items[0][2], { from: "blur", dur: 0.5, blur: 8, scale: 1.04 });
+          for (let i = 1; i < items.length; i++) {
+            const t = S.items[i][2] - lead;   // the roll leads the cut, so the new source is in on the cut's first frame
+            tl.fromTo(items[i - 1], { yPercent: 0 }, { yPercent: -110, duration: 0.26, ease: "expo.out", immediateRender: false }, t);
+            tl.fromTo(items[i], { yPercent: 110 }, { yPercent: 0, duration: 0.26, ease: "expo.out", immediateRender: false }, t);
+          }
+          Look.exit(tl, row, T.out + 0.06, { to: "blur", dur: 0.38 });
+          if (row.__smoke) tl.fromTo(row.__smoke, { opacity: S.smoke }, { opacity: 0, duration: 0.5, ease: "power2.inOut", immediateRender: false }, T.out + 0.15);
+          // the spot arrives with the row and leaves with it
+          if (row.__spot) {
+            gsap.set(row.__spot, { opacity: 0 });
+            tl.fromTo(row.__spot, { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out", immediateRender: false }, S.items[0][2]);
+            tl.fromTo(row.__spot, { opacity: 1 }, { opacity: 0, duration: 0.45, ease: "power2.inOut", immediateRender: false }, T.out + 0.1);
+          }
+        }
+      })();
+    </script>
+  </body>
+</html>

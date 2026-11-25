@@ -1,0 +1,595 @@
+<!doctype html>
+<!-- GTA 6 component #24 — Versus card (craft v2). 1080x1920 (9:16), 30 fps, 6 s.
+     A head-to-head title that opens a comparison segment.
+     variant "0" Split  — a fight-night intro: each contender gets one full-frame close-up beat with their name, then the two
+                          portraits whip in from opposite edges carrying their names and meet on a steep diagonal blade of
+                          sunset light; the VS lands on the blade with an exposure hit and a light leak, on the complete poster.
+                          LUCIA flush left above the seam, JASON flush right at the foot of his portrait, both bigger than their
+                          intro names. Every shot plays at 1.0x: each pane cuts to a second shot during the hold.
+     variant "1" Centre — GTA V vs GTA VI: a full-bleed split on a 12.5-degree seam, cutting together on the beat through four
+                          matched pairs (the skyline / welcome sign, the view from the top, the car on the street, the city).
+                          Scale tells the upgrade: a small 86%-white GTA V and VS sit on the seam, and GTA VI (the hero, the
+                          frame's one accent) slams in big under them on the first matched cut. The panes open from the seam
+                          and shut back onto it.
+     bg is accepted for library parity, but this is a full-frame component: footage always shows and the Look finishing
+     stack is always on.
+     Safe zones: all text inside x 72–936, y 230–1480. Content, clips, timing and layout live in CONFIG. -->
+<html lang="en" data-composition-variables='[
+  {"id":"variant","type":"enum","label":"Variant","default":"0","options":[{"value":"0","label":"Split"},{"value":"1","label":"Centre"}]},
+  {"id":"bg","type":"enum","label":"Background","default":"plate","options":[{"value":"plate","label":"Sample footage"},{"value":"none","label":"Transparent"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link rel="stylesheet" href="assets/fonts/fonts.css" />
+    <link rel="stylesheet" href="assets/kit/look/look.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="assets/kit/look/look.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: transparent; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; background: #000; color: #fff;
+        font-family: "Inter", sans-serif; -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; }
+      #shake, #push { position: absolute; inset: 0; }
+      .layout { position: absolute; inset: 0; display: none; }
+      .layout.on { display: block; }
+      .full { position: absolute; inset: 0; overflow: hidden; }
+      .full video { position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: cover; }
+      .pane { position: absolute; inset: 0; overflow: hidden; }
+      .pbox { position: absolute; }
+      .pbox video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      .pshade { position: absolute; inset: 0; pointer-events: none; }
+      .track { position: absolute; inset: 0; }
+      #leakHost { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; pointer-events: none; mix-blend-mode: screen; }
+      /* Centre: two full-canvas panes clipped along a tilted seam; each 16:9 shot fills a 1080x1080 box at its native
+         pixels (1920x1080 cover-scaled, framed per shot), the top box on 0-1080 and the bottom box on 840-1920 */
+      .cpane { position: absolute; inset: 0; overflow: hidden; }
+      .sw { position: absolute; left: 0; width: 1080px; height: 1080px; }
+      .sw video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      .bscrim { position: absolute; pointer-events: none; }
+
+      /* overlay */
+      #ov { position: absolute; inset: 0; z-index: 20; }
+      .ovl { position: absolute; inset: 0; display: none; }
+      .ovl.on { display: block; }
+      .scrim { position: absolute; left: 0; width: 1080px; pointer-events: none; }
+      .blk { position: absolute; left: 0; top: 0; white-space: nowrap; }
+      .nm { display: block; white-space: nowrap; line-height: 1; letter-spacing: .02em; }
+      .nm.dim { color: rgba(255,255,255,.86); }
+      .nm.lift { filter: drop-shadow(0 2px 2px rgba(0,0,0,.30)) drop-shadow(0 10px 30px rgba(0,0,0,.42)); }
+      .lb { display: block; white-space: nowrap; line-height: 1; color: rgba(255,255,255,.88); font-size: 26px; letter-spacing: .34em;
+        text-shadow: 0 1px 2px rgba(0,0,0,.5), 0 4px 16px rgba(0,0,0,.45); }
+      .centred { text-align: center; }
+
+      /* the seam: a blade of light that breaks around the VS (Split: a 4 px sunset edge; Centre: a white hairline) */
+      #blade { position: absolute; left: 0; top: 0; height: 0; transform-origin: 0 0; pointer-events: none; }
+      #blade i { position: absolute; top: -1px; height: 2px; background: #fff; border-radius: 1px;
+        box-shadow: 0 0 2px rgba(255,255,255,.9), 0 0 10px rgba(254,183,71,.55), 0 0 28px rgba(248,79,164,.38); }
+      #blade b { position: absolute; top: 2px; height: 30px; pointer-events: none;   /* contact shadow: the upper plate lies over the lower one */
+        background: linear-gradient(180deg, rgba(0,0,0,.36), rgba(0,0,0,.18) 30%, rgba(0,0,0,.06) 65%, rgba(0,0,0,0)); }
+
+      /* VS: wide Archivo 900. Split: sunset fill + orange bloom. Centre: white in the Rockstar date style (magenta offset + bloom). */
+      #vsBox { position: absolute; left: 0; top: 0; }
+      #vsSlam { position: relative; transform-origin: 50% 50%; }
+      #vsGlow { position: relative; }
+      #vsText, #vsBack { display: block; font-family: "Archivo", "Inter", sans-serif; font-stretch: 125%; font-weight: 900; line-height: 1;
+        letter-spacing: .02em; white-space: nowrap; color: #fff; }
+      #vsBack { position: absolute; left: 0; top: 0; color: #FE8E4E; }   /* Split: an orange copy under the gradient glyphs that carries the bloom */
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1080" data-height="1920">
+      <div id="shake"><div id="push">
+        <!-- ===== Variant 0 · Split ===== -->
+        <div class="layout" id="L0">
+          <div class="full" id="iwA"><video id="v0ia" class="clip" src="assets/shots/s083-duo-convertible-v.mp4" muted playsinline data-start="0" data-duration="1.1" data-media-start="0" data-track-index="0"></video></div>
+          <div class="full" id="iwB"><video id="v0ib" class="clip" src="assets/shots/s076-jason-boat-v.mp4" muted playsinline data-start="1.1" data-duration="1.5" data-media-start="1.35" data-track-index="0"></video></div>
+          <div class="pane" id="paneA">
+            <div class="pbox" id="pbA"><video id="v0pa" class="clip" src="assets/shots/s018-lucia-gate-v.mp4" muted playsinline data-start="2.3" data-duration="2.95" data-media-start="0" data-track-index="1"></video></div>
+            <div class="pbox" id="pbA2"><video id="v0pa2" class="clip" src="assets/shots/s105-lucia-rooftop-v.mp4" muted playsinline data-start="5.25" data-duration="0.75" data-media-start="0" data-track-index="1"></video></div>
+            <div class="pshade" id="shA"></div>
+          </div>
+          <div class="pane" id="paneB">
+            <div class="pbox" id="pbB"><div class="track" id="trB"><video id="v0pb" class="clip" src="assets/clips/s078-jason-track-100-v.mp4" muted playsinline data-start="2.3" data-duration="2.1" data-media-start="0" data-track-index="2"></video></div></div>
+            <div class="pbox" id="pbB2"><video id="v0pb2" class="clip" src="assets/clips/s092-jason-window-v.mp4" muted playsinline data-start="4.4" data-duration="1.6" data-media-start="0" data-track-index="2"></video></div>
+            <div class="pshade" id="shB"></div>
+          </div>
+          <div id="leakHost"></div>  <!-- rotated onto the seam: the light leak runs along the blade -->
+        </div>
+        <!-- ===== Variant 1 · Centre ===== -->
+        <div class="layout" id="L1">
+          <div class="cpane" id="pA">
+            <div class="sw" id="swA0"><video id="v1a0" class="clip" src="assets/shots/g33-gta5-oil-sunset-h.mp4" muted playsinline data-start="0" data-duration="1" data-media-start="0.3" data-track-index="3"></video></div>
+            <div class="sw" id="swA1"><video id="v1a1" class="clip" src="assets/shots/g06-gta5-mountain-h.mp4" muted playsinline data-start="1" data-duration="1.6" data-media-start="0.2" data-track-index="3"></video></div>
+            <div class="sw" id="swA2"><video id="v1a2" class="clip" src="assets/shots/g07-gta5-red-convertible-h.mp4" muted playsinline data-start="2.6" data-duration="1.65" data-media-start="0.3" data-track-index="3"></video></div>
+            <div class="sw" id="swA3"><video id="v1a3" class="clip" src="assets/shots/g16-gta5-michael-skyline-h.mp4" muted playsinline data-start="4.25" data-duration="1.75" data-media-start="0.3" data-track-index="3"></video></div>
+            <div class="bscrim" id="scA"></div>
+          </div>
+          <div class="cpane" id="pB">
+            <div class="sw" id="swB0"><video id="v1b0" class="clip" src="assets/shots/s074-keys-sign-h.mp4" muted playsinline data-start="0" data-duration="1" data-media-start="0.2" data-track-index="4"></video></div>
+            <div class="sw" id="swB1"><video id="v1b1" class="clip" src="assets/shots/s135-skydive-city-h.mp4" muted playsinline data-start="1" data-duration="1.6" data-media-start="0" data-track-index="4"></video></div>
+            <div class="sw" id="swB2"><video id="v1b2" class="clip" src="assets/shots/s096-police-street-h.mp4" muted playsinline data-start="2.6" data-duration="1.65" data-media-start="0.1" data-track-index="4"></video></div>
+            <div class="sw" id="swB3"><video id="v1b3" class="clip" src="assets/shots/s011-vice-highway-h.mp4" muted playsinline data-start="4.25" data-duration="1.75" data-media-start="1.85" data-track-index="4"></video></div>
+            <div class="bscrim" id="scB"></div>
+          </div>
+        </div>
+      </div></div>
+
+      <div id="ov" class="clip" data-start="0" data-duration="6" data-track-index="5">
+        <!-- Split overlay -->
+        <div class="ovl" id="O0">
+          <div class="scrim lk-scrim-bottom" id="introScrim"></div>
+          <div class="scrim" id="poolA"></div>
+          <div class="scrim" id="poolB"></div>
+          <div class="blk" id="iA"><span class="nm t-wide lift" id="iAn"></span><span class="lb t-label-wide" id="iAl"></span></div>
+          <div class="blk" id="iB"><span class="nm t-wide lift" id="iBn"></span><span class="lb t-label-wide" id="iBl"></span></div>
+          <!-- the face-off: kicker label over each name; A flush left above the seam, B flush right at the foot of its portrait -->
+          <div class="blk" id="sAlw"><span class="lb t-label-wide" id="sAl"></span></div>
+          <div class="blk" id="sA"><span class="nm t-wide lift" id="sAn"></span></div>
+          <div class="blk" id="sBlw"><span class="lb t-label-wide" id="sBl"></span></div>
+          <div class="blk" id="sB"><span class="nm t-wide lift" id="sBn"></span></div>
+        </div>
+        <!-- Centre overlay: the lockup on the tilted seam: label, GTA V (small, 86% white), VS, GTA VI (the hero, sunset), label -->
+        <div class="ovl" id="O1">
+          <div class="blk centred" id="cA"><span class="nm t-wide lift dim centred" id="cAn"></span></div>
+          <div class="blk centred" id="cAlw"><span class="lb t-label-wide centred" id="cAlab"></span></div>
+          <div class="blk centred" id="cBlw"><span class="lb t-label-wide centred" id="cBlab"></span></div>
+          <div class="blk centred" id="cB"><div id="cBs"><span class="nm t-wide centred" id="cBn"></span></div></div>
+        </div>
+        <div id="blade"><b id="shadeL"></b><b id="shadeR"></b><i id="segL"></i><i id="segR"></i></div>
+        <div id="vsBox"><div id="vsSlam"><div id="vsGlow"><span id="vsBack" data-layout-allow-occlusion></span><span id="vsText"></span></div></div></div>
+      </div>
+    </div>
+
+    <script>
+      const CONFIG = {
+        duration: 6,
+        variants: {
+          // ---- Split: intro beat A, intro beat B, then the two portraits whip in with their names and meet on a diagonal blade (A = top pane, B = bottom) ----
+          // Every shot plays at 1.0x (r11): where the hold is longer than a shot, the pane cuts to a second shot (pane2).
+          "0": {
+            layout: "split",
+            vs: "VS",
+            a: { name: "Lucia", label: "Caminos",
+                 intro: { clip: "assets/shots/s083-duo-convertible-v.mp4", start: 0 },
+                 // pane box in canvas px (the clip is laid into it with object-fit: cover). s018 at 1.0x from its first frame:
+                 // her head lifts during the whip-in (2.30-2.67 s) and she looks to camera from the hit on
+                 pane:  { clip: "assets/shots/s018-lucia-gate-v.mp4", start: 0, box: { x: 0, y: -80, w: 1080, h: 1920 }, origin: "50% 22%", push: 1.06 },
+                 // cut on the exit (5.25 s): Lucia on the rooftop at sunset, the brightest, warmest shot to end on
+                 pane2: { clip: "assets/shots/s105-lucia-rooftop-v.mp4", start: 0, at: 5.25, box: { x: 0, y: -60, w: 1080, h: 1920 }, origin: "50% 22%", push: 1.04 } },
+            b: { name: "Jason", label: "Duval",
+                 intro: { clip: "assets/shots/s076-jason-boat-v.mp4", start: 1.35 },
+                 // s078 re-cut from the 4K master by make-clips.sh at 1.0x: a window that pans with his face, 1080x1424 (0.742x of 4K).
+                 // The pan is baked in; vertically his head rises in the first 0.35 s, so the box follows his eye (clip px) to hold it at eyeY.
+                 pane:  { clip: "assets/clips/s078-jason-track-100-v.mp4", start: 0, box: { x: 0, y: 496, w: 1080, h: 1424 }, origin: "57% 52%", push: 1.04,
+                          filter: "brightness(1.07) contrast(1.05)",
+                          eyeY: 1000, yMax: 700,   // the box may sit between box.y (its foot on the canvas floor) and yMax (its top on the seam's high end)
+                          track: [[0, 744], [0.14, 620], [0.28, 531], [0.42, 470], [0.56, 432], [0.70, 409], [0.84, 397], [0.98, 393], [1.12, 392],
+                                  [1.40, 393], [1.68, 390], [1.96, 385], [2.10, 385]] },
+                 // cut at 4.4 s, as the sheen crosses the VS: s092 (Jason leaning on the car at golden hour) re-cut from the 4K master,
+                 // 1080x1220 (0.85x of 4K, a window that pans with the camera's drift), his face right of the VS under the seam, above JASON
+                 pane2: { clip: "assets/clips/s092-jason-window-v.mp4", start: 0, at: 4.4, box: { x: 0, y: 700, w: 1080, h: 1220 }, origin: "70% 25%", push: 1.04 } },
+            // seam from (0, yLeft) to (1080, yRight): a steep 19° blade between the two portraits
+            seam: { yLeft: 1080, yRight: 700 },
+            introSize: 146, introMaxW: 760, introBaseline: 1372,   // intro name: lower third, flush left (the setup: smaller than the payoff)
+            nameSize: 168, nameMaxW: 804, vsSize: 210, vsX: 530,   // face-off names span 75-86% of the safe width; VS ink centred on the seam at vsX
+            nameBBaseline: 1466,  // JASON sits at the foot of his portrait, under his chin, inside the safe zone
+            gapVS: 30,            // LUCIA baseline ↔ VS ink top
+            seamClear: 24,        // LUCIA's last letter stays this far above the seam
+            gapLabel: 22,         // kicker label baseline ↔ name cap top
+            bladeGap: 26,         // blade clear of the VS ink
+            blade: { width: 4, fill: "linear-gradient(90deg, #F84FA4 0%, #FE78A6 30%, #FE8E4E 66%, #FEB747 100%)", bloom: "#FE8E4E", strength: 0.6 },
+            vsBloom: { color: "#FE8E4E", strength: 0.45 },
+            leak: { colors: ["#FEB747", "#F84FA4"], opacity: 0.55, dur: 0.55, size: 1100 },
+            expose: { peak: 1.6, hold: 3 / 30, dur: 0.34 }   // the payoff light: blows the highlights, keeps the blacks (no white flash)
+          },
+          // ---- Centre: a full-bleed split on a 12.5° seam; matched pairs cut together on the beat ----
+          "1": {
+            layout: "centre",
+            vs: "VS",
+            a: { name: "GTA V",  label: "2013 · Los Santos" },
+            b: { name: "GTA VI", label: "2026 · Leonida" },
+            // Each 16:9 shot fills a 1080x1080 box at its native pixels (top box 0-1080, bottom box 840-1920): fit.x = object-position x
+            // (0-1), fit.s = extra zoom about (fit.x, fit.y). Shots are cast so the lockup lands on the foot of the GTA V shot and the
+            // top of the GTA VI shot, never on a face. All at 1.0x.
+            cuts: [
+              // the skyline and the welcome sign: downtown Los Santos at golden hour / "Welcome to the Keys"
+              { at: 0.0,  dur: 1.0,  a: { clip: "assets/shots/g33-gta5-oil-sunset-h.mp4",       start: 0.3, fit: { x: 0.5,  y: 0.5, s: 1 } },
+                                     b: { clip: "assets/shots/s074-keys-sign-h.mp4",             start: 0.2, fit: { x: 0.5,  y: 0.5, s: 1 } } },
+              // the view from the top (GTA VI slams in here): hikers on the summit / she leaps over Vice City (1.0x, from her stance)
+              { at: 1.0,  dur: 1.6,  a: { clip: "assets/shots/g06-gta5-mountain-h.mp4",         start: 0.2, fit: { x: 0.5,  y: 0.5, s: 1 } },
+                                     b: { clip: "assets/shots/s135-skydive-city-h.mp4",          start: 0.0, fit: { x: 0.5,  y: 0.5, s: 1 } } },
+              // the car on the street: the GTA V red convertible / a Vice City police cruiser on a palm-lined street
+              // (s096 from 0.1 s: its first 3 frames are a red car whipping past the lens)
+              { at: 2.6,  dur: 1.65, a: { clip: "assets/shots/g07-gta5-red-convertible-h.mp4",  start: 0.3, fit: { x: 0.42, y: 0.5, s: 1 } },
+                                     b: { clip: "assets/shots/s096-police-street-h.mp4",          start: 0.1, fit: { x: 0.5,  y: 0.5, s: 1 } } },
+              // the city (ends here: the brightest, sharpest pair): Michael over Los Santos / driving into Vice City under the towers
+              // (s011 from 1.85 s, once the road signs have dropped 40 px clear of "2026 · LEONIDA")
+              { at: 4.25, dur: 1.75, a: { clip: "assets/shots/g16-gta5-michael-skyline-h.mp4",  start: 0.3, fit: { x: 0.72, y: 0.5, s: 1 } },
+                                     b: { clip: "assets/shots/s011-vice-highway-h.mp4",           start: 1.85, fit: { x: 0.5,  y: 0.5, s: 1 } } }
+            ],
+            seam: { yLeft: 840, yRight: 1080 },   // 12.5°, falling to the right
+            heroSize: 176, heroMaxW: 770,         // GTA VI: the hero, sunset, ~88% of the safe width
+            nameSize: 112, vsSize: 112,           // GTA V (86% white) and the VS share the second size: 3 sizes in the frame (176 / 112 / 26)
+            gapVS: 30,          // name ink ↔ VS ink
+            seamClear: 26,      // name ink ↔ the seam under / over its nearest letter
+            gapLabel: 22,       // label ↔ name, on the ink
+            bladeGap: 26,
+            blade: { width: 4, color: "#FFFFFF", bloom: "#FFE2C4", strength: 0.55 },
+            vsBloom: { color: "#FFE2C4", strength: 0.35 },
+            // a soft dark lip on each side of the seam, under the lockup (light, not a box): darkness at the seam and at
+            // 28 / 56 / 80% of scrimH; 0 at scrimH
+            scrimH: 540, scrim: [0.70, 0.56, 0.34, 0.12],
+            sunset: "linear-gradient(100deg, #F84FA4 0%, #FE78A6 24%, #FE8E4E 62%, #FEB747 100%)",
+            expose: { peak: 1.6, hold: 3 / 30, dur: 0.34 }
+          }
+        },
+        vsFill: "linear-gradient(100deg, #F84FA4 0%, #FE78A6 26%, #FE8E4E 64%, #FEB747 100%)",
+        safe: { left: 72, right: 936, top: 230, bottom: 1480 },
+        inkEdge: { left: 96, right: 900 },   // every flush edge is aligned on the glyph ink, inset 24-36 px from the safe limits
+        // seconds
+        timing: {
+          split: { cutB: 1.1, slide: 2.3, cutSplit: 2.6, vsFall: 0.14, labels: 2.72, sheen: 4.0, sheenDur: 0.8, out: 5.3 },
+          centre: { open: 0.0, openDur: 0.5, nameA: 0.10, labelA: 0.30, vsIn: 0.36, slam: 1.0, fall: 0.14, labelB: 1.12, sheen: 1.6, out: 5.25, close: 5.55, closeDur: 0.42 }
+        }
+      };
+
+      (function () {
+        const VARS = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+        const vKey = CONFIG.variants[String(VARS.variant)] ? String(VARS.variant) : "0";
+        const V = CONFIG.variants[vKey], D = CONFIG.duration;
+        const $ = (s) => document.querySelector(s);
+        const setAttr = (el, k, val) => { if (el && el.getAttribute(k) !== String(val)) el.setAttribute(k, String(val)); };
+        const isSplit = V.layout === "split";
+        $("#L" + (isSplit ? "0" : "1")).classList.add("on");
+        $("#O" + (isSplit ? "0" : "1")).classList.add("on");
+        // the inactive variant's clips stay hidden
+        document.querySelectorAll("#L" + (isSplit ? "1" : "0") + " video").forEach((v) => (v.style.display = "none"));
+
+        // ---------- measuring helpers (ink, not line boxes) ----------
+        const ctx = document.createElement("canvas").getContext("2d");
+        function ink(text, px, weight, ls) {
+          ctx.font = weight + " " + px + "px Archivo"; try { ctx.fontStretch = "expanded"; } catch (e) {}
+          try { ctx.letterSpacing = (ls || 0) + "px"; } catch (e) {}
+          const m = ctx.measureText(text.toUpperCase());
+          return { asc: m.actualBoundingBoxAscent, desc: m.actualBoundingBoxDescent, l: m.actualBoundingBoxLeft, r: m.actualBoundingBoxRight, w: m.width };
+        }
+        // baseline offset of a single-line element from its top (DOM marker)
+        function baselineOf(el) {
+          const mk = document.createElement("span"); mk.style.cssText = "display:inline-block;width:0;height:0;vertical-align:baseline";
+          el.appendChild(mk); const b = mk.offsetTop - el.offsetTop; el.removeChild(mk); return b;
+        }
+        function fit(el, size, maxW) {
+          el.style.fontSize = size + "px";
+          let s = size; while (el.scrollWidth > maxW && s > 60) { s -= 2; el.style.fontSize = s + "px"; }
+          return s;
+        }
+        // trailing tracking off the last glyph so centred / flush text sits on its ink
+        function trimTrack(el) {
+          const t = el.textContent; if (t.length < 2) return;
+          el.innerHTML = ""; el.appendChild(document.createTextNode(t.slice(0, -1)));
+          const l = document.createElement("span"); l.style.letterSpacing = "0"; l.textContent = t.slice(-1); el.appendChild(l);
+        }
+        // set a label's cap top exactly `gap` px under the element above it (name baseline), measured on the ink
+        function stackUnder(above, label, gap, labelCap) {
+          const aBase = above.offsetTop + baselineOf(above);
+          const capTop = label.offsetTop + baselineOf(label) - labelCap;
+          const m = parseFloat(label.style.marginTop) || 0;
+          label.style.marginTop = (m + (aBase + gap - capTop)) + "px";
+        }
+        // place a block so a child's baseline lands on y (block is absolutely positioned at left:0/top:0)
+        function placeBaseline(block, child, y) { block.style.top = "0px"; const b = child.offsetTop + baselineOf(child); block.style.top = (y - b) + "px"; }
+        // Look.bloom's light recipe as a box-shadow, for shapes (Look.bloom itself sets text-shadow, which an empty div ignores)
+        function bloomBox(hex, s) {
+          const h = hex.replace("#", ""), n = parseInt(h, 16), rgb = ((n >> 16) & 255) + "," + ((n >> 8) & 255) + "," + (n & 255);
+          const a = (x) => "rgba(" + rgb + "," + Math.min(1, x * s).toFixed(3) + ")";
+          return "0 0 1px rgba(255,255,255," + (0.35 * s).toFixed(3) + "), 0 0 14px " + a(0.42) + ", 0 0 42px " + a(0.28) + ", 0 0 110px " + a(0.16);
+        }
+
+        // the type is injected by script, so fonts.ready alone would resolve before Archivo is ever requested: load the faces first
+        const faces = ["expanded 800 100px Archivo", "expanded 900 100px Archivo", "expanded 600 26px Archivo", "600 26px Inter"];
+        Promise.all(faces.map((f) => document.fonts.load(f, "VSJASONLUCIAGT"))).catch(() => {}).then(() => document.fonts.ready).then(() => {
+          const tl = gsap.timeline({ paused: true });
+          if (isSplit) buildSplit(tl); else buildCentre(tl);
+          Look.install(tl, { duration: D, grain: 0.15, vignette: isSplit ? 0.5 : 0.42, enabled: true });
+          tl.set({}, {}, D);
+          window.__timelines = window.__timelines || {};
+          window.__timelines["main"] = tl;
+          tl.seek(0);
+        });
+
+        // ======================================================================================
+        // Split
+        // ======================================================================================
+        function buildSplit(tl) {
+          const T = CONFIG.timing.split, A = V.a, B = V.b, E = CONFIG.inkEdge;
+          const yL = V.seam.yLeft, yR = V.seam.yRight, ang = Math.atan2(yR - yL, 1080);
+          const seamY = (x) => yL + (yR - yL) * (x / 1080);
+
+          // clips (static attributes are authored to match; re-applied here so CONFIG stays the source of truth)
+          setAttr($("#v0ia"), "src", A.intro.clip); setAttr($("#v0ia"), "data-media-start", A.intro.start);
+          setAttr($("#v0ib"), "src", B.intro.clip); setAttr($("#v0ib"), "data-media-start", B.intro.start);
+          setAttr($("#v0pa"), "src", A.pane.clip);  setAttr($("#v0pa"), "data-media-start", A.pane.start);
+          setAttr($("#v0pb"), "src", B.pane.clip);  setAttr($("#v0pb"), "data-media-start", B.pane.start);
+          [["#v0pa2", A.pane2], ["#v0pb2", B.pane2]].forEach(([id, p]) => {
+            setAttr($(id), "src", p.clip); setAttr($(id), "data-media-start", p.start);
+            setAttr($(id), "data-start", p.at); setAttr($(id), "data-duration", +(D - p.at).toFixed(4));
+          });
+          setAttr($("#v0pa"), "data-duration", +(A.pane2.at - T.slide).toFixed(4));
+          setAttr($("#v0pb"), "data-duration", +(B.pane2.at - T.slide).toFixed(4));
+          [["#pbA", A.pane], ["#pbB", B.pane], ["#pbA2", A.pane2], ["#pbB2", B.pane2]].forEach(([id, p]) => {
+            const el = $(id); Object.assign(el.style, { left: p.box.x + "px", top: p.box.y + "px", width: p.box.w + "px", height: p.box.h + "px", transformOrigin: p.origin });
+          });
+          if (B.pane.filter) $("#v0pb").style.filter = B.pane.filter;
+          if (B.pane2.filter) $("#v0pb2").style.filter = B.pane2.filter;
+          // panes cut along the seam
+          $("#paneA").style.clipPath = `polygon(0px 0px, 1080px 0px, 1080px ${yR}px, 0px ${yL}px)`;
+          $("#paneB").style.clipPath = `polygon(0px ${yL}px, 1080px ${yR}px, 1080px 1920px, 0px 1920px)`;
+
+          // ---- intro names: lower third, flush left on the ink, surname label under the name
+          [["#iA", "#iAn", "#iAl", A], ["#iB", "#iBn", "#iBl", B]].forEach(([blk, n, l, side]) => {
+            $(n).textContent = side.name.toUpperCase(); $(l).textContent = side.label.toUpperCase(); trimTrack($(l));
+            const sz = fit($(n), V.introSize, V.introMaxW);
+            stackUnder($(n), $(l), 30, ink("CAMINOS", 26, 600).asc);
+            const kn = ink(side.name, sz, 800, 0.02 * sz), kl = ink(side.label, 26, 600, 0.34 * 26);
+            $(blk).style.left = (E.left + kn.l) + "px";
+            $(l).style.marginLeft = (kl.l - kn.l) + "px";      // the label's ink starts on the name's ink
+            placeBaseline($(blk), $(n), V.introBaseline);
+          });
+          Object.assign($("#introScrim").style, { top: "880px", height: "1040px" });
+
+          // ---- the face-off type
+          $("#sAn").textContent = A.name.toUpperCase(); $("#sAl").textContent = A.label.toUpperCase(); trimTrack($("#sAl"));
+          $("#sBn").textContent = B.name.toUpperCase(); $("#sBl").textContent = B.label.toUpperCase(); trimTrack($("#sBl"));
+          const nsA = fit($("#sAn"), V.nameSize, V.nameMaxW), nsB = fit($("#sBn"), V.nameSize, V.nameMaxW);
+          const ns = Math.min(nsA, nsB); $("#sAn").style.fontSize = ns + "px"; $("#sBn").style.fontSize = ns + "px";
+          const kA = ink(A.name, ns, 800, 0.02 * ns), kB = ink(B.name, ns, 800, 0.02 * ns);
+          const kAl = ink(A.label, 26, 600, 0.34 * 26), kBl = ink(B.label, 26, 600, 0.34 * 26);
+
+          // VS: ink centred on the seam at x = vsX
+          ["#vsText", "#vsBack"].forEach((s) => { $(s).textContent = V.vs.toUpperCase(); $(s).style.fontSize = V.vsSize + "px"; });
+          const vsT = $("#vsText");
+          const kV = ink(V.vs, V.vsSize, 900, 0.02 * V.vsSize);
+          const vsCx = V.vsX, vsCy = seamY(vsCx);
+          const vsLeft = vsCx - (kV.r - kV.l) / 2, vsBase = vsCy + kV.asc / 2;
+          Object.assign($("#vsBox").style, { left: vsLeft + "px", top: (vsBase - baselineOf(vsT)) + "px" });
+          const inkTop = vsBase - kV.asc, inkL = vsLeft - kV.l, inkR = vsLeft + kV.r;
+
+          // A: LUCIA flush left above the VS, clear of the seam under its last letter; its kicker label above it
+          const aRight = E.left + (kA.r + kA.l);
+          const aBase = Math.min(inkTop - V.gapVS, seamY(aRight) - V.seamClear);
+          $("#sA").style.left = (E.left + kA.l) + "px"; placeBaseline($("#sA"), $("#sAn"), aBase);
+          $("#sAlw").style.left = (E.left + kAl.l) + "px"; placeBaseline($("#sAlw"), $("#sAl"), aBase - kA.asc - V.gapLabel);
+          // B: JASON flush right (ink edge on 900) at the foot of his portrait; its kicker label above it
+          const bBase = V.nameBBaseline;
+          $("#sB").style.left = (E.right - kB.r) + "px"; placeBaseline($("#sB"), $("#sBn"), bBase);
+          $("#sBlw").style.left = (E.right - kBl.r) + "px"; placeBaseline($("#sBlw"), $("#sBl"), bBase - kB.asc - V.gapLabel);
+
+          // soft ink pools behind each name block (light, not boxes)
+          Object.assign($("#poolA").style, { top: "0px", height: "1920px",
+            background: `radial-gradient(ellipse 820px 240px at 330px ${aBase - 70}px, rgba(5,5,9,.50) 0%, rgba(5,5,9,.28) 48%, rgba(5,5,9,0) 100%)` });
+          Object.assign($("#poolB").style, { top: "0px", height: "1920px",
+            background: `radial-gradient(ellipse 860px 250px at 600px ${bBase - 72}px, rgba(5,5,9,.55) 0%, rgba(5,5,9,.32) 48%, rgba(5,5,9,0) 100%)` });
+          // pane B: a low grade so the caption zone under JASON stays quiet
+          Object.assign($("#shB").style, { background: "linear-gradient(180deg, rgba(5,5,9,0) 1340px, rgba(5,5,9,.38) 1560px, rgba(5,5,9,.72) 1920px)" });
+
+          // ---- the blade: a 4 px sunset light edge along the seam, broken around the VS
+          const len = Math.hypot(1080, yR - yL) + 80, bw = V.blade.width;
+          Object.assign($("#blade").style, { left: "-40px", top: (yL - (yR - yL) * (40 / 1080)) + "px", width: len + "px", transform: `rotate(${ang}rad)` });
+          const along = (x) => (x + 40) / Math.cos(ang);    // canvas x → distance along the blade
+          const gL = along(inkL) - V.bladeGap, gR = along(inkR) + V.bladeGap;
+          const glow = bloomBox(V.blade.bloom, V.blade.strength);
+          [["#segL", 0, Math.max(0, gL)], ["#segR", gR, len - gR]].forEach(([id, x, w]) => {
+            Object.assign($(id).style, { left: x + "px", width: w + "px", top: (-bw / 2) + "px", height: bw + "px", borderRadius: (bw / 2) + "px",
+              transformOrigin: "0% 50%", background: V.blade.fill, backgroundSize: len + "px 100%", backgroundPosition: (-x) + "px 0px", boxShadow: glow });
+          });
+          Object.assign($("#shadeL").style, { left: "0px", width: len + "px", top: (bw / 2) + "px", transformOrigin: "0% 50%" }); $("#shadeR").style.display = "none";
+
+          // ---- VS look: sunset fill (the frame's one accent) with an orange bloom carried by a transparent copy underneath
+          Look.fill("#vsText", CONFIG.vsFill, { sheen: true });
+          Look.bloom("#vsBack", { color: V.vsBloom.color, strength: V.vsBloom.strength });
+          $("#vsGlow").style.filter = "drop-shadow(0 6px 16px rgba(0,0,0,.42))";
+
+          // ---- the leak host lies along the seam (rotated about the VS), so Look.leak sweeps down the blade
+          Object.assign($("#leakHost").style, { transformOrigin: `${vsCx}px ${vsCy}px`, transform: `rotate(${ang}rad)` });
+
+          // ======================= timeline =======================
+          const cut1 = T.cutB, cut2 = T.cutSplit, sl = T.slide;
+          // footage visibility (clips are framework-timed; wrappers carry the push and the slide)
+          gsap.set(["#paneA", "#paneB"], { autoAlpha: 0 });
+          tl.set(["#paneA", "#paneB"], { autoAlpha: 1 }, sl);
+          Look.push(tl, "#iwA", 0, cut1, { from: 1.0, to: 1.06, origin: "50% 40%" });
+          Look.push(tl, "#iwB", cut1, cut2 - cut1, { from: 1.02, to: 1.08, origin: "45% 30%" });
+
+          // intro A
+          gsap.set("#iB", { autoAlpha: 0 });
+          Look.reveal(tl, "#iAn", 0.10, { by: "chars", stagger: 0.03, dur: 0.58 });
+          Look.enter(tl, "#iAl", 0.36, { from: "blur", dur: 0.46, blur: 10 });
+          tl.set("#iA", { autoAlpha: 0 }, cut1);
+          // cut to intro B: a hard cut on the beat (r11: the 0.22 white flash is gone)
+          tl.set("#iB", { autoAlpha: 1 }, cut1);
+          Look.reveal(tl, "#iBn", cut1 + 0.08, { by: "chars", stagger: 0.03, dur: 0.6 });
+          Look.enter(tl, "#iBl", cut1 + 0.36, { from: "blur", dur: 0.5, blur: 10 });
+          // intro B clears as the portraits arrive
+          Look.exit(tl, "#iB", sl - 0.06, { to: "blur", dur: 0.22, blur: 14 });
+          tl.to("#introScrim", { autoAlpha: 0, duration: 0.24, ease: "power2.in" }, sl);
+
+          // Jason's box follows his eye height (the horizontal pan is baked into the clip): box top = eyeY - eye(clip t), within [box.y, yMax]
+          const P = B.pane, tk = P.track;
+          const eyeAt = (t) => { for (let i = 1; i < tk.length; i++) if (t <= tk[i][0]) { const [t0, y0] = tk[i - 1], [t1, y1] = tk[i]; return y0 + (y1 - y0) * (t - t0) / (t1 - t0); } return tk[tk.length - 1][1]; };
+          const trackY = (t) => Math.max(0, Math.min(P.yMax - P.box.y, P.eyeY - eyeAt(t) - P.box.y));
+          // THE SLASH: both portraits slide in from opposite edges (A from the left, B from the right) and meet on the blade, accelerating into the hit
+          tl.fromTo("#pbA", { x: -1080 }, { x: 0, duration: cut2 - sl, ease: "power2.in", immediateRender: false }, sl);
+          tl.fromTo("#pbB", { x: 1080 }, { x: 0, duration: cut2 - sl, ease: "power2.in", immediateRender: false }, sl);
+          gsap.set("#pbA", { x: -1080 }); gsap.set("#pbB", { x: 1080 });
+          // r11: each name rides in with its portrait (LUCIA with A from the left, JASON with B from the right), so the whole poster,
+          // names included, is complete on the hit frame and the light lands on the finished hero
+          tl.fromTo("#sA", { x: -1080 }, { x: 0, duration: cut2 - sl, ease: "power2.in", immediateRender: false }, sl);
+          tl.fromTo("#sB", { x: 1080 }, { x: 0, duration: cut2 - sl, ease: "power2.in", immediateRender: false }, sl);
+          gsap.set("#sA", { x: -1080 }); gsap.set("#sB", { x: 1080 });
+          ["#pbA", "#pbB", "#sA", "#sB"].forEach((el) => {
+            Look.mblur(tl, el, sl, cut2 - sl, { x: 0, to: [40, 0], ease: "power2.in" });   // blur builds with the speed…
+            Look.mblur(tl, el, cut2, 0.067, { x: 16 });                                     // …and snaps sharp on the hit (2 frames)
+          });
+          // the blade draws across the frame, left to right, in 0.16 s, landing with the panes
+          const drawAt = cut2 - 0.16, drawDur = 0.16, span = len;
+          gsap.set(["#segL", "#segR", "#shadeL"], { scaleX: 0 }); gsap.set("#blade", { autoAlpha: 0 });
+          tl.set("#blade", { autoAlpha: 1 }, drawAt);
+          tl.fromTo("#shadeL", { scaleX: 0 }, { scaleX: 1, duration: drawDur, ease: "none", immediateRender: false }, drawAt);
+          tl.fromTo("#segL", { scaleX: 0 }, { scaleX: 1, duration: drawDur * Math.max(0, gL) / span, ease: "none", immediateRender: false }, drawAt);
+          tl.fromTo("#segR", { scaleX: 0 }, { scaleX: 1, duration: drawDur * (len - gR) / span, ease: "none", immediateRender: false }, drawAt + drawDur * gR / span);
+
+          // PAYOFF 2.6 s: the VS crashes onto the seam as the panes land; the blade flares and one leak runs down it
+          const fall = cut2 - T.vsFall;
+          gsap.set("#vsSlam", { autoAlpha: 0, scale: 2.6, filter: "blur(18px)" });
+          tl.fromTo("#vsSlam", { autoAlpha: 0, scale: 2.6, filter: "blur(18px)" },
+            { autoAlpha: 1, scale: 1, filter: "blur(0px)", duration: T.vsFall, ease: "power3.in", immediateRender: false }, fall);
+          tl.set("#vsSlam", { filter: "none" }, cut2);
+          // r11: no white overlay flash (it lifted the blacks to grey). The light is an exposure pulse on the footage: highlights
+          // bloom, blacks stay black, 3-frame peak. RGB split is seasoning: 5 px for 0.16 s on the VS only.
+          Look.impact(tl, cut2, { shake: "#shake", amp: 12, flash: 0, zoom: 1.035, dur: 0.36 });
+          Look.expose(tl, cut2, { target: "#shake", peak: V.expose.peak, hold: V.expose.hold, dur: V.expose.dur });
+          Look.chroma(tl, "#vsText", cut2, 0.16, { px: 5 });
+          Look.leak(tl, cut2 - 0.04, V.leak.dur, { host: "#leakHost", colors: V.leak.colors, opacity: V.leak.opacity, size: V.leak.size,
+            y: vsCy / 1920, from: -0.35, to: 1.35 });
+          // the blade flares on the hit, then settles to its resting light
+          gsap.set("#blade", { filter: "brightness(1)" });
+          tl.fromTo("#blade", { filter: "brightness(1.9)" }, { filter: "brightness(1)", duration: 0.5, ease: "power2.out", immediateRender: false }, cut2);
+          // the hold: slow pushes; Jason's box follows his eye height
+          Look.push(tl, "#pbA", cut2, A.pane2.at - cut2, { from: 1.0, to: A.pane.push, origin: A.pane.origin });
+          Look.push(tl, "#pbB", cut2, B.pane2.at - cut2, { from: 1.0, to: B.pane.push, origin: B.pane.origin });
+          Look.push(tl, "#pbA2", A.pane2.at, D - A.pane2.at, { from: 1.0, to: A.pane2.push, origin: A.pane2.origin });
+          Look.push(tl, "#pbB2", B.pane2.at, D - B.pane2.at, { from: 1.0, to: B.pane2.push, origin: B.pane2.origin });
+          Look.drive(tl, sl, B.pane2.at - sl, (p) => gsap.set("#trB", { y: trackY(p * (B.pane2.at - sl)) }));
+          gsap.set("#trB", { y: trackY(0) });
+          gsap.set(["#poolA", "#poolB", "#sA", "#sB", "#sAlw", "#sBlw"], { autoAlpha: 0 });
+          tl.set(["#sA", "#sB"], { autoAlpha: 1 }, sl);
+          tl.set(["#sAlw", "#sBlw"], { autoAlpha: 1 }, cut2);
+          tl.fromTo(["#poolA", "#poolB"], { autoAlpha: 0 }, { autoAlpha: 1, duration: cut2 - sl, ease: "power2.in", immediateRender: false }, sl);
+          // the kicker labels settle in after the hit
+          Look.enter(tl, ["#sAl", "#sBl"], T.labels, { from: "blur", dur: 0.5, blur: 10, stagger: 0.06 });
+          // one specular pass across the VS during the hold, crossing it as Jason's pane cuts (4.4 s)
+          Look.sheen(tl, "#vsText", T.sheen, { dur: T.sheenDur });
+          // exit: type blurs out, then the VS, then the blade retracts (the last move of the card, ending on frame 179)
+          Look.exit(tl, ["#sAlw", "#sA", "#sBlw", "#sB"], T.out, { to: "blur", dur: 0.4, stagger: 0.05, blur: 14 });
+          Look.exit(tl, "#vsSlam", T.out + 0.16, { to: "blur", dur: 0.36, blur: 16, scale: 1.12 });
+          tl.to("#segR", { scaleX: 0, duration: 0.4, ease: "power3.in" }, T.out + 0.28);
+          tl.to("#segL", { scaleX: 0, duration: 0.32, ease: "power3.in" }, T.out + 0.32);
+          tl.to(["#poolA", "#poolB"], { autoAlpha: 0, duration: 0.5, ease: "power2.in" }, T.out + 0.2);
+        }
+
+        // ======================================================================================
+        // Centre
+        // ======================================================================================
+        function buildCentre(tl) {
+          const T = CONFIG.timing.centre, A = V.a, B = V.b;
+          const yL = V.seam.yLeft, yR = V.seam.yRight, ang = Math.atan2(yR - yL, 1080);
+          const seamY = (x) => yL + (yR - yL) * (x / 1080);
+          const cx = 540, cy = seamY(cx);
+          const boxTopB = Math.min(yL, yR), boxHA = Math.max(yL, yR);
+          // the panes are clipped along the seam; k = 0 open, k = 1 shut onto the seam (each edge stays parallel to the seam)
+          const clipA = (k) => `polygon(0px ${(yL * k).toFixed(2)}px, 1080px ${(yR * k).toFixed(2)}px, 1080px ${yR}px, 0px ${yL}px)`;
+          const clipB = (k) => `polygon(0px ${yL}px, 1080px ${yR}px, 1080px ${(yR + (1920 - yR) * (1 - k)).toFixed(2)}px, 0px ${(yL + (1920 - yL) * (1 - k)).toFixed(2)}px)`;
+          // the dark lip on each side of the seam lives inside its pane, rotated with the seam (it opens and shuts with the pane)
+          const sc = (deg) => `linear-gradient(${deg}deg, rgba(5,5,9,${V.scrim[0]}) 0%, rgba(5,5,9,${V.scrim[1]}) 28%, rgba(5,5,9,${V.scrim[2]}) 56%, rgba(5,5,9,${V.scrim[3]}) 80%, rgba(5,5,9,0) 100%)`;
+          const lipW = 1500;
+          Object.assign($("#scA").style, { left: (cx - lipW / 2) + "px", top: (cy - V.scrimH) + "px", width: lipW + "px", height: V.scrimH + "px",
+            background: sc(0), transformOrigin: "50% 100%", transform: `rotate(${ang}rad)` });
+          Object.assign($("#scB").style, { left: (cx - lipW / 2) + "px", top: cy + "px", width: lipW + "px", height: V.scrimH + "px",
+            background: sc(180), transformOrigin: "50% 0%", transform: `rotate(${ang}rad)` });
+          V.cuts.forEach((c, i) => {
+            [["A", c.a], ["B", c.b]].forEach(([s, shot]) => {
+              const v = $("#v1" + s.toLowerCase() + i), w = $("#sw" + s + i), f = shot.fit, org = (f.x * 100) + "% " + (f.y * 100) + "%";
+              setAttr(v, "src", shot.clip); setAttr(v, "data-media-start", shot.start);
+              setAttr(v, "data-start", c.at); setAttr(v, "data-duration", c.dur);
+              Object.assign(w.style, { top: (s === "A" ? 0 : boxTopB) + "px", height: (s === "A" ? boxHA : 1920 - boxTopB) + "px" });
+              v.style.objectPosition = org;
+              Look.push(tl, w, c.at, c.dur, { from: f.s, to: f.s * 1.05, origin: org });
+            });
+          });
+
+          // ---- the lockup, centred on x 540: label / GTA V (small) / VS on the seam / GTA VI (the hero) / label
+          $("#cAn").textContent = A.name.toUpperCase(); $("#cBn").textContent = B.name.toUpperCase();
+          $("#cAlab").textContent = A.label.toUpperCase(); $("#cBlab").textContent = B.label.toUpperCase();
+          trimTrack($("#cAlab")); trimTrack($("#cBlab"));
+          $("#cAn").style.fontSize = V.nameSize + "px";
+          const hs = fit($("#cBn"), V.heroSize, V.heroMaxW);
+          ["#cA", "#cB", "#cAlw", "#cBlw"].forEach((b) => Object.assign($(b).style, { left: "0px", width: "1080px" }));
+          const kA = ink(A.name, V.nameSize, 800, 0.02 * V.nameSize), kB = ink(B.name, hs, 800, 0.02 * hs), kL = ink("LOS SANTOS", 26, 600);
+          // ink span of a centred line (the trailing tracking shifts the ink half a track left)
+          const spanOf = (k, ls) => { const o = cx - k.w / 2; return [o - k.l, o + k.r]; };
+          const [aL, aR] = spanOf(kA), [bL, bR] = spanOf(kB);
+          // VS: pure white wide Archivo 900 with a soft warm bloom, ink centred on the seam
+          const vsT = $("#vsText"); vsT.textContent = V.vs.toUpperCase(); vsT.style.fontSize = V.vsSize + "px";
+          $("#vsBack").style.display = "none";
+          const kV = ink(V.vs, V.vsSize, 900, 0.02 * V.vsSize);
+          const vsLeft = cx - (kV.r - kV.l) / 2, vsTop = cy - kV.asc / 2, vsBot = cy + kV.asc / 2;
+          Object.assign($("#vsBox").style, { left: vsLeft + "px", top: (vsBot - baselineOf(vsT)) + "px" });
+          Look.bloom(vsT, { color: V.vsBloom.color, strength: V.vsBloom.strength });
+          $("#vsGlow").style.filter = "drop-shadow(0 4px 14px rgba(0,0,0,.55)) drop-shadow(0 0 34px rgba(0,0,0,.3))";
+          const inkL = vsLeft - kV.l, inkR = vsLeft + kV.r;
+          // GTA V sits on the VS, clear of the seam under its nearest letter; GTA VI hangs under the VS, clear of the seam over its highest letter
+          const nameABase = Math.min(vsTop - V.gapVS, Math.min(seamY(aL), seamY(aR)) - V.seamClear);
+          placeBaseline($("#cA"), $("#cAn"), nameABase);
+          placeBaseline($("#cAlw"), $("#cAlab"), nameABase - kA.asc - V.gapLabel);
+          const capB = Math.max(vsBot + V.gapVS, Math.max(seamY(bL), seamY(bR)) + V.seamClear);
+          const nameBBase = capB + kB.asc;
+          placeBaseline($("#cB"), $("#cBn"), nameBBase);
+          placeBaseline($("#cBlw"), $("#cBlab"), nameBBase + V.gapLabel + kL.asc);
+          $("#cBs").style.transformOrigin = `540px ${(nameBBase - kB.asc / 2) - parseFloat($("#cB").style.top)}px`;
+
+          // ---- the seam: a 4 px white blade with a warm bloom along the tilted seam, broken around the VS
+          const bw = V.blade.width, glow = bloomBox(V.blade.bloom, V.blade.strength);
+          const len = Math.hypot(1080, yR - yL) + 80;
+          Object.assign($("#blade").style, { left: "-40px", top: (yL - (yR - yL) * (40 / 1080)) + "px", width: len + "px", transform: `rotate(${ang}rad)` });
+          const along = (x) => (x + 40) / Math.cos(ang);
+          const gL = along(inkL) - V.bladeGap, gR = along(inkR) + V.bladeGap;
+          Object.assign($("#segL").style, { left: "0px", width: gL + "px", transformOrigin: "100% 50%" });
+          Object.assign($("#segR").style, { left: gR + "px", width: (len - gR) + "px", transformOrigin: "0% 50%" });
+          ["#segL", "#segR"].forEach((id) => Object.assign($(id).style, { top: (-bw / 2) + "px", height: bw + "px", borderRadius: (bw / 2) + "px", background: V.blade.color, boxShadow: glow }));
+          $("#shadeL").style.display = "none"; $("#shadeR").style.display = "none";
+
+          // GTA V rises char by char; GTA VI is the sunset (the frame's one accent) with a warm bloom, slammed whole
+          Look.reveal(tl, "#cAn", T.nameA, { by: "chars", stagger: 0.03, dur: 0.6 });
+          Look.fill("#cBn", V.sunset, { sheen: true });
+          $("#cBn").style.filter = "drop-shadow(0 2px 3px rgba(0,0,0,.3)) drop-shadow(0 0 22px rgba(248,79,164,.32)) drop-shadow(0 0 60px rgba(254,142,78,.18))";
+
+          // ======================= timeline =======================
+          // the panes open from the seam (each starts half open, so frame 0 already shows both shots)
+          const eo = gsap.parseEase("expo.out"), ei = gsap.parseEase("power2.in");
+          // one driver over the whole card, so every seek (forward or back) sets the panes from absolute time
+          const paneK = (t) => t < T.open + T.openDur ? 0.5 * (1 - eo(Math.max(0, t - T.open) / T.openDur)) : (t < T.close ? 0 : ei(Math.min(1, (t - T.close) / T.closeDur)));
+          Look.drive(tl, 0, D, (p) => { const k = paneK(p * D); $("#pA").style.clipPath = clipA(k); $("#pB").style.clipPath = clipB(k); });
+          gsap.set(["#segL", "#segR"], { scaleX: 0 });
+          tl.fromTo(["#segL", "#segR"], { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease: "expo.out", immediateRender: false }, T.open + 0.02);
+          Look.enter(tl, "#cAlab", T.labelA, { from: "blur", dur: 0.5, blur: 10 });
+          // the VS settles onto the seam (a setup, not the hit)
+          gsap.set("#vsSlam", { autoAlpha: 0, scale: 1.5, filter: "blur(12px)" });
+          tl.fromTo("#vsSlam", { autoAlpha: 0, scale: 1.5, filter: "blur(12px)" },
+            { autoAlpha: 1, scale: 1, filter: "blur(0px)", duration: 0.4, ease: "expo.out", immediateRender: false }, T.vsIn);
+          tl.set("#vsSlam", { filter: "none" }, T.vsIn + 0.4);
+          // PAYOFF 1.0 s: GTA VI slams in under the VS on the first matched cut, complete and in its final colour on the hit frame;
+          // the light is an exposure pulse on the footage (no white flash), RGB split 5 px for 0.16 s on GTA VI only
+          const fall = T.slam - T.fall;
+          gsap.set("#cBs", { autoAlpha: 0, scale: 1.7, filter: "blur(16px)" });
+          tl.fromTo("#cBs", { autoAlpha: 0, scale: 1.7, filter: "blur(16px)" },
+            { autoAlpha: 1, scale: 1, filter: "blur(0px)", duration: T.fall, ease: "power3.in", immediateRender: false }, fall);
+          tl.set("#cBs", { filter: "none" }, T.slam);
+          Look.impact(tl, T.slam, { shake: "#shake", amp: 9, flash: 0, zoom: 1.03, dur: 0.34 });
+          Look.expose(tl, T.slam, { target: "#shake", peak: V.expose.peak, hold: V.expose.hold, dur: V.expose.dur });
+          Look.chroma(tl, "#cBn", T.slam, 0.16, { px: 5 });
+          gsap.set("#blade", { filter: "brightness(1)" });
+          tl.fromTo("#blade", { filter: "brightness(2)" }, { filter: "brightness(1)", duration: 0.45, ease: "power2.out", immediateRender: false }, T.slam);
+          Look.enter(tl, "#cBlab", T.labelB, { from: "blur", dur: 0.5, blur: 10 });
+          Look.sheen(tl, "#cBn", T.sheen, { dur: 1.0 });
+          // exit
+          Look.exit(tl, ["#cAlw", "#cBlw"], T.out, { to: "blur", dur: 0.32, stagger: 0.04 });
+          Look.exit(tl, ["#cA", "#cB"], T.out + 0.06, { to: "blur", dur: 0.4, stagger: 0.06, blur: 14 });
+          Look.exit(tl, "#vsSlam", T.out + 0.14, { to: "blur", dur: 0.36, blur: 16, scale: 1.12 });
+          tl.to(["#segL", "#segR"], { scaleX: 0, duration: 0.4, ease: "power3.in" }, T.out + 0.12);
+          // the panes shut back onto the seam from T.close (paneK above): they opened from it
+        }
+      })();
+    </script>
+  </body>
+</html>

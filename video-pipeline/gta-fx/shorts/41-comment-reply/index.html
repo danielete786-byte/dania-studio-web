@@ -1,0 +1,276 @@
+<!doctype html>
+<!-- GTA 6 component #41 — Comment reply. 1080x1920 (9:16), 30 fps, 6.5 s.
+     Variables: variant "0" Reply sticker (white speech-bubble sticker that docks to the hook zone)
+                        "1" Comment stack (three smoked-glass comments, one gets picked and docks above the caption zone)
+                bg "plate" (sample GTA VI footage underneath) / "none" (transparent overlay for CapCut / Premiere).
+     Safe zones: all text stays inside x 72–936, y 230–1480. -->
+<html lang="en" data-composition-variables='[
+  {"id":"variant","type":"enum","label":"Variant","default":"0","options":[{"value":"0","label":"Reply sticker"},{"value":"1","label":"Comment stack"}]},
+  {"id":"bg","type":"enum","label":"Background","default":"plate","options":[{"value":"plate","label":"Sample footage"},{"value":"none","label":"Transparent"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link rel="stylesheet" href="assets/fonts/fonts.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="assets/kit/motion/motion.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: transparent; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; font-family: "Inter", sans-serif;
+        -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; font-feature-settings: "tnum" 1, "ss01" 1; }
+      .plate { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      #ov { position: absolute; inset: 0; }
+      :root {
+        --ink: #0B0B0E; --paper: #FFFFFF; --mute: #6C6C78;
+        --sunset: linear-gradient(135deg, #F84FA4 0%, #FE8E4E 55%, #FEB747 100%);
+        --smoke: rgba(16,16,22,0.84);
+        --hair-dark: rgba(255,255,255,.22);
+      }
+
+      /* "the video opens": a dimmed, blurred hold behind the question, cleared when the answer starts */
+      #scrim { position: absolute; inset: 0; background: rgba(8,8,12,.38);
+        -webkit-backdrop-filter: blur(10px) saturate(1.1); backdrop-filter: blur(10px) saturate(1.1); }
+
+      /* ---------- variant 0: reply sticker ---------- */
+      #stk { position: absolute; left: 74px; width: max-content; min-width: 620px; max-width: 860px; top: 735px; display: none;
+        transform-origin: 50% 0;
+        filter: drop-shadow(0 1px 1px rgba(0,0,0,.22)) drop-shadow(0 26px 34px rgba(0,0,0,.38)); }
+      .stk-card { position: relative; background: var(--paper); border-radius: 36px; padding: 38px 46px 44px; }
+      .stk-head { display: flex; align-items: center; gap: 18px; }
+      .av { flex: none; width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+        color: #fff; font-weight: 800; font-size: 30px; letter-spacing: -0.02em; }
+      .av-sun { background: var(--sunset); color: var(--ink); box-shadow: inset 0 0 0 1px rgba(255,255,255,.25); }
+      .stk-label { font-size: 34px; font-weight: 600; color: #55555F; letter-spacing: -0.01em; white-space: nowrap; }
+      .stk-label b { color: var(--ink); font-weight: 700; }
+      .stk-text { margin-top: 18px; font-size: 92px; font-weight: 800; color: var(--ink); line-height: 1.02; letter-spacing: -0.035em; }
+      .stk-text .w { display: inline-block; }
+      .stk-tail { position: absolute; left: 66px; bottom: -27px; width: 46px; height: 30px; display: block; }
+
+      /* ---------- variant 1: comment stack ---------- */
+      #stack { position: absolute; left: 74px; top: 0; width: 860px; display: none; }
+      /* one shared width (CONFIG stackWidth, set in JS): every card shares both edges, so the three read as one list */
+      .cm { position: absolute; left: 80px; width: 700px; min-width: 0; display: flex; gap: 26px; padding: 30px 36px 30px 32px;
+        background: var(--smoke); border-radius: 28px;
+        -webkit-backdrop-filter: blur(20px) saturate(1.4); backdrop-filter: blur(20px) saturate(1.4);
+        box-shadow: inset 0 0 0 1px var(--hair-dark), inset 0 1px 0 rgba(255,255,255,.10), 0 1px 2px rgba(0,0,0,.30), 0 26px 60px -22px rgba(0,0,0,.65);
+        transform-origin: 50% 50%; }
+      .cm .av { width: 76px; height: 76px; font-size: 34px; }
+      .cm-body { flex: 1; min-width: 0; }
+      .cm-meta { display: flex; align-items: baseline; gap: 14px; font-size: 28px; font-weight: 600; line-height: 1.2; }
+      .cm-user { color: rgba(255,255,255,.92); }
+      .cm-time { color: rgba(255,255,255,.50); font-weight: 500; }
+      .cm-text { margin-top: 8px; font-size: 44px; font-weight: 700; color: #fff; line-height: 1.16; letter-spacing: -0.025em; text-wrap: balance; }
+      .cm-actions { margin-top: 16px; display: flex; align-items: center; gap: 30px; font-size: 28px; font-weight: 600; color: rgba(255,255,255,.62); }
+      .cm-like { display: flex; align-items: center; gap: 10px; }
+      .cm-like svg { width: 30px; height: 30px; display: block; }
+      .pill { position: relative; height: 60px; padding: 0 26px; border-radius: 30px; display: flex; align-items: center;
+        font-size: 30px; background: rgba(255,255,255,.10); color: rgba(255,255,255,.86); }
+      /* the sunset fill always carries ink type (same rule as the V0 avatar): white on the amber end measured ~2:1 */
+      .pill-fill { position: absolute; inset: 0; border-radius: 30px; background: linear-gradient(90deg, #F84FA4 0%, #FE8E4E 62%, #FEB747 100%); opacity: 0;
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,.18); }
+      .pill-flash { position: absolute; inset: 0; border-radius: 30px; background: rgba(255,255,255,.25); opacity: 0; }
+      .pill-txt { position: relative; display: grid; }
+      .pill-txt > span { grid-area: 1 / 1; justify-self: start; display: flex; align-items: center; gap: 10px; white-space: nowrap; }
+      .pill-b { color: var(--ink); font-weight: 800; letter-spacing: -0.01em; opacity: 0; }
+      .pill-b svg { width: 24px; height: 24px; display: block; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6.5" data-width="1080" data-height="1920">
+      <!-- sample footage: one framework-owned muted video per plate; the script hides all but the one the variant names -->
+      <video id="plateA" class="clip plate" src="assets/plates/p01-keys-sign-v.mp4" muted playsinline data-start="0" data-duration="6.5" data-track-index="0"></video>
+      <video id="plateB" class="clip plate" src="assets/plates/p06-lucia-gate-v.mp4" muted playsinline data-start="0" data-duration="6.5" data-track-index="0"></video>
+
+      <div id="ov" class="clip" data-start="0" data-duration="6.5" data-track-index="1">
+        <div id="scrim"></div>
+
+        <!-- variant 0 -->
+        <div id="stk">
+          <div class="stk-card">
+            <div class="stk-head"><div class="av av-sun" id="stkAv"></div><div class="stk-label" id="stkLabel"></div></div>
+            <div class="stk-text" id="stkText"></div>
+          </div>
+          <svg class="stk-tail" viewBox="0 0 46 30" aria-hidden="true"><path d="M0 0 H46 C36 8 22 20 4 30 C12 20 13 9 0 0 Z" fill="#fff"/></svg>
+        </div>
+
+        <!-- variant 1 -->
+        <div id="stack"></div>
+      </div>
+    </div>
+
+    <script>
+      const CONFIG = {
+        variants: {
+          // Reply sticker: one comment, white speech-bubble sticker, docks into the hook zone
+          "0": {
+            plate: "assets/plates/p01-keys-sign-v.mp4",
+            label: "Reply to",                 // grey lead-in before the handle
+            user: "@keysboatlife",             // the commenter (a viewer handle, fan voice)
+            initial: "K",                      // avatar letter
+            comment: "is the water real?",     // the question your video answers
+            dockTop: 290,                      // y of the docked sticker (hook zone 230–640)
+            dockScale: 0.92,
+            dockRotate: -1.5                   // degrees: a hand-placed sticker tilt
+          },
+          // Comment stack: three comments load, one is picked, the rest clear, the pick docks above the captions
+          "1": {
+            plate: "assets/plates/p06-lucia-gate-v.mp4",
+            comments: [
+              { user: "@leonida.daily",   initial: "L", tint: "#4E4A63", time: "3h", text: "these sunsets are unreal", likes: "1.2K" },
+              { user: "@vicecity.nights", initial: "V", tint: "#3D5660", time: "2h", text: "wait… is that Lucia??", likes: "4.8K", pick: true },
+              { user: "@nov19ready",      initial: "N", tint: "#5E5143", time: "1h", text: "counting down to Nov 19", likes: "862" }
+            ],
+            replyText: "Reply",
+            answeredText: "Video reply",
+            stackWidth: 700,                   // every card shares this width (one list, one right edge), centred in the safe zone
+            stackCenter: 840,                  // y centre of the stack while it loads
+            dockBottom: 1440,                  // bottom edge of the docked comment (captions zone ends 1480)
+            dockMaxScale: 1.3                  // the docked comment grows to this (capped at 860 px wide, so 1.23x at stackWidth 700)
+          }
+        },
+        // shared timing, then per-variant beats (seconds). If you change `end`, also update data-duration on #root, the videos and #ov.
+        timing: {
+          in: 0.07, out: 6.05, end: 6.5,
+          "0": { dock: 1.4 },                          // sticker lifts to the hook zone, the hold clears
+          "1": { pick: 1.0, swap: 1.2, dock: 1.6 }     // tap Reply (the fill and "Video reply" land on the tap), then dock the pick
+        }
+      };
+
+      (function () {
+        const VARS = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+        const vKey = CONFIG.variants[String(VARS.variant)] ? String(VARS.variant) : "0";
+        const showPlate = VARS.bg !== "none";
+        const V = CONFIG.variants[vKey], T = Object.assign({}, CONFIG.timing, CONFIG.timing[vKey]);
+        const $ = (s) => document.querySelector(s);
+        const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+        document.querySelectorAll("video.plate").forEach((v) => {
+          if (!showPlate || v.getAttribute("src") !== V.plate) v.style.display = "none";
+        });
+        // the dimmed hold only exists over the sample plate: a transparent overlay must not bake a wash over the creator's clip
+        if (!showPlate) document.getElementById("scrim").style.display = "none";
+
+        const HEART = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 20.2s-7.6-4.6-7.6-10.2A4.3 4.3 0 0 1 12 7.4a4.3 4.3 0 0 1 7.6 2.6c0 5.6-7.6 10.2-7.6 10.2z"/></svg>';
+        const PLAY = '<svg viewBox="0 0 24 24"><path d="M7 4.8v14.4a1 1 0 0 0 1.5.86l11.6-7.2a1 1 0 0 0 0-1.72L8.5 3.94A1 1 0 0 0 7 4.8z" fill="currentColor"/></svg>';
+
+        if (vKey === "0") {
+          $("#stk").style.display = "block";
+          $("#stkAv").textContent = V.initial;
+          $("#stkLabel").innerHTML = esc(V.label) + " <b>" + esc(V.user) + "</b>";
+          $("#stkText").innerHTML = V.comment.split(" ").map((w) => '<span class="w">' + esc(w) + "</span>").join(" ");
+        } else {
+          const st = $("#stack");
+          st.style.display = "block";
+          const SW = Math.min(860, V.stackWidth || 700);
+          st.innerHTML = V.comments.map((c, i) =>
+            '<div class="cm" id="cm' + i + '" style="width:' + SW + "px;left:" + Math.round((860 - SW) / 2) + 'px">' +
+              '<div class="av" style="background:' + c.tint + '">' + esc(c.initial) + "</div>" +
+              '<div class="cm-body">' +
+                '<div class="cm-meta"><span class="cm-user">' + esc(c.user) + '</span><span class="cm-time">' + esc(c.time) + "</span></div>" +
+                '<div class="cm-text">' + esc(c.text) + "</div>" +
+                '<div class="cm-actions"><span class="cm-like">' + HEART + "<span>" + esc(c.likes) + "</span></span>" +
+                  '<span class="pill"><span class="pill-fill"></span><span class="pill-flash"></span><span class="pill-txt">' +
+                    '<span class="pill-a">' + esc(V.replyText) + "</span>" +
+                    (c.pick ? '<span class="pill-b">' + PLAY + esc(V.answeredText) + "</span>" : "") +
+                  "</span></span>" +
+                "</div>" +
+              "</div>" +
+            "</div>").join("");
+        }
+
+        document.fonts.ready.then(() => {
+          const tl = gsap.timeline({ paused: true });
+
+          // the hold eases in from clear footage, so the loop point (scrim 0 at the end) doesn't jump
+          tl.fromTo("#scrim", { opacity: 0 }, { opacity: 1, duration: 0.18, ease: "power1.out" }, 0);
+
+          if (vKey === "0") {
+            // centre the sticker in the safe zone, then dock it into the hook zone
+            const stk = $("#stk");
+            // the card hugs the comment (max 860 wide) and centres in the safe zone (x 72-936)
+            const h = stk.offsetHeight, w = stk.offsetWidth;
+            const top0 = Math.round(855 - h / 2);
+            stk.style.top = top0 + "px";
+            stk.style.left = Math.max(74, Math.round(504 - w / 2)) + "px";
+
+            // pop out of the tail: origin sits on the tail (bottom left), the whole sticker is solid white from its first visible frame
+            const ox = 84, oy = h + 12;
+            gsap.set(stk, { transformOrigin: ox + "px " + oy + "px", opacity: 0, scale: 0.86 });
+            gsap.set("#stkAv", { scale: 0.6 });
+
+            tl.to(stk, { opacity: 1, duration: 0.03, ease: "none" }, T.in);
+            tl.to(stk, { scale: 1, duration: 0.42, ease: "back.out(1.5)" }, T.in);
+            tl.to("#stkAv", { scale: 1, duration: 0.4, ease: "back.out(2.2)" }, T.in + 0.05);
+
+            // the answer starts: sticker lifts into the hook zone, the hold clears.
+            // Scaling about the tail origin moves the top and centre, so offset x/y to land the top-centre at (centre, dockTop).
+            const s = V.dockScale;
+            const dx = Math.round((w / 2 - ox) * (1 - s)), dy = Math.round(V.dockTop - top0 - oy * (1 - s));
+            tl.to(stk, { x: dx, y: dy, scale: s, rotation: V.dockRotate, duration: 0.7, ease: "power3.inOut" }, T.dock);
+            tl.to("#scrim", { opacity: 0, duration: 0.7, ease: "power2.inOut" }, T.dock + 0.05);
+
+            tl.to(stk, { opacity: 0, y: "-=14", duration: 0.35, ease: "power2.in" }, T.out);
+          } else {
+            const cards = V.comments.map((_, i) => $("#cm" + i));
+            const pickIdx = Math.max(0, V.comments.findIndex((c) => c.pick));
+            const gap = 22;
+            const hs = cards.map((c) => c.offsetHeight);
+            const total = hs.reduce((a, b) => a + b, 0) + gap * (cards.length - 1);
+            let y = Math.round(V.stackCenter - total / 2);
+            const tops = cards.map((c, i) => { const t = y; c.style.top = t + "px"; y += hs[i] + gap; return t; });
+            const pick = cards[pickIdx];
+            const others = cards.filter((_, i) => i !== pickIdx);
+            const pFill = pick.querySelector(".pill-fill"), pFlash = pick.querySelector(".pill-flash"), pill = pick.querySelector(".pill");
+            const pA = pick.querySelector(".pill-a"), pB = pick.querySelector(".pill-b");
+
+            // the pill hugs its label: start at "Reply" width, grow to "Video reply" on the swap
+            const pTxt = pick.querySelector(".pill-txt");
+            const wA = Math.ceil(pA.getBoundingClientRect().width), wB = Math.ceil(pB.getBoundingClientRect().width);
+            pTxt.style.width = wA + "px";
+
+            gsap.set(cards, { opacity: 0, y: 46, scale: 0.96 });
+            gsap.set(pB, { opacity: 0, y: 10 });
+
+            // comments load top to bottom
+            cards.forEach((c, i) => tl.to(c, { opacity: 1, y: 0, scale: 1, duration: 0.4, ease: "expo.out" }, T.in + i * 0.12));
+
+            // pick one: the rest dim and soften, the pick steps forward
+            tl.fromTo(others, { opacity: 1, scale: 1, filter: "blur(0px)" },
+              { opacity: 0.22, scale: 0.97, filter: "blur(2px)", duration: 0.3, ease: "power3.out", immediateRender: false }, T.pick);
+            tl.to(pick, { scale: 1.06, duration: 0.35, ease: "power3.out" }, T.pick);
+
+            // the tap is the payoff: press (scale 0.9 + a 0.1 s inner flash), and on release the pill fills and reads "Video reply"
+            const press = T.swap - 0.04;
+            tl.to(pill, { scale: 0.9, duration: 0.08, ease: "power2.out" }, press);
+            tl.fromTo(pFlash, { opacity: 0 }, { opacity: 1, duration: 0.03, ease: "none", immediateRender: false }, press);
+            tl.to(pFlash, { opacity: 0, duration: 0.07, ease: "power1.out" }, press + 0.03);
+            tl.to(pFill, { opacity: 1, duration: 0.12, ease: "power2.out" }, T.swap);
+            tl.to(pill, { scale: 1, duration: 0.3, ease: "back.out(2)" }, T.swap + 0.04);
+            // the pill widens first (≈90% by swap+0.1), then the ink label lands, so it never spills past the fill onto the dark card
+            tl.to(pA, { opacity: 0, y: -8, duration: 0.1, ease: "power1.in" }, T.swap);
+            tl.to(pTxt, { width: wB, duration: 0.22, ease: "power4.out" }, T.swap);
+            tl.to(pB, { opacity: 1, y: 0, duration: 0.2, ease: "power3.out" }, T.swap + 0.1);
+
+            // the result of the tap: the others clear, the pick drops into place above the captions, the hold clears
+            tl.to(others[0], { opacity: 0, y: -40, duration: 0.35, ease: "power2.in" }, T.dock);
+            if (others[1]) tl.to(others[1], { opacity: 0, y: 40, duration: 0.35, ease: "power2.in" }, T.dock);
+            // the docked comment grows about its centre until it fills the safe width (x 74-934), bottom edge on dockBottom
+            const pw = pick.offsetWidth, ph = hs[pickIdx];
+            const ds = Math.min(V.dockMaxScale || 1.3, 860 / pw);
+            const dockY = V.dockBottom - ph / 2 - (ph * ds) / 2 - tops[pickIdx];
+            tl.to(pick, { y: dockY, scale: ds, duration: 0.72, ease: "power3.inOut" }, T.dock + 0.08);
+            tl.to("#scrim", { opacity: 0, duration: 0.7, ease: "power2.inOut" }, T.dock + 0.1);
+
+            tl.to(pick, { opacity: 0, y: "-=14", duration: 0.35, ease: "power2.in" }, T.out);
+          }
+
+          tl.set({}, {}, T.end);
+          window.__timelines = window.__timelines || {};
+          window.__timelines["main"] = tl;
+          tl.seek(0);
+        });
+      })();
+    </script>
+  </body>
+</html>

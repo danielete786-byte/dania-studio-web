@@ -1,0 +1,433 @@
+<!doctype html>
+<!-- GTA 6 component #4 — Word captions (craft v2, round 9). 1080x1920, 30 fps, 7.0 s. The spoken word wears the sunset.
+     "0" Word pop: 4K shots cut on every card; Inter 900 caps punch in from blur, each card sized to its own words (≤ 170 px);
+       "TODAY?" is a display beat on the explosion; "305" (340 px) slams on a cut with a warm exposure kick + shake +
+       RGB split + sheen + warm bloom, and the final card floats up 14 px over the hold.
+     "1" Karaoke line: full-bleed 4K shots cut on every line under a soft bottom shade; ONE 160 px line at a time, swept in
+       sunset; the payoff "19." is a 360 px sunset numeral that slams in fully lit on the cut to Lucia, with a full-frame leak.
+     Variables: variant "0"/"1"; bg "plate" (footage + Look finishing) / "none" (transparent caption overlay). -->
+<html lang="en" data-composition-variables='[
+  {"id":"variant","type":"enum","label":"Variant","default":"0","options":[{"value":"0","label":"Word pop"},{"value":"1","label":"Karaoke line"}]},
+  {"id":"bg","type":"enum","label":"Background","default":"plate","options":[{"value":"plate","label":"Sample footage"},{"value":"none","label":"Transparent"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link rel="stylesheet" href="assets/fonts/fonts.css" />
+    <link rel="stylesheet" href="assets/kit/look/look.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="assets/kit/look/look.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: transparent; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; font-family: "Inter", sans-serif; color: #fff;
+        -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; }
+      #frame { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; overflow: hidden; }
+      #shake, #push { position: absolute; inset: 0; }  .shot { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      /* s083 Lucia on the car door (v0 card 1, v1 "and Lucia."): scale from the bottom edge so her face rides ~110 px
+         higher, clear of the caption */
+      #a1, #b2 { transform: scale(1.12); transform-origin: 50% 100%; }
+      #ov { position: absolute; inset: 0; z-index: 10; pointer-events: none; }
+      /* warm exposure flash (screen) — replaces the flat white impact flash */
+      .warm { position: absolute; inset: 0; pointer-events: none; mix-blend-mode: screen; opacity: 0; z-index: 80; }  /* fill from CONFIG.flash.color */
+
+      /* ---------- Variant 0: Word pop ---------- */
+      /* light, edgeless shade under the caption block (no box): an ellipse plus a low gradient */
+      #scrim { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; opacity: 0;
+        background: radial-gradient(ellipse 720px 400px at 540px 1250px, rgba(5,5,9,.46) 0%, rgba(5,5,9,.26) 48%, rgba(5,5,9,0) 100%),
+                    linear-gradient(180deg, rgba(5,5,9,0) 50%, rgba(5,5,9,.26) 76%, rgba(5,5,9,.40) 100%); }
+      #root.none #scrim { background: radial-gradient(ellipse 640px 340px at 540px 1250px, rgba(5,5,9,.40) 0%, rgba(5,5,9,.18) 50%, rgba(5,5,9,0) 100%); }
+      /* caption block: centred on the frame axis (540 ± 396 = x 144–936), centred at y 1250 (block spans ≤ 1040–1460) */
+      #zone { position: absolute; left: 144px; width: 792px; top: 1040px; height: 420px; }
+      .card { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: 0; }
+      .card-in { display: flex; flex-direction: column; align-items: center; }
+      .ln { white-space: nowrap; text-align: center; }
+      .cap { font-weight: 900; text-transform: uppercase; letter-spacing: -0.03em; line-height: .94; font-feature-settings: "case" 1; }
+      .cap .ln.em { font-weight: 800; letter-spacing: -0.055em; line-height: .80; }
+      .w { display: inline-block; position: relative; opacity: 0; transform-origin: 50% 62%; }
+      .w > span { display: block; }
+      .w-white { position: relative; color: #fff; opacity: 0;
+        text-shadow: 0 1px 1px rgba(0,0,0,.30), 0 4px 14px rgba(0,0,0,.40), 0 16px 48px rgba(0,0,0,.42); }
+      .w-sun { position: absolute; left: 0; top: 0;
+        filter: drop-shadow(0 0 20px rgba(248,79,164,.40)) drop-shadow(0 6px 16px rgba(0,0,0,.42)); }
+
+      /* ---------- Variant 1: Karaoke line (one big line at a time, full-bleed) ---------- */
+      /* bottom shade under the line: clear above y 740, ~.42 behind the line (1040–1160), .60 at the safe-zone floor */
+      #kscrim { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; opacity: 0;
+        background: linear-gradient(180deg, rgba(5,5,9,0) 0px, rgba(5,5,9,0) 740px, rgba(5,5,9,.24) 900px, rgba(5,5,9,.42) 1060px,
+                    rgba(5,5,9,.54) 1260px, rgba(5,5,9,.60) 1500px, rgba(5,5,9,.66) 1920px); }
+      .lyr { position: absolute; z-index: 2; left: 72px; white-space: nowrap; font-weight: 800; letter-spacing: -0.035em; line-height: 1;
+        font-feature-settings: "cv11" 1; }
+      /* per-word rise mask, padded so the glow is never clipped (negative margins keep the layout) */
+      .km { display: inline-block; overflow: hidden; vertical-align: top; padding: .26em .22em .3em; margin: -.26em -.22em -.3em; }
+      .k { display: inline-block; position: relative; }  .lyr-in { display: block; }
+      .k-dim, .k-white { text-shadow: 0 1px 1px rgba(0,0,0,.30), 0 4px 14px rgba(0,0,0,.40), 0 14px 40px rgba(0,0,0,.40); }
+      .k-dim { display: block; position: relative; color: #fff; opacity: .38; }   /* unsung: crisp white at 38 %, waiting */
+      .k-white { position: absolute; left: 0; top: 0; color: #fff; opacity: 0; }
+      /* the glow lives on an UNMASKED wrapper: it lights whatever the sweep has revealed, with no mask box to clip it */
+      .k-glow { position: absolute; left: 0; top: 0; filter: drop-shadow(0 0 14px rgba(248,79,164,.42)) drop-shadow(0 0 40px rgba(254,142,78,.20)) drop-shadow(0 6px 16px rgba(0,0,0,.36)); }
+      .k-sun { display: block; --sw: 0px; --fe: 18px;
+        -webkit-mask-image: linear-gradient(90deg, #000 calc(var(--sw) - var(--fe)), transparent var(--sw));
+        mask-image: linear-gradient(90deg, #000 calc(var(--sw) - var(--fe)), transparent var(--sw)); }
+      .lyr.em { letter-spacing: -0.055em; z-index: 1; }  .lyr.em .k { transform-origin: 0% 30%; }
+      .lyr.em .k-dim { opacity: 0; }  .lyr.em .k-sun { -webkit-mask-image: none; mask-image: none; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="7" data-width="1080" data-height="1920">
+      <div id="frame">
+        <div id="shake"><div id="push">
+          <!-- Word pop (v0): vertical 4K shots, one per caption card, cut on the card's first word -->
+          <video id="a1" class="clip shot" src="assets/shots/s083-duo-convertible-v.mp4" muted playsinline data-start="0" data-duration="1.25" data-media-start="0.05" data-track-index="0"></video>
+          <!-- a2: skydive over Vice City for "90 million" (scale, not romance); a4 opens on the explosion's brightest frame (media 0.40) -->
+          <video id="a2" class="clip shot" src="assets/shots/s135-skydive-city-v.mp4" muted playsinline data-start="1.25" data-duration="1.25" data-media-start="0.05" data-track-index="0"></video>
+          <video id="a3" class="clip shot" src="assets/shots/s084-swamp-sunset-v.mp4" muted playsinline data-start="2.5" data-duration="1.2" data-media-start="0.1" data-track-index="0"></video>
+          <video id="a4" class="clip shot" src="assets/shots/s098-jason-fireworks-v.mp4" muted playsinline data-start="3.7" data-duration="0.65" data-media-start="0.4" data-track-index="0"></video>
+          <video id="a5" class="clip shot" src="assets/shots/s018-lucia-gate-v.mp4" muted playsinline data-start="4.35" data-duration="2.65" data-media-start="0.25" data-track-index="0"></video>
+          <!-- Karaoke line (v1): full-bleed vertical 4K shots, one per line, cut on the line's first word -->
+          <video id="b1" class="clip shot" src="assets/shots/s078-jason-phone-v.mp4" muted playsinline data-start="0" data-duration="1.05" data-media-start="0.95" data-track-index="2"></video>
+          <video id="b2" class="clip shot" src="assets/shots/s083-duo-convertible-v.mp4" muted playsinline data-start="1.05" data-duration="0.95" data-media-start="0.25" data-track-index="2"></video>
+          <video id="b3" class="clip shot" src="assets/shots/s092-duo-car-v.mp4" muted playsinline data-start="2" data-duration="0.9" data-media-start="0.3" data-track-index="2"></video>
+          <video id="b4" class="clip shot" src="assets/shots/s014-driveby-police-v.mp4" muted playsinline data-start="2.9" data-duration="0.85" data-media-start="0" data-track-index="2"></video>
+          <video id="b5" class="clip shot" src="assets/shots/s135-skydive-city-v.mp4" muted playsinline data-start="3.75" data-duration="0.9" data-media-start="0.55" data-track-index="2"></video>
+          <video id="b6" class="clip shot" src="assets/shots/s027-sunset-dock-v.mp4" muted playsinline data-start="4.65" data-duration="0.6" data-media-start="0.5" data-track-index="2"></video>
+          <!-- b7: the payoff. s105 Lucia on a rooftop under the pink sunset, pre-slowed to 0.37x (motion-compensated) so the
+               0.73 s shot holds the 1.75 s date (assets/clips; 55 frames, 1.83 s) -->
+          <video id="b7" class="clip shot" src="assets/clips/s105-lucia-rooftop-slow-v.mp4" muted playsinline data-start="5.25" data-duration="1.75" data-media-start="0.05" data-track-index="2"></video>
+        </div></div>
+      </div>
+
+      <div id="ov" class="clip" data-start="0" data-duration="7" data-track-index="1"></div>
+    </div>
+
+    <script>
+      /* ============================ CONFIG ============================
+         Word times are the moment each word is SPOKEN (paste them from CapCut / Premiere / Whisper word timestamps).
+         The spoken word, and only that word, wears the sunset; it hands the accent on the frame the next word starts.
+         Word pop: each card is a list of LINES, each line a list of [text, seconds] or [text, seconds, "em"].
+           "em" sets the word as a big display numeral/emphasis word (its own line). A card stays up until the next card's
+           first word; the footage cuts on that word too (see the <video> tags). Each card is sized on its own: its plain
+           lines get the largest size ≤ pop.maxSize at which its widest line fits pop.maxLine; "em" lines get ≤ pop.emSize
+           (or the card's own emSize) and also fit pop.maxLine.
+         Karaoke line: each line is a list of [text, seconds]; the line rises in whole just before its first word and
+           leaves just before the next line. A line whose word carries "em" is the payoff: it does NOT replace the line
+           above it, it slams in underneath at kara.emSize, fully sunset on its own frame. */
+      const CONFIG = {
+        duration: 7.0,
+        sunset: "linear-gradient(100deg, #F84FA4 0%, #FE78A6 22%, #FE8E4E 60%, #FEB747 100%)",
+        flash: { color: "#FFE2B8", peak: 0.16, exposure: 1.8 },   // the payoff light: warm screen flash + exposure kick on the footage (a variant's flashPeak overrides peak)
+        variants: {
+          "0": {
+            style: "pop",
+            shots: ["a1", "a2", "a3", "a4", "a5"],
+            // VO (FACTS: Trailer 1 drew 90M+ views in its first 24 hours; 305.4M views as of 2026-11-18):
+            // "GTA 6's first trailer: 90 million views in 24 hours. Today? 305 million."
+            cards: [
+              { lines: [[["GTA 6’s", 0.10]], [["first", 0.42]], [["trailer", 0.68]]] },
+              { lines: [[["90", 1.25, "em"]], [["million", 1.70]]] },
+              { lines: [[["views", 2.50], ["in", 2.76]], [["24", 2.92], ["hours.", 3.18]]] },
+              { lines: [[["today?", 3.70, "em"]]], emSize: 240 },   // a display beat on the explosion, not a filler card
+              { lines: [[["305", 4.35, "em"]], [["million.", 4.92]]], payoff: true, drift: { from: 4.9, to: 6.5, y: -14 } }
+            ],
+            bloom: { color: "#FEB747", strength: 0.6 },    // the scene's sun on the payoff numeral
+            exitAt: 6.50                                    // the last card blurs out here (0.4 s)
+          },
+          "1": {
+            style: "karaoke",
+            shots: ["b1", "b2", "b3", "b4", "b5", "b6", "b7"],
+            // VO (FACTS: leads Jason Duval and Lucia Caminos; set in Vice City, Leonida; out November 19, 2026):
+            // "Meet Jason and Lucia. Their story plays out in Vice City, November 19."
+            lines: [
+              [["Meet", 0.15], ["Jason", 0.45]],
+              [["and", 1.05], ["Lucia.", 1.30]],
+              [["Their", 2.00], ["story", 2.28]],
+              [["plays", 2.90], ["out", 3.18], ["in", 3.40]],
+              [["Vice", 3.75], ["City,", 4.05]],
+              [["November", 4.65]],
+              [["19.", 5.25, "em"]]
+            ],
+            payoff: 5.25,                                   // the hit: slam + exposure kick + RGB split + bloom + sheen + leak
+            flashPeak: 0.12,                                // the leak does the work here, so the screen flash is lighter
+            leak: { dur: 0.6, colors: ["#FE8E4E", "#F84FA4"], opacity: 0.5, y: 0.36 },
+            drift: { from: 5.25, to: 6.45, y: -14 },        // the last line + numeral float up over the hold
+            exitAt: 6.45
+          }
+        },
+        // word pop: caption px ceiling per card (shrinks so that card's widest line fits maxLine), numeral px, floor
+        pop: { maxSize: 170, minSize: 96, emSize: 340, maxLine: 780 },
+        // karaoke: line px (shrinks so the widest line fits 864), payoff numeral px, cap-top of the line row (y), gap baseline→numeral cap,
+        // unsung-word opacity
+        kara: { maxSize: 160, emSize: 360, maxLine: 864, capTop: 1040, emGap: 50, dim: 0.38, feather: 18, maxSweep: 0.45, rise: 0.13, out: 0.24, outDur: 0.14 }
+      };
+
+      (function () {
+        const VARS = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+        const vKey = CONFIG.variants[String(VARS.variant)] ? String(VARS.variant) : "0";
+        const plate = VARS.bg !== "none";
+        const V = CONFIG.variants[vKey], D = CONFIG.duration, isPop = V.style === "pop";
+        const root = document.getElementById("root"), ov = document.getElementById("ov");
+        const IR = { immediateRender: false };
+        if (!plate) root.classList.add("none");
+        document.querySelectorAll("video.shot").forEach((v) => { if (!plate || !V.shots.includes(v.id)) v.style.display = "none"; });
+        const mark = (el) => { el.setAttribute("data-layout-allow-overlap", ""); el.setAttribute("data-layout-allow-occlusion", ""); return el; };
+        const mk = (tag, cls, parent) => { const e = document.createElement(tag); if (cls) e.className = cls; if (parent) parent.appendChild(e); return e; };
+        const rgb = (h) => { const n = parseInt(h.replace("#", ""), 16); return ((n >> 16) & 255) + "," + ((n >> 8) & 255) + "," + (n & 255); };
+
+        // ---------- build DOM ----------
+        let cards = [], lines = [], zone, scrim;
+        if (isPop) {
+          scrim = mk("div", "", ov); scrim.id = "scrim";
+          zone = mk("div", "cap", ov); zone.id = "zone"; mark(zone);
+          cards = V.cards.map((c) => {
+            const el = mark(mk("div", "card", zone)), inner = mark(mk("div", "card-in", el));
+            const words = [], lineEls = [];
+            c.lines.forEach((ln) => {
+              const lEl = mark(mk("div", "ln", inner));
+              if (ln.some((w) => w[2] === "em")) lEl.classList.add("em");
+              ln.forEach(([text, t, flag], i) => {
+                if (i > 0) lEl.appendChild(document.createTextNode(" "));
+                const w = mark(mk("span", "w", lEl));
+                const white = mark(mk("span", "w-white", w)); white.textContent = text;
+                const sun = mark(mk("span", "w-sun", w)); sun.textContent = text;
+                words.push({ el: w, white, sun, t, em: flag === "em" });
+              });
+              lineEls.push(lEl);
+            });
+            return { el, inner, lineEls, words, start: words[0].t, payoff: !!c.payoff, emSize: c.emSize, drift: c.drift };
+          });
+        } else {
+          if (plate) { scrim = mk("div", "", ov); scrim.id = "kscrim"; }   // bottom shade: footage only (none = lift shadow only)
+          lines = V.lines.map((ln) => {
+            const em = ln.some((w) => w[2] === "em");
+            const el = mark(mk("div", "lyr" + (em ? " em" : ""), ov)), inner = mark(mk("div", "lyr-in", el));
+            const words = ln.map(([text, t], i) => {
+              if (i > 0) inner.appendChild(document.createTextNode(" "));
+              const host = em ? inner : mark(mk("span", "km", inner));     // em words slam (no rise mask to clip the scale)
+              const w = mark(mk("span", "k", host));
+              const dim = mark(mk("span", "k-dim", w)); dim.textContent = text;
+              const white = mark(mk("span", "k-white", w)); white.textContent = text;
+              const glow = mark(mk("span", "k-glow", w));
+              const sun = mark(mk("span", "k-sun", glow)); sun.textContent = text;
+              return { el: w, dim, white, glow, sun, t, em };
+            });
+            return { el, inner, words, start: words[0].t, em };
+          });
+        }
+
+        const fontsReady = Promise.all([
+          document.fonts.load('900 140px "Inter"'), document.fonts.load('800 140px "Inter"')
+        ]).then(() => document.fonts.ready);
+
+        // the payoff light: a warm screen flash (0.06 s in, 0.3 s expo.out) + an exposure kick on the footage itself
+        function warmHit(tl, at, host) {
+          if (!plate) return;
+          const F = CONFIG.flash, pk = V.flashPeak == null ? F.peak : V.flashPeak, fl = mk("div", "warm", document.querySelector(host)), c = rgb(F.color);
+          fl.style.background = "radial-gradient(ellipse 90% 70% at 50% 42%, rgba(" + c + ",1) 0%, rgba(" + c + ",.75) 55%, rgba(" + c + ",.45) 100%)";
+          gsap.set(fl, { opacity: 0 });
+          tl.fromTo(fl, { opacity: 0 }, { opacity: pk, duration: 0.06, ease: "power1.out", ...IR }, at);
+          tl.fromTo(fl, { opacity: pk }, { opacity: 0, duration: 0.3, ease: "expo.out", ...IR }, at + 0.06);
+          const ex = (b, s) => "brightness(" + b + ") saturate(" + s + ")";
+          gsap.set("#push", { filter: ex(1, 1) });
+          tl.fromTo("#push", { filter: ex(1, 1) }, { filter: ex(F.exposure, 1.12), duration: 0.06, ease: "power1.out", ...IR }, at);
+          tl.fromTo("#push", { filter: ex(F.exposure, 1.12) }, { filter: ex(1, 1), duration: 0.34, ease: "expo.out", ...IR }, at + 0.06);
+        }
+
+        fontsReady.then(() => {
+          const tl = gsap.timeline({ paused: true });
+
+          if (isPop) {
+            // ---------- sizes: per card. Plain lines: the largest size ≤ maxSize at which the card's widest line fits maxLine.
+            // "em" lines: ≤ the card's emSize (or pop.emSize), also fitted to maxLine. Short cards get big; long cards step down.
+            const P = CONFIG.pop;
+            cards.forEach((c) => {
+              const plain = c.lineEls.filter((l) => !l.classList.contains("em")), ems = c.lineEls.filter((l) => l.classList.contains("em"));
+              let fs = P.maxSize;
+              const setP = () => plain.forEach((l) => { l.style.fontSize = fs + "px"; });
+              const widest = () => Math.max(0, ...plain.map((l) => l.getBoundingClientRect().width));
+              setP();
+              while (fs > P.minSize && widest() > P.maxLine) { fs -= 2; setP(); }
+              ems.forEach((l) => {
+                let es = c.emSize || P.emSize; l.style.fontSize = es + "px";
+                while (es > 160 && l.getBoundingClientRect().width > P.maxLine) { es -= 4; l.style.fontSize = es + "px"; }
+              });
+            });
+            // sunset fill on every word's accent layer (leaf-level gradient; the payoff word also carries a sheen band)
+            cards.forEach((c) => c.words.forEach((w) => Look.fill(w.sun, CONFIG.sunset, { sheen: c.payoff && w.em })));
+
+            // ---------- scrim ----------
+            if (plate) gsap.set(scrim, { opacity: 1 });
+            else {
+              gsap.set(scrim, { opacity: 0 });
+              tl.fromTo(scrim, { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power2.out", ...IR }, 0);
+              tl.fromTo(scrim, { opacity: 1 }, { opacity: 0, duration: 0.4, ease: "power2.in", ...IR }, V.exitAt);
+            }
+
+            // ---------- footage: a slow push on every shot (each cut starts a new move) ----------
+            if (plate) V.shots.forEach((id) => {
+              const v = document.getElementById(id), s = +v.dataset.start, d = +v.dataset.duration;
+              Look.push(tl, "#push", s, d, { from: 1.0, to: id === V.shots[V.shots.length - 1] ? 1.075 : 1.05 });
+            });
+
+            // ---------- cards ----------
+            cards.forEach((c, ci) => {
+              const next = cards[ci + 1];
+              gsap.set(c.el, { opacity: 0 });
+              tl.fromTo(c.el, { opacity: 0 }, { opacity: 1, duration: 0.001, ...IR }, Math.max(0, c.start - 0.02));
+              const all = c.words;
+              all.forEach((w, wi) => {
+                // punch-in: the word lands big and out of focus and snaps sharp (scale + blur + opacity)
+                // (a wide display word like TODAY? starts at the largest scale that still fits the frame, so the punch never crops)
+                const s0 = w.em ? Math.min(1.75, 1080 / Math.max(1, w.el.getBoundingClientRect().width)) : 1.24, b0 = w.em ? 26 : 11, dur = w.em ? 0.38 : 0.26;
+                gsap.set(w.el, { opacity: 0, scale: s0, filter: "blur(" + b0 + "px)" });
+                gsap.set(w.white, { opacity: 0 }); gsap.set(w.sun, { opacity: 1 });
+                tl.fromTo(w.el, { opacity: 0 }, { opacity: 1, duration: 0.05, ease: "none", ...IR }, w.t);
+                tl.fromTo(w.el, { scale: s0, filter: "blur(" + b0 + "px)" }, { scale: 1, filter: "blur(0px)", duration: dur, ease: "expo.out", ...IR }, w.t);
+                // hand-off: on the frame the next word lands, this one turns white (exactly one sunset word per frame)
+                const nw = all[wi + 1];
+                if (nw) {
+                  tl.fromTo(w.white, { opacity: 0 }, { opacity: 1, duration: 0.001, ...IR }, nw.t);
+                  tl.fromTo(w.sun, { opacity: 1 }, { opacity: 0, duration: 0.001, ...IR }, nw.t);
+                }
+                if (c.payoff && w.em) {
+                  // THE payoff: the number slams on the cut — warm exposure kick, shake + punch-zoom, RGB split, sheen
+                  if (plate) Look.impact(tl, w.t, { shake: "#shake", amp: 12, flash: 0, zoom: 1.045 });
+                  warmHit(tl, w.t, "#root");
+                  Look.chroma(tl, c.inner, w.t, 0.36, { px: 16 });
+                  Look.sheen(tl, w.sun, w.t + 0.14, { dur: 0.7 });
+                  // the scene's sun lights the numeral: warm bloom that kicks on the hit and settles to its rest strength
+                  const B = V.bloom, lift = "0 1px 1px rgba(0,0,0,.26), 0 4px 14px rgba(0,0,0,.30), 0 16px 48px rgba(0,0,0,.30)";
+                  w.white.style.textShadow = Look.bloom(w.white, { color: B.color, strength: B.strength }) + ", " + lift;
+                  const c1 = rgb(B.color), c2 = rgb("#FE8E4E");
+                  Look.drive(tl, w.t, 0.7, (p) => {
+                    const s = 2.0 - 1.0 * (1 - Math.pow(1 - p, 3));      // 2.0 → 1.0 (expo-ish settle)
+                    w.sun.style.filter = "drop-shadow(0 0 22px rgba(" + c2 + "," + (0.30 * s).toFixed(3) + ")) drop-shadow(0 0 64px rgba(" + c1 + "," + (0.20 * s).toFixed(3) + ")) drop-shadow(0 6px 16px rgba(0,0,0,.40))";
+                  });
+                }
+              });
+              if (c.drift) {
+                // the held card floats up as a layer over the footage (linear, like a push) instead of sitting printed on it
+                gsap.set(c.inner, { y: 0 });
+                tl.fromTo(c.inner, { y: 0 }, { y: c.drift.y, duration: c.drift.to - c.drift.from, ease: "none", ...IR }, c.drift.from);
+              }
+              if (next) {
+                // designed exit: lift + blur out, finishing on the frame the next card's first word lands
+                tl.fromTo(c.el, { opacity: 1, y: 0, filter: "blur(0px)" }, { opacity: 0, y: -28, filter: "blur(10px)", duration: 0.12, ease: "power2.in", ...IR }, next.start - 0.12);
+              } else {
+                Look.exit(tl, c.el, V.exitAt, { to: "blur", dur: 0.4, blur: 14, scale: 1.05 });
+              }
+            });
+          } else {
+            // ---------- sizes: one line size (largest at which the widest line fits the 864 px safe width) ----------
+            const K = CONFIG.kara, plain = lines.filter((l) => !l.em), ems = lines.filter((l) => l.em);
+            let fs = K.maxSize, es = K.emSize;
+            plain.forEach((l) => { l.el.style.fontSize = fs + "px"; });
+            const widest = () => Math.max(...plain.map((l) => l.inner.getBoundingClientRect().width));
+            while (fs > 120 && widest() > K.maxLine) { fs -= 2; plain.forEach((l) => { l.el.style.fontSize = fs + "px"; }); }
+            ems.forEach((l) => { l.el.style.fontSize = es + "px"; while (es > 200 && l.inner.getBoundingClientRect().width > K.maxLine) { es -= 4; l.el.style.fontSize = es + "px"; } });
+            // vertical placement from real font metrics: the line row's cap-top sits at K.capTop; the numeral's cap-top
+            // sits K.emGap below the line's baseline
+            const ctx = document.createElement("canvas").getContext("2d");
+            const metrics = (px) => { ctx.font = "800 " + px + "px Inter"; const m = ctx.measureText("H");
+              const base = (px - (m.fontBoundingBoxAscent + m.fontBoundingBoxDescent)) / 2 + m.fontBoundingBoxAscent;
+              return { base, cap: base - m.actualBoundingBoxAscent }; };
+            const mL = metrics(fs), mE = metrics(es);
+            const lineTop = Math.round(K.capTop - mL.cap), baseY = lineTop + mL.base;
+            const emTop = Math.round(baseY + K.emGap - mE.cap);
+            lines.forEach((l) => { l.el.style.top = (l.em ? emTop : lineTop) + "px"; });
+            const fe = K.feather;
+            lines.forEach((l) => l.words.forEach((w) => {
+              w.width = Math.ceil(w.sun.getBoundingClientRect().width);
+              Look.fill(w.sun, CONFIG.sunset, { sheen: w.t === V.payoff });
+              w.sun.style.setProperty("--fe", fe + "px");
+            }));
+
+            // ---------- full-bleed footage: a focus-pull open, a bottom shade under the line, a slow push on every shot ----------
+            if (plate) {
+              gsap.set(scrim, { opacity: 1 });
+              const ff = (b, x) => "blur(" + b + "px) brightness(" + x + ")";
+              gsap.set("#frame", { filter: ff(16, 0.72) });
+              tl.fromTo("#frame", { filter: ff(16, 0.72) }, { filter: ff(0, 1), duration: 0.5, ease: "expo.out", ...IR }, 0);
+              V.shots.forEach((id) => {
+                const v = document.getElementById(id), s = +v.dataset.start, d = +v.dataset.duration;
+                Look.push(tl, "#push", s, d, { from: 1.0, to: id === V.shots[V.shots.length - 1] ? 1.06 : 1.04 });
+              });
+            }
+
+            // ---------- lines: one at a time. Rise in whole (masked, 50 ms word stagger), lift-blur out before the next ----------
+            // the old line is gone (lift + blur, kara.out → kara.out − outDur before the next first word) as the next rises
+            lines.forEach((l, i) => {
+              const nextPlain = lines.slice(i + 1).find((x) => !x.em);
+              gsap.set(l.el, { opacity: 1, y: 0, filter: "blur(0px)" });
+              if (!l.em) {
+                const at = Math.max(0.05, l.start - K.rise);
+                l.words.forEach((w, wi) => {
+                  gsap.set(w.el, { yPercent: 125 });
+                  tl.fromTo(w.el, { yPercent: 125 }, { yPercent: 0, duration: 0.5, ease: "expo.out", ...IR }, at + wi * 0.05);
+                });
+              } else {
+                // the payoff numeral: slams in fully lit (scale 1.6 → 1, blur 24 → 0, 0.38 s expo.out)
+                l.words.forEach((w) => {
+                  gsap.set(w.el, { opacity: 0, scale: 1.6, filter: "blur(24px)" });
+                  tl.fromTo(w.el, { opacity: 0 }, { opacity: 1, duration: 0.04, ease: "none", ...IR }, w.t);
+                  tl.fromTo(w.el, { scale: 1.6, filter: "blur(24px)" }, { scale: 1, filter: "blur(0px)", duration: 0.38, ease: "expo.out", ...IR }, w.t);
+                });
+              }
+              if (nextPlain) {
+                tl.fromTo(l.el, { opacity: 1, y: 0, filter: "blur(0px)" }, { opacity: 0, y: -30, filter: "blur(10px)", duration: K.outDur, ease: "power2.in", ...IR }, nextPlain.start - K.out);
+              } else {
+                // the last line + the numeral float up together over the hold (on .lyr-in, clear of the exit on .lyr)
+                const Dr = V.drift;
+                if (Dr) { gsap.set(l.inner, { y: 0 }); tl.fromTo(l.inner, { y: 0 }, { y: Dr.y, duration: Dr.to - Dr.from, ease: "none", ...IR }, Dr.from); }
+                Look.exit(tl, l.el, V.exitAt + (l.em ? 0.05 : 0), { to: "blur", dur: 0.4, blur: 14, scale: 1.03 });
+              }
+            });
+
+            // ---------- words: the sunset sweeps across the spoken word, then hands off to white on the next word ----------
+            const flat = [].concat(...lines.map((l) => l.words));
+            flat.forEach((w, wi) => {
+              const nw = flat[wi + 1], full = (w.width + fe + 4) + "px";
+              gsap.set(w.white, { opacity: 0 }); gsap.set(w.glow, { opacity: 1 });
+              if (w.em) {
+                // the payoff word is fully sunset on its own frame (no sweep), so the hit lands on a lit word
+                gsap.set(w.sun, { "--sw": full });
+              } else {
+                const span = (nw ? nw.t : V.exitAt) - w.t;
+                const sweep = Math.max(0.18, Math.min(K.maxSweep, span * 0.8));
+                gsap.set(w.sun, { "--sw": "0px" });
+                tl.fromTo(w.sun, { "--sw": "0px" }, { "--sw": full, duration: sweep, ease: "power1.inOut", ...IR }, w.t);
+                // once fully swept, the "unsung" layer underneath is retired (nothing doubles under the lit word)
+                gsap.set(w.dim, { opacity: K.dim });
+                tl.fromTo(w.dim, { opacity: K.dim }, { opacity: 0, duration: 0.001, ...IR }, w.t + sweep);
+              }
+              if (nw) {
+                // hand-off: instant when the next word is the payoff (one accent on the hit frame), else 0.08 s
+                const hd = nw.em ? 0.001 : 0.08;
+                tl.fromTo(w.white, { opacity: 0 }, { opacity: 1, duration: hd, ease: "power2.out", ...IR }, nw.t);
+                tl.fromTo(w.glow, { opacity: 1 }, { opacity: 0, duration: hd, ease: "power2.out", ...IR }, nw.t);
+              }
+              if (w.t === V.payoff) {
+                // THE payoff: cut + full-frame warm exposure kick and leak, shake, RGB split on the numeral, bloom kick, sheen
+                if (plate) Look.impact(tl, w.t, { shake: "#shake", amp: 10, flash: 0, zoom: 1.04 });
+                warmHit(tl, w.t, "#root");
+                if (plate && V.leak) Look.leak(tl, w.t, V.leak.dur, { colors: V.leak.colors, opacity: V.leak.opacity, y: V.leak.y });
+                const line = lines.find((l) => l.words.includes(w));
+                Look.chroma(tl, line.inner, w.t, 0.34, { px: 14 });
+                Look.sheen(tl, w.sun, w.t + 0.12, { dur: 0.75 });
+                Look.drive(tl, w.t, 0.8, (p) => {
+                  const s = 2.2 - 1.2 * (1 - Math.pow(1 - p, 3));      // bloom 2.2 → 1.0 as the light settles
+                  w.glow.style.filter = "drop-shadow(0 0 18px rgba(248,79,164," + (0.30 * s).toFixed(3) + ")) drop-shadow(0 0 56px rgba(254,142,78," + (0.20 * s).toFixed(3) + ")) drop-shadow(0 0 120px rgba(254,183,71," + (0.10 * s).toFixed(3) + ")) drop-shadow(0 6px 16px rgba(0,0,0,.36))";
+                });
+              }
+            });
+          }
+
+          Look.install(tl, { duration: D, grain: 0.14, vignette: 0.45, enabled: plate });
+          tl.set({}, {}, D);
+          window.__timelines = window.__timelines || {};
+          window.__timelines["main"] = tl;
+          tl.seek(0);
+        });
+      })();
+    </script>
+  </body>
+</html>

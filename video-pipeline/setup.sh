@@ -20,4 +20,6 @@ for r in ["Qwen/Qwen3-TTS-12Hz-1.7B-Base", "Systran/faster-whisper-large-v3"]:
 PY
 
 (cd remotion && npm ci --no-audit --no-fund --loglevel=error)
+# HyperFrames (renderiza los efectos GTA de gta-fx/): lo deja en la caché de npx
+npx --yes hyperframes@0.8.162 --version >/dev/null 2>&1 || true
 echo "SETUP OK"

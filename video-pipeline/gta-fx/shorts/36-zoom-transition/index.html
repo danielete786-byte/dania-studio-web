@@ -1,0 +1,465 @@
+<!doctype html>
+<!-- #36 Punch zoom transition — GTA 6 component library, craft v2. 1080x1920 (9:16), 30 fps, 5.5 s.
+     Full-frame transition: it always shows footage. Three 4K trailer shots are cut on the beat; every cut is the
+     transition. Variant 0 punches in (radial zoom blur), variant 1 whips sideways (horizontal motion blur with a
+     camera roll). A location title rides the incoming shot's camera: it lands with the shot, streaked by the same
+     motion blur, and leaves on the next transition the same way.
+     The blur is one WebGL pass over the footage: 96 jittered samples per pixel, averaged in linear light, read from a
+     mip level that grows with the streak (a pre-filter, so fine detail smears instead of ghosting), with the blur
+     length taken from the real speed of the move (a shutter).
+     The light on each hit is Look.expose (an exposure pulse on #shake: highlights burn, blacks hold), with
+     Look.impact for the landing kick (flash:0). Look.install adds grain + vignette.
+     Every visual is a pure function of composition time t (one linear clock tween + hf-seek drive render(t)).
+     Variables: variant "0" Punch zoom / "1" Whip pan. bg is kept for library parity; footage always shows. -->
+<html lang="en" data-composition-variables='[
+  {"id":"variant","type":"enum","label":"Variant","default":"0","options":[{"value":"0","label":"Punch zoom"},{"value":"1","label":"Whip pan"}]},
+  {"id":"bg","type":"enum","label":"Background","default":"plate","options":[{"value":"plate","label":"Sample footage"},{"value":"none","label":"Transparent"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link rel="stylesheet" href="assets/fonts/fonts.css" />
+    <link rel="stylesheet" href="assets/kit/look/look.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="assets/kit/look/look.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: #000; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; background: #000; color: #fff;
+        font-family: "Inter", sans-serif; -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; }
+      /* source footage: framework-owned clips, invisible; the WebGL canvas draws them */
+      .bank { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; opacity: 0; pointer-events: none; }
+      .bank video { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; object-fit: cover; }
+      #shake, #push { position: absolute; inset: 0; }
+      #gl { position: absolute; inset: 0; width: 1080px; height: 1920px; display: block; }
+      /* the title lives on the incoming shot's picture plane: .cam carries that shot's camera (scale / slide / roll) */
+      .cam { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; visibility: hidden; will-change: transform; }
+      .slide, .wb { position: absolute; inset: 0; }
+      .scrim { position: absolute; left: 0; right: 0; top: 0; height: 1180px; opacity: 0; }
+      /* the whip's scrim is part of its shot's grade: it slides and streaks with the picture (3 frames wide, so no edge shows) */
+      .scrim1 { position: absolute; left: -1080px; top: 0; width: 3240px; height: 900px; opacity: 0; }
+      /* Punch zoom title: stacked wide caps in the Rockstar place style: pure white, a hard #EE08F2 offset, soft magenta bloom, lifted off the sky */
+      .ttl0 { position: absolute; left: 0; right: 0; text-align: center; font-weight: 800; letter-spacing: .045em; line-height: .9;
+        text-shadow: 5px 4px 0 rgba(238,8,242,.92), 0 0 2px rgba(255,255,255,.4), 0 0 30px rgba(238,8,242,.30), 0 12px 44px rgba(4,10,30,.38), 0 30px 90px rgba(4,10,30,.30); }
+      .ttl0 .ln { display: block; }
+      /* Whip pan title: one line of wide caps in the Leonida sunset fill (Look.fill), lifted with a drop-shadow */
+      .ttl1 { position: absolute; left: 0; right: 0; text-align: center; white-space: nowrap; font-weight: 800; letter-spacing: .04em; line-height: 1;
+        filter: drop-shadow(0 3px 4px rgba(10,20,50,.28)) drop-shadow(0 12px 34px rgba(10,20,60,.36)); }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="5.5" data-width="1080" data-height="1920">
+
+      <!-- Variant 0 (Punch zoom): biker beside the seaplane -> skydive over Vice City -> beach gym -> jetski -->
+      <div class="bank" data-v="0">
+        <video id="z0" class="clip" data-v="0" data-seg="0" src="assets/shots/s065-biker-plane-v.mp4" muted playsinline data-start="0" data-duration="1.2" data-media-start="0.4" data-track-index="0"></video>
+        <video id="z1" class="clip" data-v="0" data-seg="1" src="assets/shots/s135-skydive-city-v.mp4" muted playsinline data-start="1.2" data-duration="1.55" data-media-start="0" data-track-index="1"></video>
+        <video id="z2" class="clip" data-v="0" data-seg="2" src="assets/shots/s012-muscle-beach-v.mp4" muted playsinline data-start="2.75" data-duration="1.4" data-media-start="0.2" data-track-index="2"></video>
+        <video id="z3" class="clip" data-v="0" data-seg="3" src="assets/shots/s064-jetski-v.mp4" muted playsinline data-start="4.15" data-duration="1.35" data-media-start="0" data-track-index="6"></video>
+      </div>
+      <!-- Variant 1 (Whip pan): Jason driving -> highway into Vice City -> man at the pickup -> Jason and Lucia -->
+      <div class="bank" data-v="1">
+        <video id="w0" class="clip" data-v="1" data-seg="0" src="assets/shots/s008-jason-driving-v.mp4" muted playsinline data-start="0" data-duration="1.468" data-media-start="1.2" data-track-index="3"></video>
+        <video id="w1" class="clip" data-v="1" data-seg="1" src="assets/shots/s011-vice-highway-v.mp4" muted playsinline data-start="1.332" data-duration="1.517" data-media-start="0" data-track-index="4"></video>
+        <video id="w2" class="clip" data-v="1" data-seg="2" src="assets/shots/s004-palm-shirt-truck-v.mp4" muted playsinline data-start="2.712" data-duration="1.507" data-media-start="0.3" data-track-index="5"></video>
+        <video id="w3" class="clip" data-v="1" data-seg="3" src="assets/shots/s092-duo-car-v.mp4" muted playsinline data-start="4.082" data-duration="1.418" data-media-start="0.1" data-track-index="7"></video>
+      </div>
+
+      <div id="shake"><div id="push">
+        <canvas id="gl" width="1080" height="1920"></canvas>
+        <div class="scrim lk-scrim-top" id="scrim"></div>
+        <div class="cam" id="cam0" data-v="0"><div class="wb" id="wb0">
+          <div class="ttl0 t-wide" id="ttl0"></div>
+        </div></div>
+        <div class="cam" id="cam1" data-v="1"><div class="slide" id="slide1"><div class="wb" id="wb1">
+          <div class="scrim1 lk-scrim-top" id="scrim1"></div>
+          <div class="ttl1 t-wide" id="ttl1"></div>
+        </div></div></div>
+      </div></div>
+      <svg width="0" height="0" style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true">
+        <defs><filter id="hblur" x="-40%" y="-60%" width="180%" height="220%" color-interpolation-filters="sRGB">
+          <feGaussianBlur id="hblurG" in="SourceGraphic" stdDeviation="0 0" /></filter></defs>
+      </svg>
+    </div>
+
+    <script>
+      const CONFIG = {
+        duration: 5.5,                       // seconds; keep equal to #root data-duration
+        variants: {
+          "0": {
+            name: "Punch zoom", mode: "zoom",
+            // shots in order: src, in = media time at the shot's start (s), start = when it cuts in (s),
+            // focus = the point the camera lands on and punches into, as [x, y] fractions of the frame
+            shots: [
+              { src: "assets/shots/s065-biker-plane-v.mp4",    in: 0.4, start: 0,    focus: [0.50, 0.33] },  // the biker's sunglasses
+              { src: "assets/shots/s135-skydive-city-v.mp4",   in: 0.0, start: 1.2,  focus: [0.50, 0.42] },  // the skydiver over the skyline
+              { src: "assets/shots/s012-muscle-beach-v.mp4",   in: 0.2, start: 2.75, focus: [0.50, 0.50] },  // the lifter
+              { src: "assets/shots/s064-jetski-v.mp4",         in: 0.0, start: 4.15, focus: [0.55, 0.42] }   // the riders
+            ],
+            // per cut: Look.expose peak (0 = none) and lead (frames of build before the cut), Look.impact shake px
+            hits: [ { peak: 1.6, lead: 2, shake: 8 }, { peak: 1.3, lead: 2, shake: 5 }, { peak: 1.25, lead: 2, shake: 4 } ],
+            title: { lines: ["Vice", "City"], shot: 1, size: 184, top: 230 }, // rides shot 1's camera; lines: [] = no title
+            scrim: 0.78,             // soft top scrim under the title while its shot is on screen (0 = off)
+            punchIn: 0.24,           // seconds of accelerating zoom before each cut
+            land: 0.30,              // seconds for the incoming shot to settle (quart-out)
+            zoomA: 2.3,              // scale the outgoing shot reaches at the cut (cubic-in)
+            zoomB: 1.25,             // scale the incoming shot lands from
+            landStreak: 0.55,        // the incoming shot arrives streaked: landStreak x maxSpread, decaying to 0 over land
+            shutter: 0.045,          // motion-blur exposure (s): streak = zoom speed x shutter
+            maxSpread: 0.36,         // cap on the radial streak (fraction of the distance to the focus)
+            prefilter: 0.05,         // source pre-blur per px of streak (mip level): lights smear, never ghost
+            drift: 0.04,             // slow push on each held shot
+            vignette: 0.32           // extra edge darkening while the blur is up
+          },
+          "1": {
+            name: "Whip pan", mode: "whip",
+            shots: [
+              { src: "assets/shots/s008-jason-driving-v.mp4",      in: 1.2 },
+              { src: "assets/shots/s011-vice-highway-v.mp4",       in: 0.0 },
+              { src: "assets/shots/s004-palm-shirt-truck-v.mp4",   in: 0.3 },
+              { src: "assets/shots/s092-duo-car-v.mp4",            in: 0.1 }
+            ],
+            switches: [1.40, 2.78, 4.15],  // the cut inside each whip (peak speed); whip j runs switch ± whip/2
+            hits: [ { peak: 1.35, lead: 3, dur: 0.22, shake: 0 }, { peak: 0, shake: 0 }, { peak: 0, shake: 0 } ],
+            title: { text: "Leonida", shot: 1, size: 124, top: 252, sheenAt: 1.72 },
+            scrim: 0.5,
+            whip: 0.40,              // seconds per whip (power4 in-out)
+            travel: 0.65,            // how far each shot slides, as a fraction of frame width
+            direction: "left",       // "left": picture travels left, the next shot enters from the right
+            shutter: 0.05,           // motion-blur exposure (s), centred, tapered: streak = speed x shutter
+            maxBlur: 520,            // cap on the streak in px: highlights stay as hard horizontal lines
+            prefilter: 0.025,        // light pre-blur per px of streak (kills striation, keeps streak structure)
+            camPunch: 0.06,          // camera scale bump at mid-whip
+            roll: 1.6,               // camera roll at mid-whip (deg): a hand-whipped camera, not two sliding strips
+            arc: 30,                 // vertical arc at mid-whip (px)
+            drift: 0.03              // slow push across the piece
+          }
+        }
+      };
+
+      (function () {
+        const VARS = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+        const vKey = CONFIG.variants[String(VARS.variant)] ? String(VARS.variant) : "0";
+        const V = CONFIG.variants[vKey];
+        const END = CONFIG.duration, FPS = 30, W = 1080, H = 1920;
+        // Look.install's grain overlay lifts the shadows ~15 Y levels and greys the colour (measured: YLOW 21 -> 36 with
+        // grain .15, 21 with grain 0). The shader pre-darkens by the same amount and restores saturation, so the
+        // finished frame keeps the shot's own black point and colour.
+        const GRAIN = 0.13, PRECOMP = 0.05, SAT = 1.1;
+        const $ = (s) => document.querySelector(s);
+        const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+        const smooth = (a, b, x) => { const u = clamp((x - a) / (b - a), 0, 1); return u * u * (3 - 2 * u); };
+        const r3 = (x) => +x.toFixed(3);
+        const NS = V.shots.length;
+
+        // ---- show only the active variant's bank and title ----
+        document.querySelectorAll(".bank, .cam").forEach((el) => { if (el.getAttribute("data-v") !== vKey) el.style.display = "none"; });
+
+        // ---- shot timing: [data-start, data-duration, data-media-start] per shot ----
+        const SH = V.mode === "whip" ? V.shutter / 2 : 0, MARGIN = 1 / FPS + 0.01;
+        const segStart = [], segEnd = [];
+        for (let i = 0; i < NS; i++) {
+          if (V.mode === "zoom") { segStart[i] = V.shots[i].start; segEnd[i] = i + 1 < NS ? V.shots[i + 1].start : END; }
+          else { segStart[i] = i ? V.switches[i - 1] : 0; segEnd[i] = i < NS - 1 ? V.switches[i] : END; }
+        }
+        const vids = [];
+        document.querySelectorAll('video[data-v="' + vKey + '"]').forEach((v) => {
+          const i = +v.getAttribute("data-seg"), S = V.shots[i];
+          if (v.getAttribute("src") !== S.src) v.setAttribute("src", S.src);
+          // a whip shot is live while the shutter can see it (a little before / after its switch)
+          const a = V.mode === "whip" && i > 0 ? segStart[i] - SH - MARGIN : segStart[i];
+          const b = V.mode === "whip" && i < NS - 1 ? segEnd[i] + SH + MARGIN : segEnd[i];
+          v.setAttribute("data-start", String(r3(a)));
+          v.setAttribute("data-duration", String(r3(b - a)));
+          v.setAttribute("data-media-start", String(r3(S.in)));
+          vids[i] = v;
+        });
+
+        // ---- WebGL2 (mipmapped textures for the streak pre-filter); WebGL1 fallback ----
+        const canvas = $("#gl");
+        const ctxOpts = { preserveDrawingBuffer: true, alpha: false, antialias: false, premultipliedAlpha: false };
+        let gl = canvas.getContext("webgl2", ctxOpts); const GL2 = !!gl;
+        if (!gl) gl = canvas.getContext("webgl", ctxOpts);
+        const VS = GL2 ? "#version 300 es\nin vec2 aPos; void main(){ gl_Position = vec4(aPos, 0.0, 1.0); }"
+                       : "attribute vec2 aPos; void main(){ gl_Position = vec4(aPos, 0.0, 1.0); }";
+        const HEAD = GL2 ? "#version 300 es\nprecision highp float;\nout vec4 oColor;\n#define FRAG oColor\n#define TEX(s, uv, l) textureLod(s, uv, l)\n"
+                         : "precision highp float;\n#define FRAG gl_FragColor\n#define TEX(s, uv, l) texture2D(s, uv)\n";
+        const COMMON = HEAD + `
+          uniform vec2 uRes; uniform float uSeed;
+          const int N = 96;
+          // interleaved gradient noise: a per-pixel sample offset that turns tap steps into fine grain (deterministic)
+          float ign(vec2 p){ return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715)))); }
+          vec3 lin(vec3 c){ return pow(max(c, vec3(0.0)), vec3(2.2)); }
+          vec3 gam(vec3 c){ return pow(clamp(c, 0.0, 1.0), vec3(1.0 / 2.2)); }
+          // tapered shutter: taps fade in and out at the ends of the exposure, so streaks have soft ends, not hard edges
+          float shw(float f){ return smoothstep(0.0, 0.3, f) * smoothstep(1.0, 0.7, f) + 0.02; }
+          uniform float uPre0, uSat;
+          // grade: pre-compensate the grain overlay's shadow lift, restore saturation
+          vec3 grade(vec3 c){ c = c - uPre0 * (1.0 - c); float g = dot(c, vec3(0.2126, 0.7152, 0.0722)); return mix(vec3(g), c, uSat); }`;
+        const FS_ZOOM = COMMON + `
+          uniform sampler2D uTex; uniform vec2 uCover, uFocus;
+          uniform float uScale, uK, uVig, uPunch, uTexPx, uPre;
+          vec3 samp(vec2 uv, float l){ return lin(TEX(uTex, (uv - 0.5) * uCover + 0.5, l).rgb); }
+          void main(){
+            vec2 p = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y) / uRes;
+            vec2 d = p - uFocus;
+            vec3 acc;
+            if (uK < 0.0008) { acc = samp(uFocus + d / uScale, 0.0); }
+            else {
+              float len = length(d * uRes) / uScale * (uK / (1.0 + uK)) * uTexPx;   // streak in source texels
+              float l = log2(1.0 + uPre * len);
+              float j = ign(gl_FragCoord.xy + vec2(uSeed * 5.0, uSeed * 3.0));
+              acc = vec3(0.0); float ws = 0.0;
+              for (int i = 0; i < N; i++) {
+                float f = (float(i) + j) / float(N), w = shw(f);
+                acc += w * samp(uFocus + d / (uScale * (1.0 + uK * f)), l);   // the zoom the shutter saw
+                ws += w;
+              }
+              acc /= ws;
+            }
+            vec3 c = gam(acc);
+            float g = dot(c, vec3(0.2126, 0.7152, 0.0722));
+            c = mix(vec3(g), c, 1.0 + 0.12 * uPunch);                 // hold saturation while blurred
+            c = (c - 0.5) * (1.0 + 0.08 * uPunch) + 0.5;               // and contrast
+            float r = length(d * vec2(uRes.x / uRes.y, 1.0)) / 0.62;
+            c *= 1.0 - uVig * smoothstep(0.45, 1.3, r);                // tunnel the eye while punching
+            FRAG = vec4(clamp(grade(c), 0.0, 1.0), 1.0);
+          }`;
+        const FS_WHIP = COMMON + `
+          uniform sampler2D uC0, uC1; uniform vec2 uCov0, uCov1;
+          uniform float uP0, uP1, uSlot0, uSlot1, uSw, uCam, uLod, uRot, uDy;
+          // one shot, full frame, mirrored edges (only ever seen under heavy blur)
+          vec3 clipAt(sampler2D s, vec2 cov, float X, float y, float l){
+            float m = mod(X, 2.0 * uRes.x);
+            float xm = m < uRes.x ? m : 2.0 * uRes.x - m;
+            return lin(TEX(s, (vec2(xm / uRes.x, y) - 0.5) * cov + 0.5, l).rgb);
+          }
+          void main(){
+            vec2 px = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y);
+            // camera: screen = c + (0, dy) + R(rot) * cam * (picture - c)  ->  invert it
+            vec2 c = 0.5 * uRes, d = px - c - vec2(0.0, uDy);
+            float cs = cos(uRot), sn = sin(uRot);
+            d = vec2(cs * d.x + sn * d.y, -sn * d.x + cs * d.y) / uCam;
+            px = c + d;
+            float y = px.y / uRes.y;
+            vec3 acc;
+            if (abs(uP1 - uP0) < 0.5) {
+              acc = uSw >= 0.5 ? clipAt(uC0, uCov0, px.x + uP1 - uSlot0, y, 0.0) : clipAt(uC1, uCov1, px.x + uP1 - uSlot1, y, 0.0);
+            } else {
+              float j = ign(gl_FragCoord.xy + vec2(uSeed * 5.0, uSeed * 3.0));
+              acc = vec3(0.0); float ws = 0.0;
+              for (int i = 0; i < N; i++) {
+                float f = (float(i) + j) / float(N), w = shw(f);   // time inside the shutter, 0..1
+                float X = px.x + mix(uP0, uP1, f);                 // where the camera was at that instant
+                // the cut is a moment in time: taps before it see the outgoing shot, taps after it the incoming one
+                if (f < uSw) acc += w * clipAt(uC0, uCov0, X - uSlot0, y, uLod);
+                else         acc += w * clipAt(uC1, uCov1, X - uSlot1, y, uLod);
+                ws += w;
+              }
+              acc /= ws;
+            }
+            FRAG = vec4(clamp(grade(gam(acc)), 0.0, 1.0), 1.0);
+          }`;
+        function prog(fs) {
+          const mk = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+            if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(s)); return s; };
+          const p = gl.createProgram();
+          gl.attachShader(p, mk(gl.VERTEX_SHADER, VS)); gl.attachShader(p, mk(gl.FRAGMENT_SHADER, fs));
+          gl.bindAttribLocation(p, 0, "aPos"); gl.linkProgram(p);
+          if (!gl.getProgramParameter(p, gl.LINK_STATUS)) console.error(gl.getProgramInfoLog(p));
+          return p;
+        }
+        const P = prog(V.mode === "zoom" ? FS_ZOOM : FS_WHIP);
+        gl.useProgram(P);
+        const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+        gl.viewport(0, 0, W, H);
+        const U = {}; ["uRes", "uSeed", "uTex", "uCover", "uFocus", "uScale", "uK", "uVig", "uPunch", "uTexPx", "uPre",
+          "uC0", "uC1", "uCov0", "uCov1", "uP0", "uP1", "uSlot0", "uSlot1", "uSw", "uCam", "uLod", "uRot", "uDy", "uPre0", "uSat"].forEach((n) => { U[n] = gl.getUniformLocation(P, n); });
+        gl.uniform2f(U.uRes, W, H); gl.uniform1f(U.uPre0, PRECOMP); gl.uniform1f(U.uSat, SAT);
+        const MINF = GL2 ? gl.LINEAR_MIPMAP_LINEAR : gl.LINEAR;
+        function makeTex(unit) {
+          const t = gl.createTexture(); gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, t);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, MINF); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, 1, 1, 0, gl.RGB, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0]));
+          if (GL2) gl.generateMipmap(gl.TEXTURE_2D);
+          return { tex: t, unit, cover: [1, 1], texPx: 1 };
+        }
+        const TEX = [makeTex(0), makeTex(1)];
+
+        // the current frame of a clip: the <img> HyperFrames injects after each <video> at render time, else the live video
+        function frameOf(v) {
+          const n = v && v.nextElementSibling;
+          if (n && n.tagName === "IMG" && n.classList.contains("__render_frame__")) return (n.complete && n.naturalWidth > 0) ? n : null;
+          if (v && v.readyState >= 2 && v.videoWidth > 0) return v;
+          return null;
+        }
+        function pendingFrame(v) {
+          const n = v && v.nextElementSibling;
+          return (n && n.tagName === "IMG" && n.classList.contains("__render_frame__") && !(n.complete && n.naturalWidth > 0)) ? n : null;
+        }
+        function upload(T, v) {
+          const src = frameOf(v);
+          if (!src) return;                       // no decodable frame yet: keep the previous one
+          const w = src.naturalWidth || src.videoWidth, h = src.naturalHeight || src.videoHeight;
+          gl.activeTexture(gl.TEXTURE0 + T.unit); gl.bindTexture(gl.TEXTURE_2D, T.tex);
+          try { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, src); } catch (e) { return; }
+          if (GL2) gl.generateMipmap(gl.TEXTURE_2D);
+          const ta = w / h, sa = W / H;                // object-fit: cover
+          T.cover = ta > sa ? [sa / ta, 1] : [1, ta / sa];
+          T.texPx = T.cover[0] * w / W;                // source texels per frame px
+        }
+
+        // ---- the title: built from CONFIG, it rides the camera of its shot ----
+        const TT = V.title || {};
+        const cam = $("#cam" + vKey), wb = $("#wb" + vKey), ttl = $("#ttl" + vKey), slide = $("#slide1");
+        const hblur = $("#hblurG");
+        const hasTitle = V.mode === "zoom" ? !!(TT.lines && TT.lines.length) : !!TT.text;
+        if (hasTitle) {
+          if (V.mode === "zoom") TT.lines.forEach((s) => { const d = document.createElement("span"); d.className = "ln"; d.textContent = s; ttl.appendChild(d); });
+          else ttl.textContent = TT.text;
+          ttl.style.fontSize = TT.size + "px"; ttl.style.top = TT.top + "px";
+        }
+        const scrim = $("#scrim");
+        if (V.mode === "whip" && hasTitle) $("#scrim1").style.opacity = String(V.scrim || 0);
+        const setTitle = (vis, transform, blurCss, op) => {
+          if (!hasTitle) return;
+          cam.style.visibility = vis ? "visible" : "hidden";
+          if (!vis) return;
+          cam.style.transform = transform;
+          wb.style.filter = blurCss; wb.style.opacity = String(op);
+        };
+
+        const outQuart = (x) => 1 - Math.pow(1 - x, 4);
+        const inOut4 = (x) => (x < 0.5 ? 8 * x * x * x * x : 1 - 8 * Math.pow(1 - x, 4));
+        let render, activeVids;
+
+        if (V.mode === "zoom") {
+          gl.uniform1i(U.uTex, 0); gl.uniform1f(U.uPre, GL2 ? V.prefilter : 0);
+          const kMax = V.maxSpread, nStart = segStart.map((s) => Math.round(s * FPS));
+          const segAt = (n) => { let i = 0; for (let k = 1; k < NS; k++) if (n >= nStart[k]) i = k; return i; };
+          // scale of shot i at time t, analytic, so its speed (and so the blur) is exact
+          const scaleAt = (i, t) => {
+            let s = 1;
+            if (i > 0) s *= V.zoomB - (V.zoomB - 1) * outQuart(clamp((t - segStart[i]) / V.land, 0, 1));
+            s *= 1 + V.drift * clamp((t - segStart[i]) / (segEnd[i] - segStart[i]), 0, 1);
+            if (i < NS - 1) { const u = clamp((t - (segEnd[i] - V.punchIn)) / V.punchIn, 0, 1); s *= 1 + (V.zoomA - 1) * u * u * u; }
+            return s;
+          };
+          const landK = (i, t) => { if (!i) return 0; const v = clamp((t - segStart[i]) / V.land, 0, 1); return V.landStreak * kMax * (1 - v) * (1 - v); };
+          activeVids = (t) => [vids[segAt(Math.round(t * FPS))]];
+          render = (t) => {
+            const n = Math.round(t * FPS), i = segAt(n), f = V.shots[i].focus;
+            const s = scaleAt(i, t), dt = 0.004;
+            const speed = Math.abs(s - scaleAt(i, t - dt)) / dt;
+            const k = Math.min(kMax, Math.max(V.shutter * speed / s, landK(i, t)));
+            upload(TEX[0], vids[i]);
+            gl.uniform2f(U.uCover, TEX[0].cover[0], TEX[0].cover[1]); gl.uniform1f(U.uTexPx, TEX[0].texPx);
+            gl.uniform2f(U.uFocus, f[0], f[1]);
+            gl.uniform1f(U.uScale, s); gl.uniform1f(U.uK, k);
+            gl.uniform1f(U.uVig, V.vignette * k / kMax); gl.uniform1f(U.uPunch, k / kMax);
+            gl.uniform1f(U.uSeed, n % 64);
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+            // title on its shot's picture plane: same scale about the same focus, gaussian ~ the radial streak at the type
+            const on = hasTitle && i === TT.shot;
+            if (on) {
+              const fx = f[0] * W, fy = f[1] * H, cy = TT.top + ttl.offsetHeight / 2;
+              const dist = Math.hypot(W / 2 - fx, cy - fy) * s;
+              const bl = Math.min(26, 0.3 * dist * k / (1 + k));
+              cam.style.transformOrigin = fx + "px " + fy + "px";
+              // it emerges from the streak (0 on the cut frame, full 2 frames later) and fades as it flies out on the next punch
+              const fin = clamp((n - nStart[i]) / 2, 0, 1);
+              setTitle(true, "scale(" + s.toFixed(4) + ")", bl > 0.25 ? "blur(" + bl.toFixed(2) + "px)" : "none",
+                fin * (i < NS - 1 ? 1 - smooth(segEnd[i] - 0.1, segEnd[i] - 1 / FPS, t) : 1));
+            } else setTitle(false);
+            if (V.scrim > 0) scrim.style.opacity = on ? String(V.scrim) : "0";
+          };
+        } else {
+          const sgn = V.direction === "right" ? -1 : 1;
+          const D = V.travel * W, step = sgn * 2 * D;          // shot i sits at step * i on a virtual strip
+          const SW = V.switches;
+          const uOf = (t, j) => clamp((t - (SW[j] - V.whip / 2)) / V.whip, 0, 1);
+          const Pos = (t) => { let p = 0; for (let j = 0; j < SW.length; j++) p += step * inOut4(uOf(t, j)); return p; };
+          const vPeak = 8 * D / V.whip;
+          // the frame's shots: inside a whip's shutter window -> outgoing + incoming with sw = share of the shutter before the switch
+          const state = (t) => {
+            for (let j = 0; j < SW.length; j++) {
+              if (t - SH < SW[j] && t + SH > SW[j]) return { a: j, b: j + 1, sw: clamp((SW[j] - (t - SH)) / (2 * SH), 0, 1) };
+            }
+            let i = 0; for (let j = 0; j < SW.length; j++) if (t >= SW[j]) i = j + 1;
+            return { a: i, b: i, sw: 1 };
+          };
+          activeVids = (t) => { const S = state(t); return S.a === S.b ? [vids[S.a]] : [vids[S.a], vids[S.b]]; };
+          render = (t) => {
+            const n = Math.round(t * FPS), S = state(t);
+            const TA = TEX[S.a % 2], TB = TEX[S.b % 2];
+            upload(TA, vids[S.a]); if (S.b !== S.a) upload(TB, vids[S.b]);
+            let p0 = Pos(t - SH), p1 = Pos(t + SH);
+            if (Math.abs(p1 - p0) > V.maxBlur) { const m = (p0 + p1) / 2, hb = Math.sign(p1 - p0) * V.maxBlur / 2; p0 = m - hb; p1 = m + hb; }
+            const len = Math.abs(p1 - p0);
+            let bump = 0; for (let j = 0; j < SW.length; j++) bump += Math.sin(Math.PI * uOf(t, j));
+            const sc = 1 + V.camPunch * bump + V.drift * (t / END);
+            const rot = sgn * V.roll * Math.PI / 180 * bump, dy = V.arc * bump;
+            gl.uniform1i(U.uC0, TA.unit); gl.uniform1i(U.uC1, TB.unit);
+            gl.uniform2f(U.uCov0, TA.cover[0], TA.cover[1]); gl.uniform2f(U.uCov1, TB.cover[0], TB.cover[1]);
+            gl.uniform1f(U.uSlot0, step * S.a); gl.uniform1f(U.uSlot1, step * S.b); gl.uniform1f(U.uSw, S.sw);
+            gl.uniform1f(U.uP0, p0); gl.uniform1f(U.uP1, p1); gl.uniform1f(U.uCam, sc);
+            gl.uniform1f(U.uRot, rot); gl.uniform1f(U.uDy, dy);
+            gl.uniform1f(U.uLod, GL2 ? Math.log2(1 + V.prefilter * len * TA.texPx / sc) : 0);
+            gl.uniform1f(U.uSeed, n % 64);
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+            // title on its shot's strip slot: same slide, same camera, horizontal blur ~ the streak, shown for its share of the shutter
+            const ti = TT.shot;
+            const share = !hasTitle ? 0 : S.a === S.b ? (S.a === ti ? 1 : 0) : (S.b === ti ? 1 - S.sw : S.a === ti ? S.sw : 0);
+            if (share > 0) {
+              const off = step * ti - Pos(t);
+              slide.style.transform = "translate3d(" + off.toFixed(2) + "px,0,0)";
+              cam.style.transformOrigin = "540px 960px";
+              const sx = Math.min(70, 0.3 * len * sc);
+              hblur.setAttribute("stdDeviation", sx.toFixed(2) + " 0");
+              setTitle(true, "translate(0px," + dy.toFixed(2) + "px) rotate(" + (rot * 180 / Math.PI).toFixed(4) + "deg) scale(" + sc.toFixed(4) + ")",
+                sx > 0.3 ? "url(#hblur)" : "none", share);
+            } else setTitle(false);
+          };
+        }
+
+        // one linear clock: GSAP writes clock.t, the setter repaints (runs on every seek, suppressed or not)
+        const clock = {}; let _t = 0;
+        Object.defineProperty(clock, "t", { get: () => _t, set: (val) => { _t = val; render(val); } });
+        // HyperFrames fires hf-seek again once each clip's frame is injected: repaint with the exact frame
+        window.addEventListener("hf-seek", (e) => {
+          const time = e && e.detail && typeof e.detail.time === "number" ? e.detail.time : _t;
+          render(time);
+          const pend = activeVids(time).map(pendingFrame).filter(Boolean);
+          if (pend.length && e.detail && typeof e.detail.waitUntil === "function") {
+            e.detail.waitUntil(Promise.all(pend.map((im) => (im.decode ? im.decode().catch(() => {}) : Promise.resolve()))).then(() => render(time)));
+          }
+        });
+
+        document.fonts.ready.then(() => {
+          render(0);
+          const tl = gsap.timeline({ paused: true });
+          tl.fromTo(clock, { t: 0 }, { t: END, duration: END, ease: "none", immediateRender: false }, 0);
+          const cuts = V.mode === "zoom" ? segStart.slice(1) : V.switches;
+          if (hasTitle && V.mode === "whip") {
+            Look.fill(ttl, "linear-gradient(100deg, #F84FA4 0%, #FE78A6 24%, #FE8E4E 62%, #FEB747 100%)", { sheen: true });
+            Look.sheen(tl, ttl, TT.sheenAt, { dur: 0.9 });
+          }
+          // the hit on each cut: light from Look.expose (exposure pulse, blacks hold), the kick from Look.impact (no flash)
+          cuts.forEach((c, j) => {
+            const h = V.hits[j] || V.hits[V.hits.length - 1];
+            if (h.peak > 1) Look.expose(tl, c - (h.lead || 1) / FPS, { target: "#shake", peak: h.peak, dur: h.dur || 0.34 });
+            if (h.shake) Look.impact(tl, c, { shake: "#push", amp: h.shake, flash: 0, zoom: 1.03, dur: 0.3 });
+          });
+          Look.install(tl, { duration: END, grain: GRAIN, vignette: 0.45, enabled: true });
+          tl.set({}, {}, END);
+          window.__timelines = window.__timelines || {};
+          window.__timelines["main"] = tl;
+          tl.seek(0);
+        });
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,623 @@
+<!doctype html>
+<!-- #27 Top 3 podium (Compilation scaffolding) — 1080x1920, 30 fps, 6.0 s.
+     A Three.js podium for a top-3 reveal: one stepped podium (heights 1.00 / 0.70 / 0.50, the winner's step 1.15x wider).
+     Third, second, then first grow straight up out of the floor (always opaque), each carrying its clip as a card standing
+     on top; the "1" slams, the winner's sunset rim ignites, and the camera pushes in and settles square on the winner.
+     Exit: the cards fold back and fade, then the steps sink into the floor, so the last frame is clear for a loop.
+     Full-frame component: it always shows footage. Every clip path, in-point and speed comes from CONFIG (mirrored on the
+     <video> tags); every <video> the active variant does not use is hidden. bg "none" drops only the blurred backdrop.
+     3D: blocks, extruded numerals, ground shadows and light are WebGL; the clip cards are DOM, pinned every frame to their
+     3D quads with a projective matrix3d so type stays crisp. Everything is a pure function of timeline time. -->
+<html lang="en" data-composition-variables='[
+  {"id":"variant","type":"enum","label":"Variant","default":"0","options":[{"value":"0","label":"Podium"},{"value":"1","label":"Winner spotlight"}]},
+  {"id":"bg","type":"enum","label":"Background","default":"plate","options":[{"value":"plate","label":"Blurred clip backdrop"},{"value":"none","label":"Transparent"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link rel="stylesheet" href="assets/fonts/fonts.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: transparent; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; font-family: "Inter", sans-serif;
+        -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; font-feature-settings: "tnum" 1, "ss01" 1; }
+      :root { --shadow-type: 0 2px 2px rgba(0,0,0,.35), 0 6px 24px rgba(0,0,0,.45); }
+
+      /* ---------- blurred backdrop: the winner's clip, enlarged, blurred, with a soft sunset haze ---------- */
+      #bgwrap { position: absolute; inset: 0; z-index: 0; overflow: hidden; }
+      .bgvid { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+        transform: scale(1.18); filter: blur(34px) contrast(.7) brightness(1.2); }   /* flattened: the clip gives soft light and shade, the sky gives colour */
+      /* Rockstar's feature-card sky (#9C7AA8 → #FFC88F) IS the backdrop: a colour blend keeps only the clip's light and shade,
+         so the frame reads as one clean sunset instead of a muddy blurred plate */
+      #haze { position: absolute; inset: 0; z-index: 1; mix-blend-mode: color; opacity: .85;
+        background: linear-gradient(180deg, #9C7AA8 0%, #D689A1 38%, #FAA08D 62%, #FFC88F 82%, #FFC88F 100%); }
+      #glow { position: absolute; inset: 0; z-index: 1; mix-blend-mode: screen;
+        background: radial-gradient(62% 26% at 47% 74%, rgba(250,160,141,.5) 0%, rgba(214,137,161,.2) 50%, rgba(156,122,168,0) 100%); }   /* sunset floor glow under the podium */
+      #shade { position: absolute; inset: 0; z-index: 1;
+        background: linear-gradient(180deg, rgba(8,8,12,.62) 0%, rgba(8,8,12,.2) 30%, rgba(8,8,12,.04) 55%, rgba(8,8,12,.1) 76%, rgba(8,8,12,.3) 100%); }
+      #dim { position: absolute; inset: 0; z-index: 1; background: radial-gradient(110% 62% at 47% 48%, rgba(6,6,10,.45) 0%, rgba(6,6,10,.86) 100%); opacity: 0; }
+
+      /* ---------- WebGL podium ---------- */
+      #gl { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; z-index: 2; display: block; }
+
+      /* ---------- clip cards: DOM pinned to 3D quads (transform set every frame; sizes set from the camera) ---------- */
+      .card { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform, opacity; opacity: 0;
+        overflow: hidden; background: #0d0d12; z-index: 3;
+        box-shadow: 0 1px 2px rgba(0,0,0,.5), 0 6px 10px rgba(0,0,0,.55), 0 0 26px rgba(0,0,0,.3); }
+      .card video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      .card .dimmer { position: absolute; inset: 0; background: #07070b; opacity: 0; }
+      .card .scrim { position: absolute; inset: 0; background: linear-gradient(0deg, rgba(8,8,12,.88) 0%, rgba(8,8,12,.55) 28%, rgba(8,8,12,0) 56%); }
+      .card .edge { position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.16), inset 0 2px 0 rgba(255,255,255,.22); }
+      .card .sheen { position: absolute; top: -20%; bottom: -20%; width: 46%; left: -60%;
+        background: linear-gradient(100deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.26) 50%, rgba(255,255,255,0) 100%); transform: skewX(-14deg); }
+      .card .lab { position: absolute; color: #fff; }
+      .card .name { font-family: "Barlow Condensed", sans-serif; font-weight: 800; line-height: .9;
+        text-transform: uppercase; letter-spacing: .015em; text-shadow: 0 2px 10px rgba(0,0,0,.4); text-wrap: balance; }
+      .card .meta { font-weight: 600; letter-spacing: -0.01em; color: rgba(255,255,255,.88); font-variant-numeric: tabular-nums; white-space: nowrap; }
+      /* spotlight variant: the beam landing on the top of the winner's card (screen blend inside the card) */
+      .card .kiss { position: absolute; inset: 0; opacity: 0; mix-blend-mode: screen;
+        background: radial-gradient(70% 46% at 50% -6%, rgba(255,241,226,.6) 0%, rgba(255,228,206,.2) 55%, rgba(255,228,206,0) 100%); }
+      .card .pill { position: absolute; border-radius: 999px; white-space: nowrap; opacity: 0; color: #fff; font-weight: 600; letter-spacing: -0.005em;
+        background: rgba(14,14,20,.62); backdrop-filter: blur(16px) saturate(1.4); -webkit-backdrop-filter: blur(16px) saturate(1.4);
+        box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.18); font-variant-numeric: tabular-nums; }
+
+      /* ---------- title block (screen space, upper third) ---------- */
+      #ov { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
+      #title { position: absolute; left: 72px; width: 864px; top: 262px; text-align: center; color: #fff; }
+      #kicker { font-weight: 600; font-size: 32px; letter-spacing: .34em; text-transform: uppercase; color: rgba(255,255,255,.86);
+        text-shadow: var(--shadow-type); padding-left: .34em; }
+      #head { margin-top: 18px; font-weight: 800; font-size: 108px; line-height: .94; text-wrap: balance; font-feature-settings: "case" 1;
+        letter-spacing: -0.025em; text-transform: uppercase; text-shadow: var(--shadow-type); }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6.0" data-width="1080" data-height="1920">
+      <!-- blurred backdrop: one copy per variant; in-point and speed keep it on ONE shot (mirrors CONFIG.backdrop) -->
+      <div id="bgwrap">
+        <video id="bg0" class="clip bgvid" data-layout-allow-overflow src="assets/clips/bg-p06-v-043.mp4" muted playsinline data-start="0" data-duration="6.0" data-media-start="0" data-track-index="0"></video>
+        <video id="bg1" class="clip bgvid" data-layout-allow-overflow src="assets/clips/t1-beach-v-bg.mp4" muted playsinline data-start="0" data-duration="6.0" data-media-start="0" data-track-index="0"></video>
+      </div>
+      <!-- #dim (spotlight house lights) sits under the sky grade, so low light reads as a darker dusk, not a grey veil -->
+      <div id="dim"></div>
+      <div id="haze"></div>
+      <div id="glow"></div>
+      <div id="shade"></div>
+
+      <canvas id="gl" width="1080" height="1920"></canvas>
+
+      <!-- clip cards standing on each block. Each card holds one <video> per variant; the script hides the ones the active
+           variant does not use. data-start = when that place rises; in-point + speed keep each card on one matching shot. -->
+      <div class="card" id="card1">
+        <video id="c1a" class="clip" data-layout-allow-overflow src="assets/clips/card-p06-v-054.mp4" muted playsinline data-start="0.95" data-duration="5.05" data-media-start="0" data-track-index="2"></video>
+        <video id="c1b" class="clip" data-layout-allow-overflow src="assets/clips/card-t1-v-043.mp4" muted playsinline data-start="0.95" data-duration="5.05" data-media-start="0" data-track-index="2"></video>
+        <div class="dimmer"></div><div class="scrim"></div><div class="sheen" data-layout-allow-overflow></div><div class="edge"></div>
+        <div class="kiss"></div><div class="pill chip"></div>
+        <div class="lab"><div class="name"></div><div class="meta"></div></div>
+      </div>
+      <div class="card" id="card2">
+        <video id="c2a" class="clip" data-layout-allow-overflow src="assets/clips/card-p04-v-035.mp4" muted playsinline data-start="0.6" data-duration="5.4" data-media-start="0" data-track-index="3"></video>
+        <video id="c2b" class="clip" data-layout-allow-overflow src="assets/clips/card-p06-v-050.mp4" muted playsinline data-start="0.6" data-duration="5.4" data-media-start="0" data-track-index="3"></video>
+        <div class="dimmer"></div><div class="scrim"></div><div class="sheen" data-layout-allow-overflow></div><div class="edge"></div>
+        <div class="kiss"></div><div class="pill chip"></div>
+        <div class="lab"><div class="name"></div><div class="meta"></div></div>
+      </div>
+      <div class="card" id="card3">
+        <video id="c3a" class="clip" data-layout-allow-overflow src="assets/clips/card-p03-h-050.mp4" muted playsinline data-start="0.25" data-duration="5.75" data-media-start="0" data-track-index="4"></video>
+        <video id="c3b" class="clip" data-layout-allow-overflow src="assets/clips/card-p01-v-032.mp4" muted playsinline data-start="0.25" data-duration="5.75" data-media-start="0" data-track-index="4"></video>
+        <div class="dimmer"></div><div class="scrim"></div><div class="sheen" data-layout-allow-overflow></div><div class="edge"></div>
+        <div class="kiss"></div><div class="pill chip"></div>
+        <div class="lab"><div class="name"></div><div class="meta"></div></div>
+      </div>
+
+      <div id="ov" class="clip" data-start="0" data-duration="6.0" data-track-index="5">
+        <div id="title"><div id="kicker"></div><div id="head"></div></div>
+      </div>
+    </div>
+
+    <script>
+      const CONFIG = {
+        variants: {
+          // "Podium": third, second, first rise out of the floor; the "1" slams and the camera pushes in and settles on the winner.
+          // Demo: the creator's top 3 moments from Trailer 2. `meta` is optional (e.g. your own timestamp or note);
+          // the demo leaves it empty because those details are the creator's to fill in.
+          "0": {
+            style: "podium",
+            backdrop: { src: "assets/clips/bg-p06-v-043.mp4", in: 0, rate: 1 },  /* p06 2.7 s on, pre-slowed 0.43x with frame blending */  // blurred full-frame backdrop: use your #1 clip
+            kicker: "GTA 6 · Trailer 2",
+            title: "Top 3 moments",
+            entries: [ // rank 1, 2, 3. Card clips are pre-slowed with frame blending (assets/clips/card-*.mp4, see DECISIONS round 6) and play at rate 1; a live playbackRate under 1 judders.
+              { name: "Lucia at the gate", meta: "", clip: { src: "assets/clips/card-p06-v-054.mp4",    in: 0, rate: 1 } },
+              // the drive-by: source 0–1.9 s only (the mural and the police), before the car's A-pillar crosses the frame at ~2.0 s
+              // pos: the card's crop (CSS object-position) sits low, below the car's sun visor, on the mural and the police
+              { name: "The drive-by",      meta: "", clip: { src: "assets/clips/card-p04-v-035.mp4",  in: 0, rate: 1, pos: "50% 88%" } },
+              // the horizontal plate, cropped left of centre (pos "30% 50%"), keeps Jason in the card for its whole window;
+              // the vertical plate's centre crop loses him off the left edge as he turns to the door
+              { name: "Jason at the door", meta: "", clip: { src: "assets/clips/card-p03-h-050.mp4",     in: 0, rate: 1, pos: "30% 50%" } }
+            ]
+          },
+          // "Winner spotlight": the house lights are already low; after the slam a spotlight beam lands on #1, its number
+          // counts up and a record chip pops in. The runners-up dim but keep their names and numbers.
+          // Real numbers: Rockstar Games YouTube views as of 2026-11-18 (research/gta6/FACTS.md).
+          "1": {
+            style: "spotlight",
+            backdrop: { src: "assets/clips/t1-beach-v-bg.mp4", in: 0, rate: 1 },   // t1-beach-v.mp4 0.6-3.3 s pre-slowed to 0.43x with frame blending (smooth 30 fps; a 0.17x live rate stepped at 5 fps)
+            kicker: "GTA 6 · YouTube views",
+            title: "Most-viewed trailers",
+            entries: [
+              { name: "Trailer 1",      count: 305.4, unit: "M views", clip: { src: "assets/clips/card-t1-v-043.mp4",        in: 0, rate: 1 }, chip: "90M+ in 24h" },
+              { name: "Trailer 2",      count: 189.6, unit: "M views", clip: { src: "assets/clips/card-p06-v-050.mp4", in: 0, rate: 1 } },
+              // pos "50% 85%": the crop sits low on the source, so the sign's lettering lands in the card's upper half, clear of the label
+              { name: "Launch Trailer", count: 82.0,  unit: "M views", clip: { src: "assets/clips/card-p01-v-032.mp4",  in: 0, rate: 1, pos: "50% 85%" } }
+            ]
+          }
+        },
+        // on-screen type sizes (px) at the settled framing: three sizes per frame (title 108, names, small)
+        type: { name: 52, small: 32, radius: 28 },
+        // seconds. rise[r] = when place r starts rising (the clip <video> data-start matches it). The build is done by 1.6 s.
+        // push = the "Podium" camera push-in after the slam; dimMore = when the spotlight variant dims the runners-up further.
+        timing: { titleIn: 0.1, rise: { 3: 0.25, 2: 0.6, 1: 0.95 }, riseDur: 0.45, riseDur1: 0.5,
+                  slam: 1.45, push: 1.2, spotlight: 1.6, dimMore: 2.4, out: 5.6, end: 6.0 }
+      };
+
+      // Barlow Condensed Black outlines for 1, 2, 3 (font units /1000, y down), extruded into real 3D numerals.
+      const GLYPH = {"1":"M86 -697Q95 -700 104 -700L268 -700Q275 -700 279 -696Q283 -692 283 -685L283 -15Q283 -8 279 -4Q275 0 268 0L110 0Q103 0 99 -4Q95 -8 95 -15L95 -523Q95 -529 89 -529L23 -529Q16 -529 12 -533Q8 -537 8 -544L8 -660Q8 -673 20 -677L86 -697Z","2":"M249 -168Q246 -166 247 -163Q248 -161 252 -161L438 -161Q445 -161 449 -157Q453 -153 453 -146L453 -15Q453 -8 449 -4Q445 0 438 0L33 0Q26 0 22 -4Q18 -8 18 -15L18 -150Q18 -161 25 -169L86 -237Q136 -292 163 -323Q189 -354 210 -385Q257 -453 257 -505Q257 -547 231 -547Q219 -547 212 -537Q204 -528 204 -512L204 -470Q204 -463 200 -459Q196 -455 189 -455L29 -455Q22 -455 18 -459Q14 -463 14 -470L14 -520Q18 -576 48 -618Q77 -661 127 -684Q177 -708 240 -708Q301 -708 348 -682Q395 -657 421 -610Q447 -564 447 -504Q447 -448 431 -404Q415 -361 378 -312Q345 -268 301 -221Q256 -175 249 -168Z","3":"M422 -700Q429 -700 433 -696Q437 -692 437 -685L437 -551Q437 -540 430 -532L327 -424Q325 -422 326 -419Q326 -417 330 -417Q376 -413 407 -372Q437 -332 437 -276L437 -172Q437 -120 411 -79Q384 -38 337 -15Q290 8 230 8Q167 8 118 -15Q69 -38 42 -79Q14 -120 14 -172L14 -217Q14 -224 18 -228Q22 -232 29 -232L187 -232Q194 -232 198 -228Q202 -224 202 -217L202 -190Q202 -173 210 -163Q217 -153 230 -153Q243 -153 251 -163Q259 -174 259 -190L259 -303Q259 -319 251 -329Q243 -340 230 -340Q214 -340 195 -323Q188 -318 184 -318Q179 -318 174 -323L94 -406Q90 -410 90 -416Q90 -423 95 -427L205 -533Q208 -535 207 -537Q206 -540 202 -540L45 -540Q38 -540 34 -544Q30 -548 30 -555L30 -685Q30 -692 34 -696Q38 -700 45 -700L422 -700Z"};
+
+      (function () {
+        const VARS = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+        const vKey = CONFIG.variants[String(VARS.variant)] ? String(VARS.variant) : "0";
+        const showBg = VARS.bg !== "none";
+        const V = CONFIG.variants[vKey], T = CONFIG.timing, TY = CONFIG.type, SPOT = V.style === "spotlight";
+        const $ = (s) => document.querySelector(s);
+
+        // ---------- footage: keep only the clips this variant uses ----------
+        document.querySelectorAll("video.bgvid").forEach((v) => { if (!showBg || v.getAttribute("src") !== V.backdrop.src) v.style.display = "none"; });
+        if (!showBg) ["#shade", "#dim", "#haze", "#glow"].forEach((s) => { $(s).style.display = "none"; });
+        [1, 2, 3].forEach((r) => {
+          const E = V.entries[r - 1], card = $("#card" + r);
+          card.querySelectorAll("video").forEach((v) => { if (v.getAttribute("src") !== E.clip.src) v.style.display = "none"; else if (E.clip.pos) v.style.objectPosition = E.clip.pos; });
+          card.querySelector(".name").textContent = E.name;
+          const metaEl = card.querySelector(".meta");
+          metaEl.textContent = E.count != null ? E.count.toFixed(1) + E.unit : (E.meta || "");
+          if (!metaEl.textContent) metaEl.style.display = "none";   // no meta: the name sits on the card's bottom inset
+          const chip = card.querySelector(".chip");
+          if (E.chip) chip.textContent = E.chip; else chip.style.display = "none";
+          if (!(SPOT && r === 1)) card.querySelector(".kiss").style.display = "none";
+        });
+        $("#kicker").textContent = V.kicker;
+        $("#head").textContent = V.title;
+
+        // ---------- 3D scene (world units; ~280 px per unit at the settled framing) ----------
+        const W = 1080, H = 1920;
+        const GX = -0.133;                       // centres the podium on the safe zone (x 72–936 → 504), not the frame
+        const BD = 0.9, BEV = 0.06, SEAM = 0.012;
+        // A real stepped podium: one joined object, heights 1.00 / 0.70 / 0.50, the winner's step 1.15x wider.
+        const W1 = 1.15, WS = 1.0;
+        const BLOCK = { 1: { x: 0, w: W1, h: 1.6 },
+                        2: { x: -(W1 / 2 + SEAM + WS / 2), w: WS, h: 1.12 },
+                        3: { x:  (W1 / 2 + SEAM + WS / 2), w: WS, h: 0.8 } };
+        // cards are sized to their step, inset so neighbours keep a ~16 px gutter and never overlap
+        const INSET = 0.03;
+        const CARD = { 1: { w: W1 - 2 * INSET, h: 1.45 }, 2: { w: WS - 2 * INSET, h: 1.22 }, 3: { w: WS - 2 * INSET, h: 1.22 } };
+        // numeral glyph heights: the "1" is ~60% of its step (~270 px); "2"/"3" are near-matched (~185 / ~170 px on screen),
+        // so the pair reads as a set and only the gradient "1" is the hero. The "3" fills its short step's face (0.60 of 0.80)
+        // with ~11 px of clear face above and below it.
+        const NUMH = { 1: 0.96, 2: 0.66, 3: 0.60 };
+        const NUMD = { 1: 0.12, 2: 0.09, 3: 0.09 }; // extrusion depth: "2"/"3" slightly shallower than the "1"
+        const NUMCAP = 0.8;                          // a numeral is never taller than 80% of the visible step
+        const CARD_TILT = 0.105;                     // cards lean back ~6deg, matching the camera's downward pitch
+        const ZC = 0.30;                             // cards stand on the front part of each step top (step depth ±0.45)
+        const DOMPX = 270;                           // DOM px per world unit for the cards
+        const canvas = $("#gl");
+        const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, preserveDrawingBuffer: true, premultipliedAlpha: true });
+        renderer.setPixelRatio(1);
+        renderer.setSize(W, H, false);
+        renderer.setClearColor(0x000000, 0);
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.0;
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(30, W / H, 0.1, 100);
+        const world = new THREE.Group(); world.position.x = GX; scene.add(world);
+
+        // ---------- environment: a neutral ink-navy studio (slate sky, a white softbox, two cool-white strip lights) ----------
+        // Restraint like Rockstar's dark VI: the steps stay ink-navy; the only warm light is the winner's thin sunset rim.
+        function canvasEl(w, h, draw) { const c = document.createElement("canvas"); c.width = w; c.height = h; draw(c.getContext("2d"), w, h); return c; }
+        const envCanvas = canvasEl(1024, 512, (g) => {
+          let gr = g.createLinearGradient(0, 0, 0, 256);
+          gr.addColorStop(0, "#0d0e15"); gr.addColorStop(.45, "#1d1f2b"); gr.addColorStop(.8, "#33354a"); gr.addColorStop(1, "#4a4c60");
+          g.fillStyle = gr; g.fillRect(0, 0, 1024, 256);
+          gr = g.createLinearGradient(0, 256, 0, 512); gr.addColorStop(0, "#262838"); gr.addColorStop(.14, "#10111a"); gr.addColorStop(1, "#07070b");
+          g.fillStyle = gr; g.fillRect(0, 256, 1024, 256);
+          g.filter = "blur(12px)";
+          g.fillStyle = "#ffffff"; g.fillRect(650, 120, 240, 110);   // softbox behind the camera: gloss on the front faces
+          g.fillStyle = "#9da3c4"; g.fillRect(84, 170, 100, 70);     // back-left cool strip
+          g.fillStyle = "#a9adc4"; g.fillRect(340, 170, 100, 70);    // back-right cool strip
+          g.filter = "none";
+        });
+        const envTex = new THREE.CanvasTexture(envCanvas); envTex.mapping = THREE.EquirectangularReflectionMapping; envTex.colorSpace = THREE.SRGBColorSpace;
+        const pmrem = new THREE.PMREMGenerator(renderer);
+        scene.environment = pmrem.fromEquirectangular(envTex).texture;
+
+        // ---------- lights ----------
+        const key = new THREE.DirectionalLight(0xffffff, 2.4); key.position.set(-4, 6, 8); scene.add(key);
+        // cool-neutral rims, low and to the side so they edge the side walls without tinting the step tops
+        const RIM = 2.2;
+        const rimL = new THREE.DirectionalLight(0xC9CCEA, RIM); rimL.position.set(-6, 1.1, -2.2); scene.add(rimL);
+        const rimR = new THREE.DirectionalLight(0xD9D6E6, RIM); rimR.position.set(6, 1.1, -2.2); scene.add(rimR);
+        const sun = new THREE.DirectionalLight(0xffffff, 0.35);   // shadow caster: high and behind, so shadows fall toward camera
+        sun.position.set(0.9, 9, -3.4); sun.target.position.set(0, 0, 0.3); world.add(sun); world.add(sun.target);
+        sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024);
+        Object.assign(sun.shadow.camera, { left: -3.4, right: 3.4, top: 3.4, bottom: -3.4, near: 1, far: 20 });
+        sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.02;
+        // the spotlight (v1): straight down onto the winner's step, a little forward so its front edge catches it
+        const SPOT_TOP = 7.4, SPOT_R = 0.72;
+        const spot = new THREE.SpotLight(0xfff1e2, 0, 0, Math.atan(SPOT_R * 1.15 / (SPOT_TOP - BLOCK[1].h)), 0.5, 0);
+        spot.position.set(0, SPOT_TOP, 0.55); spot.target.position.set(0, BLOCK[1].h, 0.25); world.add(spot); world.add(spot.target);
+
+        // ---------- ground ----------
+        function canvasTex(w, h, draw) { const t = new THREE.CanvasTexture(canvasEl(w, h, draw)); t.colorSpace = THREE.SRGBColorSpace; return t; }
+        const floorTex = canvasTex(512, 512, (g, w, h) => { const r = g.createRadialGradient(w/2, h/2, 0, w/2, h/2, w/2);
+          r.addColorStop(0, "rgba(6,6,10,.62)"); r.addColorStop(.55, "rgba(6,6,10,.36)"); r.addColorStop(1, "rgba(6,6,10,0)"); g.fillStyle = r; g.fillRect(0, 0, w, h); });
+        const contactTex = canvasTex(256, 256, (g, w, h) => { g.filter = "blur(5px)"; g.fillStyle = "rgba(0,0,0,.95)"; g.fillRect(22, 26, w - 44, h - 52); });
+        const poolTex = canvasTex(512, 512, (g, w, h) => { g.fillStyle = "#000"; g.fillRect(0, 0, w, h);
+          const r = g.createRadialGradient(w/2, h/2, 0, w/2, h/2, w/2);
+          r.addColorStop(0, "rgb(255,240,226)"); r.addColorStop(.4, "rgb(110,102,96)"); r.addColorStop(.75, "rgb(22,20,19)"); r.addColorStop(1, "rgb(0,0,0)"); g.fillStyle = r; g.fillRect(0, 0, w, h); });
+        const flat = (o) => Object.assign(o, { transparent: true, depthWrite: false, toneMapped: false });
+        const ground = new THREE.Mesh(new THREE.PlaneGeometry(7.6, 4.8), new THREE.MeshBasicMaterial(flat({ map: floorTex, opacity: 0 })));
+        ground.rotation.x = -Math.PI / 2; ground.position.set(0, 0, 0.4); world.add(ground);
+        const shadowFloor = new THREE.Mesh(new THREE.PlaneGeometry(9, 7), new THREE.ShadowMaterial({ opacity: 0.35, transparent: true, depthWrite: false }));
+        shadowFloor.rotation.x = -Math.PI / 2; shadowFloor.position.set(0, 0.0005, 0.8); shadowFloor.receiveShadow = true; world.add(shadowFloor);
+
+        // spotlight volume + pool (additive; adds light without touching alpha, so the transparent canvas stays transparent)
+        function addGlow(mat) { mat.blending = THREE.CustomBlending; mat.blendEquation = THREE.AddEquation;
+          mat.blendSrc = THREE.OneFactor; mat.blendDst = THREE.OneFactor; mat.blendSrcAlpha = THREE.ZeroFactor; mat.blendDstAlpha = THREE.OneFactor;
+          mat.transparent = true; mat.depthWrite = false; mat.toneMapped = false; return mat; }
+        const pool = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 1.4), addGlow(new THREE.MeshBasicMaterial({ map: poolTex, color: 0x000000 })));
+        pool.rotation.x = -Math.PI / 2; pool.position.set(0, 0.003, 0.75); world.add(pool);
+        // the beam: an open cone from above the frame down to the top of the winner's step (~380 px wide at its base).
+        // It is only visible below the title block (fades in over screen y BEAM_FROM → BEAM_FULL), so the light reads as
+        // landing on #1's card and step rather than washing the title; it softens only over its last few percent.
+        const BEAM_FROM = 540, BEAM_FULL = 610;
+        const coneMat = addGlow(new THREE.ShaderMaterial({
+          side: THREE.DoubleSide,
+          uniforms: { uOpacity: { value: 0 }, uColor: { value: new THREE.Color(0xfff0e2) }, uFade: { value: new THREE.Vector2(BEAM_FROM, BEAM_FULL) } },
+          vertexShader: "varying vec2 vUv; varying vec3 vN; varying vec3 vV; void main(){ vUv = uv; vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }",
+          // uFade: screen rows (px from the top) where the beam fades in, so it never washes the title and shows on #1's card and step
+          fragmentShader: "uniform float uOpacity; uniform vec3 uColor; uniform vec2 uFade; varying vec2 vUv; varying vec3 vN; varying vec3 vV; void main(){ float f = clamp(abs(dot(normalize(vN), normalize(vV))), 0.0, 1.0); float core = f * f; float along = smoothstep(0.0, 0.07, vUv.y) * (0.82 + 0.18 * (1.0 - vUv.y)); float vis = smoothstep(uFade.x, uFade.y, 1920.0 - gl_FragCoord.y); vec3 c = uColor * core * along * vis * uOpacity; gl_FragColor = vec4(c, 1.0); }"
+        }));
+        const coneH = SPOT_TOP - BLOCK[1].h;
+        const cone = new THREE.Mesh(new THREE.CylinderGeometry(0.1, SPOT_R, coneH, 64, 1, true), coneMat);
+        cone.position.set(0, BLOCK[1].h + coneH / 2, 0.18); world.add(cone);
+
+        // ---------- blocks: glossy ink-navy rounded extrusions standing on the ground (no clipping, no opacity: they grow out of the floor) ----------
+        function rrect(w, h, r) { const s = new THREE.Shape(), x = -w / 2, y = 0;
+          s.moveTo(x + r, y); s.lineTo(x + w - r, y); s.quadraticCurveTo(x + w, y, x + w, y + r); s.lineTo(x + w, y + h - r);
+          s.quadraticCurveTo(x + w, y + h, x + w - r, y + h); s.lineTo(x + r, y + h); s.quadraticCurveTo(x, y + h, x, y + h - r);
+          s.lineTo(x, y + r); s.quadraticCurveTo(x, y, x + r, y); return s; }
+        function blockGeo(w, h) { const d = BD - 2 * BEV;
+          const g = new THREE.ExtrudeGeometry(rrect(w - 2 * BEV, h - 2 * BEV, 0.05), { depth: d, bevelEnabled: true, bevelThickness: BEV, bevelSize: BEV, bevelSegments: 8, curveSegments: 8 });
+          g.translate(0, BEV, -d / 2); g.computeVertexNormals(); return g; }   // origin at the bottom centre: scaling grows it off the floor
+
+        // numerals: parse the outline, extrude 0.12 deep with a small bevel that catches the light
+        function glyphShapes(d) {
+          const sp = new THREE.ShapePath(); let cx = 0, cy = 0;
+          const re = /([MLQCZ])([^MLQCZ]*)/g; let m;
+          while ((m = re.exec(d))) {
+            const n = m[2].trim() ? m[2].trim().split(/[\s,]+/).map((v) => +v / 1000) : [];
+            for (let i = 1; i < n.length; i += 2) n[i] = -n[i];   // y down → y up
+            if (m[1] === "M") { sp.moveTo(n[0], n[1]); cx = n[0]; cy = n[1]; }
+            else if (m[1] === "L") { if (Math.abs(n[0] - cx) + Math.abs(n[1] - cy) > 1e-6) sp.lineTo(n[0], n[1]); cx = n[0]; cy = n[1]; }
+            else if (m[1] === "Q") { sp.quadraticCurveTo(n[0], n[1], n[2], n[3]); cx = n[2]; cy = n[3]; }
+            else if (m[1] === "C") { sp.bezierCurveTo(n[0], n[1], n[2], n[3], n[4], n[5]); cx = n[4]; cy = n[5]; }
+          }
+          return sp.toShapes(false);
+        }
+        function numeralGeo(ch, height, depth) {
+          const shapes = glyphShapes(GLYPH[ch]);
+          const bt = depth > 0.08 ? 0.014 : 0.01;
+          let g = new THREE.ExtrudeGeometry(shapes, { depth: depth - 2 * bt, bevelEnabled: true, bevelThickness: bt, bevelSize: 0.008, bevelSegments: 4, curveSegments: 10 });
+          g.computeBoundingBox(); let b = g.boundingBox;
+          const s = height / (b.max.y - b.min.y);
+          g.scale(s, s, 1); g.computeBoundingBox(); b = g.boundingBox;
+          g.translate(-(b.min.x + b.max.x) / 2, -(b.min.y + b.max.y) / 2, -b.min.z);
+          g.computeBoundingBox(); g.computeVertexNormals(); return g;
+        }
+        // the winner's numeral face: the Leonida sweep (#365ECE → #A341C0 → #F84FA4 → #FE8E4E) + one light sweep on the slam.
+        // Opaque: nothing in the 3D scene is ever drawn see-through (entrances/exits are geometric, not opacity fades).
+        const faceMat1 = new THREE.ShaderMaterial({
+          uniforms: { uBox: { value: new THREE.Vector4(0, 0, 1, 1) }, uSweep: { value: -1 }, uBloom: { value: 0 } },
+          vertexShader: "varying vec2 vP;\nvoid main(){ vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
+          fragmentShader: "uniform vec4 uBox; uniform float uSweep; uniform float uBloom; varying vec2 vP;\n" +
+            "vec3 ramp(float t){ vec3 a=vec3(0.212,0.369,0.808), b=vec3(0.639,0.255,0.753), c=vec3(0.973,0.310,0.643), d=vec3(0.996,0.557,0.306);\n" +
+            " if(t<0.34) return mix(a,b,t/0.34); if(t<0.66) return mix(b,c,(t-0.34)/0.32); return mix(c,d,(t-0.66)/0.34); }\n" +
+            "void main(){\n" +
+            " vec2 uv = (vP - uBox.xy) / uBox.zw;\n" +
+            " float t = clamp(0.5 + dot(uv - 0.5, vec2(0.342, -0.940)) * 0.78, 0.0, 1.0);\n" +
+            " vec3 col = ramp(t);\n" +
+            " float q = uv.x * 0.45 + (1.0 - uv.y) * 0.55;\n" +
+            " col += vec3(0.09) * smoothstep(0.14, 0.0, abs(q - 0.12));\n" +
+            " col = mix(col, vec3(1.0, 0.97, 0.94), 0.82 * smoothstep(0.12, 0.0, abs(q - uSweep)));\n" +
+            " col = mix(col, vec3(1.0, 0.95, 0.9), 0.38 * uBloom) + 0.1 * uBloom;\n" +   // v1: the beam lands (0.3 s bloom)
+            " gl_FragColor = vec4(col, 1.0);\n}"
+        });
+        const sideMat1 = new THREE.MeshPhysicalMaterial({ color: 0xC2397F, roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.1, envMapIntensity: 1.0 });
+
+        // a soft studio reflection on each glossy front face (top-lit gradient + one diagonal streak), additive, neutral
+        const glossTex = canvasTex(256, 512, (g, w, h) => { g.fillStyle = "#000"; g.fillRect(0, 0, w, h);
+          let gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, "rgb(70,72,88)"); gr.addColorStop(.08, "rgb(34,35,46)"); gr.addColorStop(.42, "rgb(8,8,12)"); gr.addColorStop(1, "rgb(0,0,0)");
+          g.fillStyle = gr; g.fillRect(0, 0, w, h);
+          g.globalCompositeOperation = "lighter"; g.filter = "blur(14px)";
+          g.fillStyle = "rgb(26,24,34)"; g.beginPath(); g.moveTo(w * .1, 0); g.lineTo(w * .42, 0); g.lineTo(w * .02, h * .9); g.lineTo(-w * .3, h * .9); g.closePath(); g.fill(); });
+        // card contact shadow on the step top: a soft dark band under each card's base (black .55, ~14 px blur, 90% of the card width)
+        const seatTex = canvasTex(256, 64, (g, w, h) => { g.filter = "blur(7px)"; g.fillStyle = "#000"; g.fillRect(16, 20, w - 32, h - 40); });
+        const blocks = {}, nums = {}, contacts = {}, mats = {}, gloss = {}, seats = {};
+        const FACE_LIFT = 0.1, TOP_HI = 0.55;   // "2"/"3": face emissive lift, top-edge highlight strength (linear, before tone mapping)
+        [1, 2, 3].forEach((r) => {
+          const B = BLOCK[r];
+          // glossy ink-navy, fully opaque at all times (the rise/exit is geometric: the step grows out of / sinks into the floor)
+          const bm = new THREE.MeshPhysicalMaterial({ color: 0x1F202B, roughness: 0.35, metalness: 0, clearcoat: 0.6, clearcoatRoughness: 0.2,
+            envMapIntensity: 1.0 });
+          const m = new THREE.Mesh(blockGeo(B.w, B.h), bm); m.castShadow = true;
+          m.position.set(B.x, 0, 0); world.add(m); blocks[r] = m;
+          const gm = new THREE.Mesh(new THREE.PlaneGeometry(B.w - 2 * BEV, B.h - 2 * BEV),
+            addGlow(new THREE.MeshBasicMaterial({ map: glossTex, color: 0xffffff })));
+          gm.position.set(0, B.h / 2, BD / 2 + 0.002); m.add(gm); gloss[r] = gm;
+          const ng = numeralGeo(String(r), NUMH[r], NUMD[r]);
+          let nm, face = null, wall = null;
+          if (r === 1) {
+            const bb = ng.boundingBox; faceMat1.uniforms.uBox.value.set(bb.min.x, bb.min.y, bb.max.x - bb.min.x, bb.max.y - bb.min.y);
+            nm = [faceMat1, sideMat1];
+          } else {
+            // "2"/"3": clean white faces (a little emissive lift so they read white, not flat grey); walls in the step's own
+            // ink-navy, except the top-facing walls and bevel, which catch a soft white highlight so the numeral reads extruded
+            face = new THREE.MeshPhysicalMaterial({ color: 0xEBEBEE, roughness: 0.3, clearcoat: 0.7, clearcoatRoughness: 0.15, envMapIntensity: 0.8,
+              emissive: 0xffffff, emissiveIntensity: FACE_LIFT });
+            wall = new THREE.MeshPhysicalMaterial({ color: 0x1F202B, roughness: 0.35, metalness: 0, clearcoat: 0.6, clearcoatRoughness: 0.2, envMapIntensity: 1.0 });
+            const hi = { value: TOP_HI };
+            wall.onBeforeCompile = (sh) => {
+              sh.uniforms.uTopHi = hi;
+              sh.fragmentShader = "uniform float uTopHi;\n" + sh.fragmentShader.replace("#include <tonemapping_fragment>",
+                "gl_FragColor.rgb += vec3(uTopHi) * smoothstep(0.35, 0.85, normal.y);\n#include <tonemapping_fragment>");
+            };
+            wall.customProgramCacheKey = () => "numeral-top-highlight";
+            wall.userData.hi = hi;
+            nm = [face, wall];
+          }
+          const n = new THREE.Mesh(ng, nm); n.castShadow = true;
+          n.position.set(0, B.h * 0.5 + (r === 1 ? 0.01 : 0), BD / 2 - 0.004); m.add(n); nums[r] = n;   // centred on the step face
+          mats[r] = { block: bm, face, wall };
+          const ct = new THREE.Mesh(new THREE.PlaneGeometry(B.w * 1.12, BD * 1.16), new THREE.MeshBasicMaterial(flat({ map: contactTex, opacity: 0 })));
+          ct.rotation.x = -Math.PI / 2; ct.position.set(B.x, 0.001, 0); world.add(ct); contacts[r] = ct;
+          const st = new THREE.Mesh(new THREE.PlaneGeometry(CARD[r].w * 0.9 * 256 / 224, 0.18), new THREE.MeshBasicMaterial(flat({ map: seatTex, opacity: 0 })));
+          st.rotation.x = -Math.PI / 2; st.position.set(0, B.h + 0.002, ZC + 0.01); m.add(st); seats[r] = st;
+        });
+
+        // #1 only: a thin emissive sunset rim on its front-top edge (#F84FA4 → #FE8E4E → #FEB747), like the glow edge of Rockstar's VI.
+        // It sits on the bevel just under the winner's card and ignites on the slam. Additive, so bg "none" stays transparent.
+        const rimMat = addGlow(new THREE.ShaderMaterial({
+          uniforms: { uGlow: { value: 0 } },
+          vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
+          fragmentShader: "uniform float uGlow; varying vec2 vUv;\n" +
+            "vec3 ramp(float t){ vec3 a=vec3(0.973,0.310,0.643), b=vec3(0.996,0.557,0.306), c=vec3(0.996,0.718,0.278); return t < 0.5 ? mix(a, b, t * 2.0) : mix(b, c, (t - 0.5) * 2.0); }\n" +
+            "void main(){ float ends = smoothstep(0.0, 0.1, vUv.x) * smoothstep(1.0, 0.9, vUv.x);\n" +
+            " float core = exp(-pow((vUv.y - 0.5) / 0.08, 2.0)); float halo = exp(-pow((vUv.y - 0.5) / 0.3, 2.0));\n" +
+            " gl_FragColor = vec4(ramp(vUv.x) * (core * 0.9 + halo * 0.25) * ends * uGlow, 1.0); }"
+        }));
+        const rimGlow = new THREE.Mesh(new THREE.PlaneGeometry(W1 - 2 * BEV - 0.04, 0.08), rimMat);
+        const RB = BEV + 0.004, R45 = Math.SQRT1_2;
+        rimGlow.rotation.x = -Math.PI / 4;   // faces along the bevel's 45deg normal
+        rimGlow.position.set(0, BLOCK[1].h - BEV + RB * R45, BD / 2 - BEV + RB * R45);
+        blocks[1].add(rimGlow);
+
+        // ---------- projective pinning of DOM to 3D quads ----------
+        const pv = new THREE.Vector3();
+        function proj(x, y, z) { pv.set(x + GX, y, z).project(camera); return [(pv.x + 1) * 0.5 * W, (1 - pv.y) * 0.5 * H]; }
+        function adj(m) { return [m[4]*m[8]-m[5]*m[7], m[2]*m[7]-m[1]*m[8], m[1]*m[5]-m[2]*m[4], m[5]*m[6]-m[3]*m[8], m[0]*m[8]-m[2]*m[6], m[2]*m[3]-m[0]*m[5], m[3]*m[7]-m[4]*m[6], m[1]*m[6]-m[0]*m[7], m[0]*m[4]-m[1]*m[3]]; }
+        function mulmm(a, b) { const c = new Array(9); for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) { let s = 0; for (let k = 0; k < 3; k++) s += a[3*i+k] * b[3*k+j]; c[3*i+j] = s; } return c; }
+        function mulmv(m, v) { return [m[0]*v[0]+m[1]*v[1]+m[2]*v[2], m[3]*v[0]+m[4]*v[1]+m[5]*v[2], m[6]*v[0]+m[7]*v[1]+m[8]*v[2]]; }
+        function basis(p) { const m = [p[0], p[2], p[4], p[1], p[3], p[5], 1, 1, 1]; const v = mulmv(adj(m), [p[6], p[7], 1]); return mulmm(m, [v[0], 0, 0, 0, v[1], 0, 0, 0, v[2]]); }
+        function pin(el, w, h, tl, tr, bl, br) {
+          const s = basis([0, 0, w, 0, 0, h, w, h]), d = basis([tl[0], tl[1], tr[0], tr[1], bl[0], bl[1], br[0], br[1]]);
+          const t = mulmm(d, adj(s)); for (let i = 0; i < 9; i++) t[i] /= t[8];
+          el.style.transform = "matrix3d(" + [t[0], t[3], 0, t[6], t[1], t[4], 0, t[7], 0, 0, 1, 0, t[2], t[5], 0, t[8]].map((n) => n.toFixed(6)).join(",") + ")";
+        }
+
+        // ---------- time → state ----------
+        const E = { expo: gsap.parseEase("expo.out"), p3o: gsap.parseEase("power3.out"), p3i: gsap.parseEase("power3.in"), p2io: gsap.parseEase("power2.inOut"),
+                    p3io: gsap.parseEase("power3.inOut"), p2i: gsap.parseEase("power2.in"), p2o: gsap.parseEase("power2.out"), sio: gsap.parseEase("sine.inOut") };
+        const cl = (v) => Math.max(0, Math.min(1, v));
+        const prog = (t, a, d) => cl((t - a) / d);
+        const lerp = (a, b, k) => a + (b - a) * k;
+        const lerp3 = (a, b, k) => [lerp(a[0], b[0], k), lerp(a[1], b[1], k), lerp(a[2], b[2], k)];
+
+        // camera keys: [position, look-at] (scene space; the podium itself is offset by GX).
+        // "Podium": the build plays on a three-quarter wide (podium ~68% of the width); on the slam the camera pushes in
+        // ~1.17x (expo.out, 1.2 s) and swings square onto the winner, ending with every card just inside x 72–936.
+        // "Winner spotlight": keeps the round-3 framing (a touch wider, so the beam has room above #1); its payoff is light.
+        const CAM = {
+          open:     [[1.3, 3.8, 15.5],    [0, 1.84, 0]],  // "Podium" build: a slight three-quarter from the right
+          set:      [[0, 3.15, 13.5],     [0, 1.85, 0]],  // "Podium" after the push: square on #1
+          setEnd:   [[-0.1, 3.12, 13.42], [0, 1.86, 0]],  // the hold keeps settling, a touch closer
+          openSpot: [[1.2, 3.6, 14.5],    [0, 1.8, 0]],
+          spot:     [[0, 3.3, 14.15],     [0, 1.78, 0]],
+          spotEnd:  [[0.25, 3.26, 14.0],  [0, 1.8, 0]]
+        };
+        const SETTLE = SPOT ? T.spotlight : T.slam;
+        const MOVE = SPOT ? 1.1 : T.push;
+        const CAM_HOLD = SETTLE + MOVE;
+        function cameraAt(t, still) {
+          const O = SPOT ? CAM.openSpot : CAM.open, A = SPOT ? CAM.spot : CAM.set, B = SPOT ? CAM.spotEnd : CAM.setEnd;
+          const k0 = (SPOT ? 0.35 : 0.12) * E.sio(prog(t, 0, SETTLE));   // a slow drift while the places rise
+          let pos = lerp3(O[0], A[0], k0), look = lerp3(O[1], A[1], k0);
+          const k1 = SPOT ? E.p3io(prog(t, SETTLE, MOVE)) : E.expo(prog(t, SETTLE, MOVE));   // then it settles on the winner
+          pos = lerp3(pos, A[0], k1); look = lerp3(look, A[1], k1);
+          const kh = E.sio(prog(t, CAM_HOLD, T.end - CAM_HOLD));
+          for (let i = 0; i < 3; i++) { pos[i] += (B[0][i] - A[0][i]) * kh; look[i] += (B[1][i] - A[1][i]) * kh; }
+          if (!still) {   // the slam: a 4-frame camera kick, about 6 px
+            const ks = prog(t, T.slam, 0.14);
+            if (ks > 0 && ks < 1) pos[1] += 0.03 * (1 - ks) * Math.cos(ks * Math.PI * 3);
+          }
+          camera.position.set(pos[0], pos[1], pos[2]);
+          camera.lookAt(look[0], look[1], look[2]);
+          camera.updateMatrixWorld(); camera.updateProjectionMatrix();
+        }
+
+        // card quad corners for place r standing on a step whose top is at `top`, hinged back by `tilt`
+        function cardQuad(r, top, tilt, lift) {
+          const B = BLOCK[r], C = CARD[r];
+          const yb = top + 0.012 + lift, x0 = B.x - C.w / 2, x1 = B.x + C.w / 2;
+          const yt = yb + C.h * Math.cos(tilt), zt = ZC - C.h * Math.sin(tilt);
+          return [proj(x0, yt, zt), proj(x1, yt, zt), proj(x0, yb, ZC), proj(x1, yb, ZC)];
+        }
+
+        // ---------- size the cards' type from the settled framing: three sizes on screen (title 108 / names / small) ----------
+        const cards = {}, K = {}, vids = {};
+        function layoutCards() {
+          cameraAt(CAM_HOLD + 0.9, true);
+          [1, 2, 3].forEach((r) => {
+            const c = $("#card" + r), C = CARD[r], wD = C.w * DOMPX, hD = C.h * DOMPX;
+            c.style.width = wD + "px"; c.style.height = hD + "px";
+            const q = cardQuad(r, BLOCK[r].h, CARD_TILT, 0);
+            const k = (Math.hypot(q[1][0] - q[0][0], q[1][1] - q[0][1]) + Math.hypot(q[3][0] - q[2][0], q[3][1] - q[2][1])) / 2 / wD;
+            K[r] = k; cards[r] = c;
+            vids[r] = [...c.querySelectorAll("video")].find((v) => v.getAttribute("src") === V.entries[r - 1].clip.src);
+            const px = (v) => (v / k).toFixed(2) + "px";
+            c.style.borderRadius = px(TY.radius);
+            const lab = c.querySelector(".lab"), name = c.querySelector(".name"), meta = c.querySelector(".meta");
+            lab.style.left = px(24); lab.style.right = px(24); lab.style.bottom = px(24);
+            name.style.fontSize = px(TY.name);
+            meta.style.fontSize = px(TY.small); meta.style.marginTop = px(10);
+            const chip = c.querySelector(".chip");
+            chip.style.fontSize = px(TY.small); chip.style.padding = px(9) + " " + px(18) + " " + px(10);
+            chip.style.top = px(18);
+            // the chip is centred on the card and shrinks (never below 26 px on screen) until it fits with an 18 px margin
+            let cs = TY.small;
+            while (cs > 26 && chip.offsetWidth > c.clientWidth - 36 / k) { cs -= 1; chip.style.fontSize = px(cs); }
+            chip.style.left = ((c.clientWidth - chip.offsetWidth) / 2).toFixed(2) + "px";
+            // fit the name to at most two lines (never below 44 px on screen), and the meta to one line
+            let fs = TY.name; name.style.fontSize = px(fs);
+            while (fs > 44 && (name.scrollHeight > (fs / k) * 0.9 * 2 + 4 || name.scrollWidth > name.clientWidth + 1)) { fs -= 2; name.style.fontSize = px(fs); }
+            let ms = TY.small;
+            if (V.entries[r - 1].count != null) meta.textContent = V.entries[r - 1].count.toFixed(1) + V.entries[r - 1].unit;
+            while (ms > 28 && meta.scrollWidth > lab.clientWidth + 1) { ms -= 1; meta.style.fontSize = px(ms); }
+          });
+        }
+
+        function renderAt(t) {
+          cameraAt(t);
+          const outK = 1 - E.p2i(prog(t, T.out, T.end - T.out - 0.05));
+          const spotK = SPOT ? E.p2io(prog(t, T.spotlight, 0.5)) : 0;
+
+          // lights: in the spotlight variant the house lights are low from the start and dip a little more when the beam fires
+          key.intensity = SPOT ? lerp(1.7, 1.2, spotK) : 2.4;
+          rimL.intensity = rimR.intensity = SPOT ? RIM * lerp(0.85, 0.65, spotK) : RIM;
+          spot.intensity = 9.0 * spotK;
+          // the beam goes first: it is gone (5.45 → 5.65 s) before the cards start fading at T.out, so it never stands alone as a column
+          const beamK = 1 - E.p2o(prog(t, T.out - 0.15, 0.2));
+          coneMat.uniforms.uOpacity.value = 0.22 * spotK * beamK;
+          pool.material.color.setScalar(0.6 * spotK * beamK);
+          cone.visible = pool.visible = spotK > 0.001;
+          // house lights: 0.42 on the first AND the last frame (only the beam's extra 0.14 fades out), so the loop never flashes
+          $("#dim").style.opacity = SPOT ? (0.42 + 0.14 * spotK * outK).toFixed(3) : "0";
+          ground.material.opacity = cl(prog(t, T.rise[3] - 0.2, 0.4)) * outK;
+
+          // exit: the cards fold back onto their steps and fade first, then the steps sink into the floor (#3, #2, then #1)
+          const cardOut = E.p2i(prog(t, T.out, 0.18));
+          const SY = {};
+          [3, 2, 1].forEach((r) => {
+            const B = BLOCK[r], t0 = T.rise[r], dur = r === 1 ? T.riseDur1 : T.riseDur;
+            // rise: the step grows straight up out of the floor (height 0 → 1, power3.out). It is fully opaque the whole time
+            // and never passes below the floor, so nothing is see-through and nothing is sliced.
+            const up = E.p3o(prog(t, t0, dur));
+            const down = E.p3i(prog(t, T.out + 0.04 + (3 - r) * 0.03, 0.24));
+            const sy = up * (1 - down); SY[r] = sy;
+            blocks[r].visible = sy > 0.004;
+            blocks[r].scale.set(1, Math.max(sy, 0.004), 1);
+            // the numeral rides its step at true proportions and is never taller than 80% of the visible step
+            const sn = Math.min(1, sy * B.h * NUMCAP / NUMH[r]);
+            const slam = r === 1 && t >= T.slam ? lerp(1.15, 1, E.p2o(prog(t, T.slam, 3 / 30))) : 1;   // the "1" slam: 1.15 → 1 in 3 frames
+            const ns = sn * slam;
+            nums[r].visible = sn > 0.02;
+            nums[r].scale.set(ns, ns / Math.max(sy, 0.004), ns);
+            const env = SPOT && r !== 1 ? lerp(0.85, 0.6, spotK) : 1;
+            mats[r].block.envMapIntensity = env;
+            if (mats[r].face) {
+              mats[r].face.envMapIntensity = 0.8 * env; mats[r].face.emissiveIntensity = FACE_LIFT * env;
+              mats[r].wall.envMapIntensity = env; mats[r].wall.userData.hi.value = TOP_HI * env;
+            }
+            gloss[r].material.color.setScalar(env);
+            contacts[r].material.opacity = 0.6 * cl(sy * 1.6);
+
+            // clip card hinges up from the top face once the step is nearly up
+            const cs = t0 + dur * 0.45;
+            const ck = E.expo(prog(t, cs, 0.5));
+            const c = cards[r];
+            const q = cardQuad(r, B.h * sy, lerp(lerp(1.35, CARD_TILT, ck), 1.35, cardOut), 0.05 * (1 - ck));
+            pin(c, CARD[r].w * DOMPX, CARD[r].h * DOMPX, q[0], q[1], q[2], q[3]);
+            const cardOp = cl(prog(t, cs, 0.15)) * (1 - cardOut);
+            c.style.opacity = cardOp.toFixed(3);
+            seats[r].material.opacity = 0.55 * cl(prog(t, cs + 0.1, 0.25)) * (1 - cardOut);   // the card's contact shadow on the step top
+            // runners-up under the spotlight: the footage drops into shadow (saturate .65, brightness .8, plus a dark dimmer
+            // of 0.25, then 0.35 once the chip lands) instead of a milky veil; the name and number stay
+            const dimK = SPOT && r !== 1 ? spotK : 0;
+            const dimMore = SPOT && r !== 1 ? E.p2io(prog(t, T.dimMore, 0.4)) : 0;
+            c.querySelector(".dimmer").style.opacity = (0.25 * dimK + 0.1 * dimMore).toFixed(3);
+            if (SPOT && r !== 1) vids[r].style.filter = dimK > 0 ? "saturate(" + (1 - 0.35 * dimK).toFixed(3) + ") brightness(" + (1 - 0.2 * dimK).toFixed(3) + ")" : "none";
+            const lk = E.p3o(prog(t, cs + 0.2, 0.35));
+            const lab = c.querySelector(".lab");
+            lab.style.opacity = (lk * (1 - 0.12 * dimK)).toFixed(3); lab.style.transform = "translateY(" + ((1 - lk) * 22).toFixed(2) + "px)";
+            const En = V.entries[r - 1];
+            if (En.count != null) {
+              const rk2 = E.p2o(prog(t, cs + 0.2, r === 1 ? 1.5 : 0.7));
+              c.querySelector(".meta").textContent = (En.count * rk2).toFixed(1) + En.unit;
+            }
+          });
+
+          // the slam: one sunset sweep crosses the "1", and the winner's sunset rim ignites (and goes out as its step sinks)
+          faceMat1.uniforms.uSweep.value = lerp(-0.25, 1.3, E.p2io(prog(t, T.slam + 0.02, 0.5)));
+          rimMat.uniforms.uGlow.value = E.expo(prog(t, T.slam, 0.4)) * cl(SY[1] * 1.5 - 0.5);
+          // spotlight variant: the beam lands with a 0.3 s bloom on the "1"
+          faceMat1.uniforms.uBloom.value = SPOT ? Math.sin(Math.PI * prog(t, T.spotlight + 0.3, 0.3)) : 0;
+
+          // the beam lands on the top of #1's card (spotlight variant)
+          if (SPOT) cards[1].querySelector(".kiss").style.opacity = spotK.toFixed(3);
+
+          // #1 card sheen once the camera has settled
+          const shk = E.p2io(prog(t, CAM_HOLD + 0.15, 0.7));
+          cards[1].querySelector(".sheen").style.left = lerp(-60, 125, shk).toFixed(2) + "%";
+
+          // record chip on #1 (spotlight variant)
+          if (V.entries[0].chip) {
+            const chk = E.p3o(prog(t, T.spotlight + 0.9, 0.35));
+            const chip = cards[1].querySelector(".chip");
+            chip.style.opacity = chk.toFixed(3); chip.style.transform = "translateY(" + ((1 - chk) * -12).toFixed(2) + "px)";
+          }
+
+          renderer.render(scene, camera);
+        }
+
+        document.fonts.ready.then(() => {
+          layoutCards();
+          const tl = gsap.timeline({ paused: true });
+          tl.fromTo("#kicker", { y: 18, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4, ease: "power3.out" }, T.titleIn);
+          tl.fromTo("#head", { y: 34, opacity: 0 }, { y: 0, opacity: 1, duration: 0.45, ease: "expo.out" }, T.titleIn + 0.1);
+          tl.to("#ov", { opacity: 0, duration: 0.35, ease: "power2.in" }, T.out);
+          // the 3D scene + pinned DOM: one proxy whose setter renders the frame for the timeline's time (seek-safe)
+          const clock = { _t: 0 };
+          Object.defineProperty(clock, "t", { get() { return this._t; }, set(v) { this._t = v; renderAt(v); } });
+          tl.fromTo(clock, { t: 0 }, { t: T.end, duration: T.end, ease: "none", immediateRender: true }, 0);
+          tl.set({}, {}, T.end);
+          window.addEventListener("hf-seek", (e) => { if (e && e.detail && typeof e.detail.time === "number") renderAt(e.detail.time); });
+          window.__timelines = window.__timelines || {};
+          window.__timelines["main"] = tl;
+          tl.seek(0);
+          renderAt(0);
+        });
+      })();
+    </script>
+  </body>
+</html>

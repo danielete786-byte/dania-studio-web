@@ -1,0 +1,535 @@
+<!doctype html>
+<!-- #39 Headline card — GTA 6 component library. 1080x1920 (9:16), 30 fps, 7 s.
+     A real reported headline set as a press clipping, with one phrase swept in the Leonida sunset marker.
+     Variables: variant "0" Single card / "1" Stack of three; bg "plate" (sample footage + vignette stage) / "none" (transparent overlay).
+     Safe zone: all text and cards inside x 72–936, y 230–1480 (including the tilt and the hold push). All content lives in CONFIG below. -->
+<html lang="en" data-composition-variables='[
+  {"id":"variant","type":"enum","label":"Variant","default":"0","options":[{"value":"0","label":"Single card"},{"value":"1","label":"Stack of three"}]},
+  {"id":"bg","type":"enum","label":"Background","default":"plate","options":[{"value":"plate","label":"Sample footage"},{"value":"none","label":"Transparent"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link rel="stylesheet" href="assets/fonts/fonts.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: transparent; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; font-family: "Inter", sans-serif;
+        -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; font-feature-settings: "tnum" 1, "ss01" 1; }
+      .plate { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      #ov { position: absolute; inset: 0; }
+      :root {
+        --ink: #0B0B0E; --paper: #FAF9F6; --muted: #6A6A75; --body: #4A4A55;
+        --sunset: linear-gradient(90deg, #F84FA4 0%, #FE8E4E 55%, #FEB747 100%);
+      }
+
+      /* stage (bg:"plate" only): a radial vignette so the card sits on a stage, not on busy footage */
+      #vig { position: absolute; inset: 0; pointer-events: none;
+        background: radial-gradient(ellipse 75% 50% at 50% 38%, rgba(0,0,0,.06) 42%, rgba(0,0,0,.6) 100%); }
+
+      /* ---------- card shell: 832 wide at x 88 (centre x 504, the safe zone's centre) ---------- */
+      .card { position: absolute; left: 88px; width: 832px; will-change: transform, opacity; }
+
+      /* v0: a lifted paper clipping. Warm paper, radius 20, sharp contact shadow + mid lift + large soft shadow */
+      .card.paper { background: var(--paper); color: var(--ink); border-radius: 20px;
+        box-shadow: 0 2px 3px rgba(0,0,0,.35), 0 18px 34px -14px rgba(0,0,0,.45), 0 60px 120px -40px rgba(0,0,0,.75), inset 0 0 0 1px rgba(0,0,0,.06); }
+      /* v1: ink-navy glass. Opaque enough to hold its edge on dark plates, hairline .22 + 1 px top highlight .28,
+         plus a contact shadow and an unclipped 48 px drop that darkens the gaps, so stacked cards separate on dark footage */
+      .card.glass { background: rgba(31,32,43,.84); color: #fff; border-radius: 28px;
+        -webkit-backdrop-filter: blur(20px) saturate(1.4); backdrop-filter: blur(20px) saturate(1.4);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.28), inset 0 0 0 1px rgba(255,255,255,.22), 0 2px 4px rgba(0,0,0,.35), 0 18px 48px rgba(0,0,0,.45); }
+
+      /* meta row (publication-neutral: section tag · source type · date, no outlet names or logos) */
+      .meta { display: flex; align-items: center; flex-wrap: nowrap; white-space: nowrap; font-weight: 600; line-height: 1; letter-spacing: -0.005em; font-variant-numeric: tabular-nums; }
+      .meta .sep { opacity: .55; padding: 0 .38em; }
+      .chip { font-weight: 700; letter-spacing: 0.12em; padding: 9px 12px 8px 14px; border-radius: 6px; margin-right: 18px; }
+      .paper .meta { font-size: 28px; color: var(--muted); }
+      .paper .chip { background: var(--ink); color: #fff; }
+      .glass .meta { font-size: 26px; color: rgba(255,255,255,.62); }
+
+      /* headline: words are laid out by the browser, then regrouped into masked lines */
+      /* --mt / --mh: the marker's top and height in em of the headline size (set per layout below) */
+      /* proportional figures in the headline (tabular "1" carries wide side bearings, which made the marker look unevenly padded) */
+      .hed { position: relative; font-weight: 800; letter-spacing: -0.035em; --mt: 0.11em; --mh: 0.86em; font-feature-settings: "ss01" 1; }
+      .hed .keep { white-space: nowrap; }
+      .hed .line { position: relative; overflow: hidden; padding: 0.08em 0.12em 0.16em; margin: -0.08em -0.12em -0.16em; }
+      .hed .line-in { position: relative; white-space: nowrap; will-change: transform; }
+      .hed .w { position: relative; z-index: 1; display: inline-block; }
+      /* the marker sits ABOVE the words and carries its own ink copy of the line, clipped to the marker box.
+         It is revealed with a clip-path, so the ink appears exactly at the marker's edge (no white-on-gradient frames),
+         and on the stack it is wiped off the same way, so the words return to white with no blended state. */
+      .hed .mark { position: absolute; z-index: 2; top: var(--mt); height: var(--mh); border-radius: 0.12em; overflow: hidden; }
+      .hed .mark .grad { position: absolute; inset: 0; background-image: var(--sunset); background-repeat: no-repeat; }
+      .hed .mark .ink { position: absolute; top: calc(-1 * var(--mt)); white-space: nowrap; }
+      .hed .mark .ink .w { color: transparent; }
+      .hed .mark .ink .w.hl { color: var(--ink); }
+
+      /* dek (single card): one factual line under the headline, like an article standfirst (auto-shrinks to stay on one line) */
+      .dek { font-size: 28px; line-height: 1.3; font-weight: 500; letter-spacing: -0.012em; color: var(--body); white-space: nowrap; }
+
+      /* lead image (single card): 2:1 still (or a one-shot clip), radius 10, filled from CONFIG */
+      .thumb { position: relative; width: 100%; aspect-ratio: 2 / 1; border-radius: 10px; overflow: hidden; background: #15151a; isolation: isolate; transform: translateZ(0); }
+      .thumb-in { position: absolute; inset: 0; will-change: transform; }
+      .thumb-in video, .thumb-in img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+      .thumb::after { content: ""; position: absolute; inset: 0; border-radius: 10px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.10); pointer-events: none; z-index: 2; }
+      .credit { font-size: 28px; line-height: 1; font-weight: 500; color: var(--muted); letter-spacing: -0.005em; }
+
+      #single, #stack { position: absolute; inset: 0; }
+      /* ---------- variant 0: single clipping (headline → meta → dek → lead image → credit, as an article runs) ---------- */
+      /* The paper is a separate .sheet behind the content, so it can grow with its content on entrance and keep its shadow:
+         the sheet's height is --rv, and the content (.body) is masked with a 20 px feather that ends 10 px above the sheet's edge,
+         so rows fade in as the edge passes (no hard slice through a line of text) and no blank paper shows.
+         At full height the feather sits inside the 36 px bottom padding, so nothing visible is masked. */
+      #single .card.paper { background: none; box-shadow: none; --rv: 100%; }
+      #single .sheet { position: absolute; left: 0; top: 0; width: 100%; height: var(--rv); background: var(--paper); border-radius: 20px;
+        box-shadow: 0 2px 3px rgba(0,0,0,.35), 0 18px 34px -14px rgba(0,0,0,.45), 0 60px 120px -40px rgba(0,0,0,.75), inset 0 0 0 1px rgba(0,0,0,.06); }
+      #single .body { position: relative; z-index: 1; padding: 40px 40px 36px;
+        -webkit-mask-image: linear-gradient(to bottom, #000 calc(var(--rv) - 30px), transparent calc(var(--rv) - 10px));
+        mask-image: linear-gradient(to bottom, #000 calc(var(--rv) - 30px), transparent calc(var(--rv) - 10px)); }
+      #single .hed { font-size: 76px; line-height: 1.04; }
+      #single .meta { margin-top: 26px; }
+      #single .dek { margin-top: 20px; }
+      #single .thumb { margin-top: 28px; }
+      #single .credit { margin-top: 16px; }
+
+      /* ---------- variant 1: stack of three (meta → headline) under a paper section tag ---------- */
+      #stack .card { padding: 32px 40px 38px; border-radius: 28px; }
+      #stack .card.first { padding-top: 50px; }
+      #stack .meta { font-size: 26px; }
+      /* the stack's marker covers the whole glyph box (ascenders to descenders: Inter b/l top .735em, g/p/y foot .211em),
+         so "biggest" keeps its descenders inside the gradient on any card. Line height 1.16 leaves ~5 px between wrapped markers. */
+      #stack .hed { margin-top: 20px; font-size: 54px; line-height: 1.16; letter-spacing: -0.03em; --mt: 0.153em; --mh: 1.06em; }
+      /* section tag: solid paper on the first card's top edge, so it reads on any footage and never floats loose.
+         It is a sibling of the cards (top set from card 1), so it stays solid when card 1 recedes. */
+      .sect { position: absolute; left: 128px; z-index: 5; background: var(--paper); color: var(--ink);
+        font-weight: 700; font-size: 26px; line-height: 1; letter-spacing: 0.16em; text-transform: uppercase;
+        padding: 11px 12px 10px 16px; border-radius: 6px;
+        box-shadow: 0 2px 3px rgba(0,0,0,.35), 0 10px 22px -8px rgba(0,0,0,.5); }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="7" data-width="1080" data-height="1920">
+      <!-- sample footage: one framework-owned muted video per plate; the script hides all but the one the variant names -->
+      <video id="plateA" class="clip plate" src="assets/plates/p04-driveby-mural-v.mp4" muted playsinline data-start="0" data-duration="7" data-track-index="0"></video>
+      <video id="plateB" class="clip plate" src="assets/plates/p01-keys-sign-v.mp4" muted playsinline data-start="0" data-duration="7" data-track-index="0"></video>
+
+      <!-- vignette stage (shown with bg:"plate" only; the timeline fades it with the card) -->
+      <div id="vig"></div>
+
+      <!-- overlay layer (plain, untimed: the GSAP timeline owns its motion) -->
+      <div id="ov"></div>
+
+      <!-- optional lead-image CLIP for the single card. Unused by default (the sample uses a still, CONFIG thumb.src .jpg).
+           To use a clip: point thumb.src at this src. Pick a single continuous shot: a cut inside the card reads as a montage. -->
+      <video id="thumbA" class="clip thumb-src" src="assets/plates/p05-truck-yard-h.mp4" muted playsinline data-start="0" data-duration="7" data-track-index="2"></video>
+    </div>
+
+    <script>
+      /* =====================================================================
+         CONFIG — every word, date, colour and timing for both variants.
+         Headlines are real, reported headlines (research/gta6/FACTS.md).
+         Cards are publication-neutral: no outlet names, no logos.
+         highlight: an exact substring of headline (whole words) that gets the sunset marker.
+         dek (single card): one factual line under the headline. Paste the article's real dek if you have it;
+           never invent a quote. Set dek: "" to drop it.
+         thumb (single card): { src, credit } — src is a .jpg/.png still (recommended, like a real article photo),
+           or a .mp4 that has a matching <video class="clip thumb-src"> above. thumb: null drops the image.
+         ===================================================================== */
+      const CONFIG = {
+        variants: {
+          "0": {
+            layout: "single",
+            plate: "assets/plates/p04-driveby-mural-v.mp4",
+            top: 270,                       // clipping's top edge (px); the headline sits in the hook zone (y 230–640)
+            tilt: 0,                        // resting angle in degrees (0 = straight; the card lands from 2.5× this angle)
+            vignette: 1,                    // stage vignette peak (bg:"plate"), 0–1
+            maxLines: 3,                    // headline auto-fits (76 px, stepping down) so it never runs past 3 lines
+            keepPhrase: true,               // keep the highlight on one line (one continuous marker); falls back to wrapping if it can't fit
+            card: {
+              tag: "NEWS", source: "Local TV report", date: "Nov 14, 2026",
+              headline: "Survey predicts 1.5M will call out sick for GTA 6 release",
+              highlight: "1.5M will call out sick",
+              dek: "Out Thursday, Nov 19, on PS5 and Xbox Series X|S."   // one line, 28 px like the meta and credit (shrinks to fit)
+            },
+            thumb: { src: "assets/stills/p05-truck-yard.jpg", credit: "Image: official GTA 6 trailer" }
+          },
+          "1": {
+            layout: "stack",
+            plate: "assets/plates/p01-keys-sign-v.mp4",   // daylight sign, marina, teal car: keeps GTA colour behind the stack the whole way
+            label: "The headlines",         // paper section tag on the first card's top edge
+            top: 282,                       // first card's top edge (the tag peaks 23 px above it)
+            gap: 28,
+            maxLines: 3,                    // each headline auto-fits (54 px, stepping down) to at most 3 lines
+            dim: { opacity: 0.72, scale: 1 },     // as each new card lands, the earlier cards' text recedes to this (the glass stays; scale 1 keeps every card on x 88–920)
+            vignette: 0.55,                 // stage vignette peak (bg:"plate"): lighter than the single card's, so the footage keeps its colour behind the stack
+            cards: [                        // three different stories, building to the biggest claim
+              // one rule: the context cards are glass and unlit; only the payoff card is paper and gets the marker
+              { source: "Local TV", date: "Nov 2026",
+                headline: "GTA 6 launch has gamers planning to call out sick and skip work",
+                highlight: "" },
+              { source: "News video", date: "Nov 2026",
+                headline: "Excitement builds ahead of latest Grand Theft Auto release",
+                highlight: "" },
+              { source: "Video report", date: "Nov 2026", paper: true,   // the payoff card: paper + ink, the one bright object
+                headline: "‘Grand Theft Auto VI’ could be biggest entertainment launch ever",
+                highlight: "biggest entertainment launch ever" }
+            ]
+          }
+        },
+        colors: { ink: "#0B0B0E", paper: "#FAF9F6", sunset: ["#F84FA4", "#FE8E4E", "#FEB747"] },
+        // marker: pad = space between the glyph ink and the marker edge, in em, the same on both sides.
+        // gap = the most of a neighbouring word space the marker may cover (share of the ink-to-ink gap), so the space stays visible.
+        // Every line of a wrapped phrase gets the full pink→amber gradient (like box-decoration-break: clone).
+        marker: { pad: 0.08, gap: 0.3 },
+        timing: {
+          in: 0.133,         // first card starts showing (frame 4; on the single card the headline lines start rising at 0)
+          reveal: 0.45,      // single card: the paper grows from headline-only to full height in this long (power3.out)
+          sweep: 0.55,       // single card: marker starts (lands by ~0.9 s)
+          every: 0.75,       // stack: seconds between cards (the payoff lands by ~2.1 s, its sweep done by ~2.5 s)
+          sweepSpeed: 2200,  // highlight marker speed, px per second
+          wipe: 0.24,        // stack: the previous marker wipes off left→right in this many seconds as the next card lands
+          hold: 1.01,        // peak hold push (keeps the clipping and the stack inside x 72–936)
+          out: 6.55,         // exit starts
+          end: 7.0
+        }
+      };
+
+      (function () {
+        const VARS = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+        const vKey = CONFIG.variants[String(VARS.variant)] ? String(VARS.variant) : "0";
+        const showPlate = VARS.bg !== "none";
+        const V = CONFIG.variants[vKey], T = CONFIG.timing, C = CONFIG.colors;
+        const ov = document.getElementById("ov");
+        const vig = document.getElementById("vig");
+        const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
+        const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+
+        const rs = document.documentElement.style;
+        rs.setProperty("--sunset", "linear-gradient(90deg, " + C.sunset[0] + " 0%, " + C.sunset[1] + " 55%, " + C.sunset[2] + " 100%)");
+        rs.setProperty("--ink", C.ink); rs.setProperty("--paper", C.paper);
+        document.querySelectorAll("video.plate").forEach((v) => {
+          if (!showPlate || v.getAttribute("src") !== V.plate) v.style.display = "none";
+        });
+        if (!showPlate) vig.style.display = "none";
+
+        /* ---- meta row: [tag] source · date ---- */
+        function buildMeta(d) {
+          const m = el("div", "meta");
+          if (d.tag) m.appendChild(el("span", "chip", esc(d.tag)));
+          m.appendChild(el("span", "src", esc(d.source)));
+          if (d.date) { m.appendChild(el("span", "sep", "·")); m.appendChild(el("span", "date", esc(d.date))); }
+          return m;
+        }
+        /* ---- headline: words in normal flow, highlighted words tagged .hl ---- */
+        // keep: wrap the highlighted words in a no-wrap span, so the browser breaks before the phrase and the marker is one bar
+        function buildHed(d, keep) {
+          const hed = el("div", "hed");
+          const words = d.headline.split(/\s+/);
+          const hw = d.highlight ? d.highlight.split(/\s+/) : [];
+          let hlStart = -1;
+          for (let i = 0; i + hw.length <= words.length && hw.length; i++) {
+            if (hw.every((w, j) => words[i + j] === w)) { hlStart = i; break; }
+          }
+          const hlEnd = hlStart + hw.length - 1;
+          let parent = hed;
+          words.forEach((w, i) => {
+            const s = el("span", "w", esc(w));
+            const isHl = hlStart >= 0 && i >= hlStart && i <= hlEnd;
+            if (isHl && keep && i === hlStart && hw.length > 1) { parent = el("span", "keep"); hed.appendChild(parent); }
+            if (isHl) {
+              // the marker (with its ink copy) sits on top of these words on purpose
+              s.classList.add("hl"); s.setAttribute("data-layout-allow-occlusion", ""); s.setAttribute("data-layout-allow-overlap", "");
+            }
+            parent.appendChild(s);
+            if (parent !== hed && i === hlEnd) parent = hed;
+            if (i < words.length - 1) parent.appendChild(document.createTextNode(" "));
+          });
+          return hed;
+        }
+
+        /* ---- lead image: a still (img), or move the matching framework-owned <video> into the card ---- */
+        const waits = [];
+        function buildThumb(t) {
+          const vids = Array.from(document.querySelectorAll("video.thumb-src"));
+          if (!t || !t.src) { vids.forEach((v) => (v.style.display = "none")); return null; }
+          const box = el("div", "thumb"), inn = el("div", "thumb-in");
+          inn.setAttribute("data-layout-allow-overflow", "");   // the slow push overflows inside the image mask on purpose
+          box.appendChild(inn);
+          const match = vids.find((v) => v.getAttribute("src") === t.src);
+          vids.forEach((v) => { if (v !== match) v.style.display = "none"; });
+          if (match) inn.appendChild(match);
+          else {
+            const img = el("img"); img.alt = ""; img.decoding = "sync"; img.src = t.src; inn.appendChild(img);
+            waits.push(img.decode ? img.decode().catch(() => {}) : Promise.resolve());
+          }
+          return { box, inn };
+        }
+
+        /* ---- after fonts: step the headline size down until it fits maxLines (measured in the render browser) ---- */
+        //      With a kept phrase, it also steps down (to 90%) until the phrase fits the measure on one line;
+        //      if it still can't, the phrase is released to wrap (the marker then flows across the wrap).
+        function fit(c, maxLines) {
+          const base = parseFloat(getComputedStyle(c.hed).fontSize);
+          const keep = c.hed.querySelector(".keep");
+          const rows = () => new Set(Array.from(c.hed.querySelectorAll(".w")).map((w) => Math.round(w.offsetTop / 4))).size;
+          const over = () => !!keep && keep.style.whiteSpace !== "normal" && keep.offsetWidth > c.hed.clientWidth + 0.5;
+          const bad = () => (maxLines && rows() > maxLines) || over();
+          const shrink = (min) => {
+            let fs = parseFloat(c.hed.style.fontSize) || base;
+            while (bad() && fs - 2 >= min) { fs -= 2; c.hed.style.fontSize = fs + "px"; }
+          };
+          shrink(base * (keep ? 0.9 : 0.8));
+          if (over()) { keep.style.whiteSpace = "normal"; c.hed.style.fontSize = ""; shrink(base * 0.8); }
+          else if (bad()) shrink(base * 0.8);
+        }
+
+        /* ---- after fonts: regroup words into masked lines and build the markers ---- */
+        function lineify(c) {
+          const ws = Array.from(c.hed.querySelectorAll(".w"));
+          const rows = [];
+          ws.forEach((w) => {
+            const top = Math.round(w.offsetTop);
+            let r = rows.find((r) => Math.abs(r.top - top) < 4);
+            if (!r) { r = { top, words: [] }; rows.push(r); }
+            r.words.push(w);
+          });
+          c.hed.innerHTML = "";
+          c.lines = []; c.marks = [];
+          rows.forEach((r) => {
+            const line = el("div", "line"), inn = el("div", "line-in");
+            r.words.forEach((w, i) => { inn.appendChild(w); if (i < r.words.length - 1) inn.appendChild(document.createTextNode(" ")); });
+            line.appendChild(inn); c.hed.appendChild(line);
+            c.lines.push(inn);
+          });
+          // one marker per line the phrase touches; each line's marker carries the full pink→amber gradient
+          // (box-decoration-break: clone behaviour), so a wrapped phrase never reads as two different markers.
+          // Each marker holds an ink copy of its line (offset by -left), clipped by the marker box.
+          // The revealed span is [--L, --R] (px, line coordinates), set on the line and tweened by the timeline.
+          const cs = getComputedStyle(c.hed);
+          const fs = parseFloat(cs.fontSize), rad = +(0.12 * fs).toFixed(2);
+          const MK = CONFIG.marker || {};
+          const P = (MK.pad != null ? MK.pad : 0.08) * fs, GAP = MK.gap != null ? MK.gap : 0.3;
+          const ls = parseFloat(cs.letterSpacing) || 0;
+          c.lines.forEach((inn) => {
+            const all = Array.from(inn.querySelectorAll(".w"));
+            const hl = all.filter((w) => w.classList.contains("hl"));
+            if (!hl.length) return;
+            const a = hl[0], b = hl[hl.length - 1];
+            // pad from the glyph INK on both sides, not the advance box (a "1" or "T" has wide side bearings, a "k" almost none):
+            // each end word's ink box comes from canvas text metrics, measured from the word's own left edge in the DOM.
+            const ib = inn.getBoundingClientRect(), k = (ib.width / (inn.offsetWidth || 1)) || 1;
+            const xOf = (w) => (w.getBoundingClientRect().left - ib.left) / k;
+            const inkL = xOf(a) + inkBox(cs, ls, a.textContent).l, inkR = xOf(b) + inkBox(cs, ls, b.textContent).r;
+            // a neighbouring word on the same line keeps its word space: the marker covers at most GAP of the ink-to-ink gap
+            let pL = P, pR = P;
+            const na = all[all.indexOf(a) - 1], nb = all[all.indexOf(b) + 1];
+            if (na) pL = Math.max(0, Math.min(P, (inkL - (xOf(na) + inkBox(cs, ls, na.textContent).r)) * GAP));
+            if (nb) pR = Math.max(0, Math.min(P, ((xOf(nb) + inkBox(cs, ls, nb.textContent).l) - inkR) * GAP));
+            const left = +(inkL - pL).toFixed(2), width = +(inkR - inkL + pL + pR).toFixed(2);
+            const ink = inn.cloneNode(true); ink.className = "ink"; ink.style.left = (-left) + "px";
+            ink.setAttribute("data-layout-allow-overflow", ""); ink.setAttribute("data-layout-allow-overlap", "");
+            ink.querySelectorAll(".w").forEach((w) => { w.setAttribute("data-layout-allow-overflow", ""); w.setAttribute("data-layout-allow-overlap", ""); });
+            const m = el("div", "mark"), g = el("div", "grad");
+            m.setAttribute("data-layout-allow-overflow", ""); m.setAttribute("data-layout-allow-overlap", "");
+            m.style.left = left + "px"; m.style.width = width + "px";
+            m.style.clipPath = "inset(0px calc(" + (left + width).toFixed(2) + "px - var(--R)) 0px calc(var(--L) - " + left.toFixed(2) + "px) round " + rad + "px)";
+            m.appendChild(g); m.appendChild(ink); inn.appendChild(m);
+            inn.style.setProperty("--L", left.toFixed(2) + "px"); inn.style.setProperty("--R", left.toFixed(2) + "px");
+            // no knock-out mask: the opaque marker covers each glyph's whole box (incl. descenders), so the words underneath never show
+            c.marks.push({ inn, m, g, left, width });
+          });
+        }
+        // a word's ink box at the headline's font, relative to its left edge: l = first ink, r = last ink
+        // (canvas text metrics with the same letter-spacing; falls back to the advance box if the browser has none)
+        const cv = document.createElement("canvas").getContext("2d");
+        function inkBox(cs, ls, word) {
+          cv.font = cs.fontWeight + " " + cs.fontSize + " " + cs.fontFamily;
+          const lsOK = "letterSpacing" in cv;
+          if (lsOK) cv.letterSpacing = ls + "px";
+          const m = cv.measureText(word);
+          if (m.actualBoundingBoxLeft == null || m.actualBoundingBoxRight == null) return { l: 0, r: m.width };
+          const n = Array.from(word).length;
+          return { l: -m.actualBoundingBoxLeft, r: m.actualBoundingBoxRight + (lsOK ? 0 : (n - 1) * ls) };
+        }
+        const px = (v) => v.toFixed(2) + "px";
+
+        /* ---- motion pieces ---- */
+        const OUT = "expo.out";
+        // card and headline start together: the card ramps to solid over o.fade (default 0.067 s), then the lines rise from their masks.
+        // o.lead (s): the lines start rising this long BEFORE the card shows, so its first visible frame already carries the headline.
+        function cardIn(tl, c, at, o) {
+          const from = { y: o.y, scale: o.scale, rotation: o.rot0 || 0 }, to = { y: 0, scale: 1, rotation: o.rot1 || 0 };
+          const lead = o.lead || 0, stag = o.stagger || 0.05, l0 = lead ? at - lead : at + 0.02;
+          const fade = o.fade != null ? o.fade : 0.067, ld = o.lineDur || 0.42;
+          gsap.set(c.card, Object.assign({ opacity: 0, transformOrigin: o.origin || "50% 50%" }, from));
+          gsap.set(c.lines, { yPercent: 108 });
+          tl.fromTo(c.card, { opacity: 0 }, { opacity: 1, duration: fade, ease: "power2.out", immediateRender: false }, at);
+          tl.fromTo(c.card, from, Object.assign({ duration: 0.5, ease: OUT, immediateRender: false }, to), at);
+          c.lines.forEach((inn, i) => {
+            tl.fromTo(inn, { yPercent: 108 }, { yPercent: 0, duration: ld, ease: OUT, immediateRender: false }, l0 + i * stag);
+          });
+          (o.rest || []).forEach((r) => {
+            if (!r || !r.el) return;
+            gsap.set(r.el, { opacity: 0, y: r.y || 0 });
+            if (r.od) {   // solid fast (no milky see-through slab), then finish the move
+              tl.fromTo(r.el, { opacity: 0 }, { opacity: 1, duration: r.od, ease: "power1.out", immediateRender: false }, at + r.at);
+              tl.fromTo(r.el, { y: r.y || 0 }, { y: 0, duration: r.d || 0.34, ease: OUT, immediateRender: false }, at + r.at);
+            } else {
+              tl.fromTo(r.el, { opacity: 0, y: r.y || 0 }, { opacity: 1, y: 0, duration: r.d || 0.34, ease: "power3.out", immediateRender: false }, at + r.at);
+            }
+          });
+          return l0 + (c.lines.length - 1) * stag + 0.3;   // when the headline reads
+        }
+        // sweep the marker in, line by line, at a constant speed (the ink copy rides with the gradient's edge)
+        function sweep(tl, c, at) {
+          let t = at;
+          c.marks.forEach((k) => {
+            const dur = k.width / T.sweepSpeed;
+            tl.fromTo(k.inn, { "--R": px(k.left) }, { "--R": px(k.left + k.width), duration: dur, ease: "none", immediateRender: false }, t);
+            t += dur;
+          });
+          return t;
+        }
+        // stack hand-off: the previous marker wipes off left→right; behind its edge the words are plain white again.
+        // No fades, so no frame ever shows grey text on a half-tint.
+        function wipe(tl, c, at) {
+          const sum = c.marks.reduce((s, k) => s + k.width, 0) || 1;
+          let t = at;
+          c.marks.forEach((k) => {
+            const dur = T.wipe * k.width / sum;
+            tl.fromTo(k.inn, { "--L": px(k.left) }, { "--L": px(k.left + k.width), duration: dur, ease: "none", immediateRender: false }, t);
+            t += dur;
+          });
+          return t;
+        }
+
+        const tl = gsap.timeline({ paused: true });
+        if (showPlate) {
+          const VG = V.vignette != null ? V.vignette : 1;   // per-variant peak: the stack keeps more of the footage's colour
+          gsap.set(vig, { opacity: 0 });
+          tl.fromTo(vig, { opacity: 0 }, { opacity: VG, duration: 0.4, ease: "power1.out", immediateRender: false }, T.in);
+          tl.fromTo(vig, { opacity: VG }, { opacity: 0, duration: 0.4, ease: "power1.in", immediateRender: false }, T.out);
+        }
+
+        if (V.layout === "single") {
+          const wrap = el("div"); wrap.id = "single"; ov.appendChild(wrap);
+          const d = V.card;
+          const c = { card: el("div", "card paper") };
+          c.card.style.top = V.top + "px";
+          // the paper sheet sits behind the content; both are sized by the card's --rv on entrance
+          const sheet = el("div", "sheet"), body = el("div", "body");
+          sheet.setAttribute("data-layout-allow-overlap", ""); sheet.setAttribute("data-layout-allow-occlusion", "");
+          body.setAttribute("data-layout-allow-overlap", "");
+          c.card.appendChild(sheet); c.card.appendChild(body);
+          c.hed = buildHed(d, V.keepPhrase); body.appendChild(c.hed);
+          c.meta = buildMeta(d); body.appendChild(c.meta);
+          let dek = null;
+          if (d.dek) { dek = el("div", "dek", esc(d.dek)); body.appendChild(dek); }
+          const th = buildThumb(V.thumb);
+          let credit = null;
+          if (th) {
+            body.appendChild(th.box);
+            if (V.thumb.credit) { credit = el("div", "credit", esc(V.thumb.credit)); body.appendChild(credit); }
+          }
+          wrap.appendChild(c.card);
+          ready(() => {
+            fit(c, V.maxLines);
+            lineify(c);
+            if (dek) {   // the dek stays one line: step it down to 26 px, then (only if it still overflows) let it wrap
+              let fs = parseFloat(getComputedStyle(dek).fontSize);
+              while (dek.scrollWidth > dek.clientWidth + 0.5 && fs > 26) { fs -= 1; dek.style.fontSize = fs + "px"; }
+              if (dek.scrollWidth > dek.clientWidth + 0.5) dek.style.whiteSpace = "normal";
+            }
+            const tilt = V.tilt || 0;
+            // one entrance rule: the card grows with its content. It ramps in (0.1 s) as a headline-only card, its lines
+            // already rising (they start at 0, one T.in before it shows), then the paper sheet grows down to full height and uncovers
+            // the meta row, dek, lead image and credit in reading order. The content fades in through a 20 px feather that
+            // ends 10 px above the sheet's edge, so every frame shows a complete card with a paper margin under its content,
+            // no blank paper and no hard slice through a row of text.
+            const H = c.card.offsetHeight;
+            // start: headline + the card's bottom padding, but short enough that the feather (which ends 10 px above the
+            // edge) finishes 6 px above the meta row, so no sliver of the NEWS chip shows on the headline-only frames
+            const rv0 = Math.min(H, c.hed.offsetTop + c.hed.offsetHeight + 36, c.meta.offsetTop + 4);
+            gsap.set(c.card, { "--rv": px(rv0) });
+            cardIn(tl, c, T.in, { y: 56, scale: 0.94, rot0: tilt * 2.5, rot1: tilt, lead: T.in, stagger: 0.03, lineDur: 0.36, fade: 0.1 });
+            tl.fromTo(c.card, { "--rv": px(rv0) }, { "--rv": px(H), duration: T.reveal || 0.45, ease: "power3.out", immediateRender: false }, T.in + 0.05);
+            const swept = sweep(tl, c, T.sweep);
+            if (th) {
+              // slow push on the lead image the whole time it is on screen, so the still never freezes
+              gsap.set(th.inn, { scale: 1.1 });
+              tl.fromTo(th.inn, { scale: 1.1 }, { scale: 1.045, duration: 1.0, ease: OUT, immediateRender: false }, T.in + 0.05);
+              tl.fromTo(th.inn, { scale: 1.045 }, { scale: 1, duration: T.out + 0.4 - (T.in + 1.05), ease: "none", immediateRender: false }, T.in + 1.05);
+            }
+            // slow push so the hold never freezes (capped at 1.01: the clipping peaks at about x 84–924)
+            tl.fromTo(c.card, { scale: 1 }, { scale: T.hold, duration: T.out - swept, ease: "sine.inOut", immediateRender: false }, swept);
+            tl.fromTo(c.card, { opacity: 1, y: 0 }, { opacity: 0, y: -26, duration: 0.36, ease: "power2.in", immediateRender: false }, T.out);
+            finish();
+          });
+        } else {
+          buildThumb(null);
+          const wrap = el("div"); wrap.id = "stack"; ov.appendChild(wrap);
+          const cards = V.cards.map((d, i) => {
+            // glass by default; a card with paper: true is the payoff (paper + ink), the one bright object in the stack
+            const c = { card: el("div", "card " + (d.paper ? "paper" : "glass") + (i === 0 ? " first" : "")) };
+            c.meta = buildMeta(d); c.card.appendChild(c.meta);
+            c.hed = buildHed(d); c.card.appendChild(c.hed);
+            wrap.appendChild(c.card);
+            return c;
+          });
+          // the section tag is a sibling on card 1's top edge (not a child), so it stays solid when card 1 recedes
+          const sect = V.label ? el("div", "sect", esc(V.label)) : null;
+          if (sect) wrap.appendChild(sect);
+          const D = V.dim || { opacity: 1, scale: 1 };
+          ready(() => {
+            let y = V.top;
+            cards.forEach((c) => { fit(c, V.maxLines); c.card.style.top = y + "px"; y += c.card.offsetHeight + V.gap; lineify(c); });
+            if (sect) sect.style.top = (V.top - 23) + "px";
+            let lastSwept = 0;
+            cards.forEach((c, i) => {
+              const at = T.in + 0.05 + i * T.every;
+              // same rule as the single card: the headline leads (its lines start rising 0.067 s before the card shows), so no card ever shows an empty plate
+              const read = cardIn(tl, c, at, { y: 48, scale: 0.96, origin: "50% 0%", lead: 0.067, stagger: 0.03, lineDur: 0.36, rest: [
+                { el: c.meta, at: 0, y: 10, d: 0.32 }, i === 0 && sect && { el: sect, at: 0.04, y: 56, d: 0.5, od: 0.08 }
+              ] });
+              if (i > 0) {
+                const prev = cards[i - 1], lit = prev.marks.length > 0;
+                if (lit) wipe(tl, prev, at + 0.06);                   // done before the new sweep starts
+                // earlier cards recede as the new one lands (after the wipe, so a marker never dims half-lit).
+                // The CONTENT dims, not the card: a see-through card would show the unblurred footage (signs, text) behind the
+                // headlines, while an opaque glass plate keeps blurring it. Scale stays 1 so every card keeps x 88–920.
+                const tDim = at + 0.06 + (lit ? T.wipe : 0);
+                tl.fromTo([prev.meta, prev.hed], { opacity: 1 }, { opacity: D.opacity, duration: 0.45, ease: "power2.out", immediateRender: false }, tDim);
+                if (D.scale !== 1) tl.fromTo(prev.card, { scale: 1 }, { scale: D.scale, duration: 0.45, ease: "power2.out", immediateRender: false }, tDim);
+              }
+              lastSwept = sweep(tl, c, Math.max(read + 0.03, at + 0.06 + T.wipe + 0.04));
+            });
+            // hold push around the card column's centre (x 504), capped so the stack peaks at x 84–924
+            tl.fromTo(wrap, { scale: 1, transformOrigin: "504px 45%" }, { scale: T.hold, duration: T.out - lastSwept, ease: "sine.inOut", immediateRender: false }, lastSwept);
+            // exit as ONE group: every card and the tag leave on the same frame with the same curve (0.30 s power2.in, y −26),
+            // so plates and text go together. Tweened per element rather than on #stack's opacity, because an ancestor
+            // with opacity < 1 would cut the glass cards' backdrop-filter off from the footage mid-fade.
+            const EX = { y: -26, opacity: 0, duration: 0.3, ease: "power2.in", immediateRender: false };
+            cards.forEach((c) => tl.fromTo(c.card, { opacity: 1, y: 0 }, Object.assign({}, EX), T.out));
+            if (sect) tl.fromTo(sect, { opacity: 1, y: 0 }, Object.assign({}, EX), T.out);
+            finish();
+          });
+        }
+
+        function ready(fn) {
+          Promise.all([
+            document.fonts.load('800 76px "Inter"'), document.fonts.load('700 28px "Inter"'),
+            document.fonts.load('600 28px "Inter"'), document.fonts.load('500 34px "Inter"'),
+            document.fonts.load('500 28px "Inter"')
+          ].concat(waits)).then(() => document.fonts.ready).then(fn);
+        }
+        function finish() {
+          tl.set({}, {}, T.end);
+          window.__timelines = window.__timelines || {};
+          window.__timelines["main"] = tl;
+          tl.seek(0);
+        }
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,278 @@
+<!doctype html>
+<!-- GTA 6 component #50: End card. 1080x1920 (9:16), 30 fps, 7 s.
+     The closing shot of a short settles into an end tile, in Rockstar's end-tile language. Nothing is boxed:
+     the footage stays full-width and one solid tile slides over it. The seam finishes before any type, so every
+     line sits on clean tile. One gesture per variant, one type voice (Rockstar's wide-tracked caps), one accent
+     per frame, three type sizes per frame.
+       v0 "Ink tile + date": footage on top, a flat ink-navy #1F202B tile rises from the bottom (120 px seam that
+                             is solid by y 980). On the ink, centred between y 980 and 1480, two tight pairs: Rockstar's
+                             two-line date card (58 px bold caps tracked 0.21em, the heaviest thing on screen, over a 40 px
+                             tracked second line, both with the crisp right-side magenta offset), then the channel name +
+                             fine print as the sign-off.
+       v1 "Sunset card":     the tile IS the sunset (plum #2C1446 -> #6B2A6E -> rose #C9566F -> peach #F08A62), falling
+                             from the top and ending in a hard horizon at y 760: a 2 px peach hairline on the tile's last
+                             rows, clear footage straight below. "SEE YOU IN / VICE CITY / date" as one block (a 136 px
+                             title, no magenta: the sky is v1's accent), then the channel and fine print as a second block.
+     Full-frame component: it always shows footage. The clip path comes from CONFIG; every <video> whose src
+     does not match the active variant's CONFIG clip is hidden. `bg` is kept for library consistency only.
+     Safe zones: all text sits inside x 144–936, y 230–1480 (centred on x 540). -->
+<html lang="en" data-composition-variables='[
+  {"id":"variant","type":"enum","label":"Variant","default":"0","options":[{"value":"0","label":"Ink tile + date"},{"value":"1","label":"Sunset card"}]},
+  {"id":"bg","type":"enum","label":"Background","default":"plate","options":[{"value":"plate","label":"Sample footage"},{"value":"none","label":"Transparent"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link rel="stylesheet" href="assets/fonts/fonts.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="assets/kit/motion/motion.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: transparent; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; font-family: "Inter", sans-serif;
+        -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; font-feature-settings: "kern" 1; }
+      :root { --ink-navy: #1F202B; --magenta: #EE08F2;
+        /* the v1 tile IS the sunset: plum at the top burning down to peach at the horizon (the seam into the footage) */
+        --sunset-sky: linear-gradient(180deg, #2C1446 0%, #6B2A6E 45%, #C9566F 80%, #F08A62 100%);
+        /* v1: 2 px hairline where the solid sky ends, so the seam reads as a horizon, not a smudge */
+        --sunset-horizon: rgba(255,200,143,.55); }
+
+      /* backing behind the plate (only ever seen under the tile); --veil-h is set from CONFIG veil.edge */
+      #back { position: absolute; inset: 0; }
+      .ink #back { background: var(--ink-navy); }
+      .sunset #back { background: var(--sunset-sky) 0 0 / 100% var(--veil-h, 760px) no-repeat, #F08A62; }  /* matches the tile at rest */
+
+      /* ---------- the footage: full width, never boxed ---------- */
+      #shot, #push { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; }
+      .plate { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+
+      /* ---------- the tile: one solid surface over the footage, short eased seam on its leading edge ---------- */
+      #veil { position: absolute; left: 0; width: 1080px; overflow: hidden; pointer-events: none; }
+      .ink #veil { background: var(--ink-navy); }
+      /* the horizon hairline sits at --horizon-y (= edge - fade - 2, set from CONFIG): the last two rows of the tile, exactly
+         on the footage edge. The sky is a fixed 760 px ramp anchored to the tile's bottom edge; the tile slides (translateY),
+         it never resizes, so the ramp never squashes or stretches */
+      .sunset #veil { background: linear-gradient(var(--sunset-horizon), var(--sunset-horizon)) 0 var(--horizon-y, 758px) / 100% 2px no-repeat,
+        var(--sunset-sky) 0 100% / 100% var(--veil-h, 760px) no-repeat; }
+      /* 7% monochrome grain dithers the sunset gradient so it never bands (static, seeded, deterministic) */
+      #grain { position: absolute; inset: 0; display: none; opacity: .07; mix-blend-mode: overlay;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' seed='11' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='240' height='240' filter='url(%23n)'/></svg>");
+        background-size: 240px 240px; }
+      .sunset #grain { display: block; }
+
+      /* ---------- type: three sizes per frame ---------- */
+      #ov { position: absolute; inset: 0; color: #fff; }
+      .blk { position: absolute; left: 0; width: 1080px; text-align: center; white-space: nowrap; }
+      .caps { text-transform: uppercase; }
+
+      /* v0 sizes: 58 (date) / 40 (line 2, handle) / 28 (fine print) */
+      /* Rockstar's Nov 19 card: the date is the heaviest thing on screen. Bold white caps, wide tracking, a crisp
+         right-side magenta offset and a faint bloom. 58 px at 0.21em is the largest bold date whose ink (offset included)
+         stays inside the x 144-936 safe zone */
+      .ink .date { font-size: 58px; line-height: 1.15; font-weight: 700; letter-spacing: 0.21em; text-indent: 0.21em;
+        text-shadow: 3px 2px 0 #EE08F2, 0 0 18px rgba(238,8,242,.30); }
+      /* the second line is ~2/3 of the date, one weight lighter, and carries the same offset (Rockstar's "PRE-ORDER NOW" line) */
+      .ink .line2 { font-size: 40px; line-height: 1.2; font-weight: 600; letter-spacing: 0.24em; text-indent: 0.24em;
+        text-shadow: 2px 1px 0 rgba(238,8,242,.85); }
+
+      /* v1 sizes: 136 (title) / 40 (handle) / 28 (eyebrow, date, fine print) */
+      .sunset .eyebrow { font-size: 28px; line-height: 1.2; font-weight: 400; letter-spacing: 0.42em; text-indent: 0.42em; }
+      /* tracked bold caps, ~73% of the frame width. No magenta here: on the plum sky it fringed, and the sky is v1's one
+         accent. A soft plum contact + depth shadow seats it on the sky. Padding keeps the whole shadow inside the rise mask */
+      .sunset .title { font-size: 136px; line-height: 1.0; font-weight: 700; letter-spacing: 0.10em; text-indent: 0.10em;
+        overflow: hidden; padding: 20px 0 44px;
+        text-shadow: 0 2px 2px rgba(30,0,50,.30), 0 10px 30px rgba(30,0,50,.35); }
+      /* text-indent is inherited: reset it inside the span, or the title sits ~7 px right of centre */
+      .sunset .title span { display: inline-block; text-indent: 0; }
+      .sunset .date { font-size: 28px; line-height: 1.2; font-weight: 600; letter-spacing: 0.36em; text-indent: 0.36em; }
+
+      /* channel sign-off: one quiet line, no dividers */
+      .handle { font-size: 40px; line-height: 1.2; font-weight: 600; letter-spacing: -0.005em; color: #fff; }
+      .fine { font-size: 28px; line-height: 1.2; font-weight: 500; letter-spacing: 0.02em; color: rgba(255,255,255,.62); }
+      .sunset .fine { color: rgba(255,255,255,.82); }   /* holds contrast on the warm part of the sky */
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="7" data-width="1080" data-height="1920">
+      <div id="back"></div>
+
+      <!-- the footage: one framework-owned muted video per variant clip; the script hides all but the active one -->
+      <div id="shot">
+        <div id="push">
+          <video id="clip0" class="clip plate" src="assets/plates/p01-keys-sign-v.mp4" muted playsinline data-start="0" data-duration="7" data-track-index="0"></video>
+          <video id="clip1" class="clip plate" src="assets/plates/p06-lucia-gate-v.mp4" muted playsinline data-start="0" data-duration="7" data-track-index="0"></video>
+        </div>
+      </div>
+
+      <div id="veil" data-layout-allow-overflow><i id="grain"></i></div>
+
+      <div id="ov" class="clip" data-start="0" data-duration="7" data-track-index="1"></div>
+    </div>
+
+    <script>
+      const CONFIG = {
+        // the channel that signs off the short (both variants)
+        channel: "@everestchris6",
+        // small legal-style line, like the fine print on Rockstar's end tiles. "" hides it.
+        finePrint: "Fan edit · Not affiliated with Rockstar Games",
+        variants: {
+          "0": {
+            style: "ink",                                   // flat ink-navy #1F202B tile
+            clip: "assets/plates/p01-keys-sign-v.mp4",
+            date: "November 19, 2026",                      // release date (FACTS.md)
+            line2: "See you in Leonida",
+            // the tile rises from the bottom; footage is fully clear above `edge`, the seam is `fade` px long,
+            // so the ink is solid from edge + fade (980) down: every line of type sits on clean ink
+            veil: { from: "bottom", edge: 860, fade: 120 },
+            // plate point `focus` (0–1) slides to y = `to`, so the subject sits in the clear footage; `push` = slow push-in
+            shot: { focus: [0.5, 0.42], to: 500, push: 0.05 },
+            // type tops (px): two tight pairs, centred in the ink between y 980 and 1480:
+            // date + line 2 (Rockstar's pair), then handle + fine print (the sign-off)
+            layout: { date: 1068, line2: 1140, handle: 1264, fine: 1326 }
+          },
+          "1": {
+            style: "sunset",                                // the tile is the sunset: plum burning down to peach
+            clip: "assets/plates/p06-lucia-gate-v.mp4",
+            eyebrow: "See you in",
+            title: "Vice City",
+            date: "November 19, 2026",
+            // the sunset tile falls from the top and ends in a hard horizon: solid sky down to `edge` (760), a 2 px peach
+            // hairline on its last rows (y 758-760), and clear footage straight below it (fade 0 = no feathered seam)
+            veil: { from: "top", edge: 760, fade: 0 },
+            // the plate settles 688 px down, so its top edge always stays under solid sky (72 px margin at rest)
+            shot: { focus: [0.45, 0.22], to: 1110, push: 0.05 },
+            // two blocks: eyebrow + title + date, then (after ~100 px of air) handle + fine print
+            layout: { eyebrow: 250, title: 266, date: 441, handle: 565, fine: 633 },
+            // per-variant timing overrides: the title starts rising while the tile lands, so it is up by ~0.6 s
+            timing: { type: 0.32 }
+          }
+        },
+        // tile = tile starts sliding over the footage; shot = footage settles; type = first line; step = gap between lines
+        // out = type clears; reopen = tile slides away again; end = total
+        timing: { tile: 0.15, tileDur: 0.6, shot: 0.2, shotDur: 0.6, type: 0.38, step: 0.15, out: 6.3, reopen: 6.42, end: 7.0 }
+      };
+
+      (function () {
+        const VARS = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+        const vKey = CONFIG.variants[String(VARS.variant)] ? String(VARS.variant) : "0";
+        const V = CONFIG.variants[vKey], T = Object.assign({}, CONFIG.timing, V.timing || {}), S = V.shot, VL = V.veil;
+        const $ = (s) => document.querySelector(s);
+        const root = $("#root"), ov = $("#ov"), veil = $("#veil");
+        root.classList.add(V.style);
+
+        // footage always shows (full-frame component): keep only the active variant's clip
+        document.querySelectorAll("video.plate").forEach((v) => {
+          if (v.getAttribute("src") !== V.clip) v.style.display = "none";
+        });
+
+        // ---- the tile: geometry + an eased (smoothstep) seam on its leading edge ----
+        const ss = (f) => f * f * (3 - 2 * f);
+        const stops = [];
+        for (let i = 0; i <= 12; i++) { const f = i / 12; stops.push(`rgba(0,0,0,${ss(f).toFixed(3)}) ${(f * VL.fade).toFixed(1)}px`); }
+        const fromBottom = VL.from === "bottom";
+        // fade 0 = a hard edge (v1's horizon): no mask at all
+        const mask = VL.fade > 0 ? `linear-gradient(${fromBottom ? "to bottom" : "to top"}, ${stops.join(", ")})` : "none";
+        veil.style.webkitMaskImage = mask; veil.style.maskImage = mask;
+        if (fromBottom) { veil.style.top = VL.edge + "px"; veil.style.height = (1920 - VL.edge) + "px"; }
+        else { veil.style.top = "0px"; veil.style.height = VL.edge + "px"; }
+        const VEIL_OFF = fromBottom ? (1920 - VL.edge) : -VL.edge;    // fully off-frame
+        // sunset: the backing matches the tile height, and the 2 px horizon hairline sits on the last two rows of solid sky
+        // (with fade 0 that is exactly the footage edge)
+        root.style.setProperty("--veil-h", VL.edge + "px");
+        root.style.setProperty("--horizon-y", (VL.edge - VL.fade - 2) + "px");
+
+        // ---- where the footage settles: plate point `focus` lands at y = `to`, clamped so its edge stays under solid tile ----
+        const px = S.focus[0] * 1080, py = S.focus[1] * 1920;
+        const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+        const ty = fromBottom ? clamp(S.to - py, VL.edge + VL.fade - 1920, 0)      // shift up, bottom stays under solid ink
+                              : clamp(S.to - py, 0, VL.edge - VL.fade);            // shift down, top stays under solid sky
+        gsap.set("#shot", { y: 0 });
+        gsap.set("#push", { transformOrigin: `${px}px ${py}px`, scale: 1 });
+        gsap.set(veil, { y: VEIL_OFF });
+
+        // ---- build the type ----
+        const blk = (cls, top, html) => {
+          const d = document.createElement("div");
+          d.className = "blk " + cls; d.style.top = top + "px"; d.innerHTML = html; ov.appendChild(d); return d;
+        };
+        const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+        const L = V.layout, parts = [];
+        let date = null;
+        // kind "track": tracking-in (letter-spacing from `from` em to the CSS value) + fade; kind "mask": rises out of a mask
+        if (V.style === "ink") {
+          date = blk("caps date", L.date, esc(V.date));
+          parts.push({ el: date, kind: "track", from: 0.34 });
+          parts.push({ el: blk("caps line2", L.line2, esc(V.line2)), kind: "track", from: 0.40 });
+        } else {
+          parts.push({ el: blk("caps eyebrow", L.eyebrow, esc(V.eyebrow)), kind: "track", from: 0.62 });
+          parts.push({ el: blk("caps title", L.title, "<span>" + esc(V.title) + "</span>"), kind: "mask" });
+          parts.push({ el: blk("caps date", L.date, esc(V.date)), kind: "track", from: 0.52 });
+        }
+        const handle = blk("handle", L.handle, esc(CONFIG.channel));
+        const fine = CONFIG.finePrint ? blk("fine", L.fine, esc(CONFIG.finePrint)) : null;
+
+        // the date's offset + faint bloom ramp in after the tracking (same shadow format both ends, so GSAP interpolates it)
+        const BLOOM_OFF = "rgba(238,8,242,0) 3px 2px 0px, rgba(238,8,242,0) 0px 0px 0px";
+        const BLOOM_ON = "rgba(238,8,242,1) 3px 2px 0px, rgba(238,8,242,0.3) 0px 0px 18px";
+        const MASK_FROM = 160;   // yPercent: the title starts fully below its mask, soft shadow included
+
+        // initial states
+        parts.forEach((p) => {
+          if (p.kind === "mask") gsap.set(p.el.firstChild, { yPercent: MASK_FROM });
+          else gsap.set(p.el, { opacity: 0 });
+        });
+        if (date) gsap.set(date, { textShadow: BLOOM_OFF });
+        gsap.set(handle, { opacity: 0, y: 16 });
+        if (fine) gsap.set(fine, { opacity: 0 });
+
+        document.fonts.ready.then(() => {
+          const tl = gsap.timeline({ paused: true });
+          const F = (el, from, to, at) => tl.fromTo(el, from, Object.assign({ immediateRender: false }, to), at);
+
+          // tracking settles at the CSS value (read after fonts load, so the CSS stays the source of truth)
+          parts.forEach((p) => {
+            if (p.kind !== "track") return;
+            const cs = getComputedStyle(p.el), fs = parseFloat(cs.fontSize);
+            p.lsTo = parseFloat(cs.letterSpacing); p.lsFrom = p.from * fs;
+          });
+
+          // 1) the tile slides over the full-width footage; the footage settles so its subject sits in the clear area
+          F(veil, { y: VEIL_OFF }, { y: 0, duration: T.tileDur, ease: "expo.out" }, T.tile);
+          F("#shot", { y: 0 }, { y: ty, duration: T.shotDur, ease: "power3.inOut" }, T.shot);
+          // slow push for life while the card holds (the clip keeps playing underneath)
+          F("#push", { scale: 1 }, { scale: 1 + S.push, duration: T.reopen - T.shot, ease: "none" }, T.shot);
+
+          // 2) type: one line leads at a time
+          let at = T.type;
+          parts.forEach((p) => {
+            if (p.kind === "track") {
+              F(p.el, { letterSpacing: p.lsFrom + "px", textIndent: p.lsFrom + "px" },
+                      { letterSpacing: p.lsTo + "px", textIndent: p.lsTo + "px", duration: 0.45, ease: "expo.out" }, at);
+              F(p.el, { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power2.out" }, at);
+              if (p.el === date) F(date, { textShadow: BLOOM_OFF }, { textShadow: BLOOM_ON, duration: 0.55, ease: "power2.out" }, at + 0.08);
+            } else {
+              F(p.el.firstChild, { yPercent: MASK_FROM }, { yPercent: 0, duration: 0.5, ease: "expo.out" }, at - 0.02);
+            }
+            at += T.step;
+          });
+          // the channel name rises in (landed by ~1.2 s), then the fine print
+          at += 0.02;
+          F(handle, { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.4, ease: "expo.out" }, at);
+          if (fine) F(fine, { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power2.out" }, at + 0.22);
+
+          // 3) loop-clean exit: type clears, the footage returns, the tile slides away (last frame = first frame)
+          const typeEls = parts.map((p) => p.el).concat([handle]).concat(fine ? [fine] : []);
+          F(typeEls, { opacity: 1 }, { opacity: 0, duration: 0.22, ease: "power2.in" }, T.out);
+          F("#shot", { y: ty }, { y: 0, duration: T.end - T.reopen - 0.08, ease: "power3.inOut" }, T.reopen);
+          F("#push", { scale: 1 + S.push }, { scale: 1, duration: T.end - T.reopen - 0.08, ease: "power3.inOut" }, T.reopen);
+          F(veil, { y: 0 }, { y: VEIL_OFF, duration: T.end - T.reopen - 0.12, ease: "power3.in" }, T.reopen + 0.06);  // fully off by the last frame
+          tl.set({}, {}, T.end);
+
+          window.__timelines = window.__timelines || {};
+          window.__timelines["main"] = tl;
+          tl.seek(0);
+        });
+      })();
+    </script>
+  </body>
+</html>

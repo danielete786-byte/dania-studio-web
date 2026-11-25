@@ -1,0 +1,397 @@
+<!doctype html>
+<!-- #35 Sunset wipe (craft v2). GTA 6 component library. 1080x1920 (9:16), 30 fps, 5.0 s.
+     A transition into the next segment of a compilation. Leonida-sunset light sweeps across clip A and leaves clip B
+     behind it, already carrying the next segment's title: the title lives on clip B's side of the cut, so the sweep
+     itself reveals it. The payoff hit (shake + Look.expose exposure pulse, no white flash) lands on the first frame the
+     sweep has cleared the whole title; then clip B runs on as 4K shots cut on rhythm at 1.0x under the held title.
+     Variant 0 "Diagonal bands": full-bleed vertical. Five "/" slabs of sunset light, speed-ramped (whoosh in, a readable
+       hang across the frame, whoosh out), staggered, motion-blurred, with a lit leading edge and a screened glow.
+       Day (Vice City highway) -> golden hour, title "Leonida Keys".
+     Variant 1 "Iris": letterbox (a 16:9 band on black). A sun forms in the sky of the outgoing sunset shot and burns
+       open into a hole ringed by a sunset corona (a white-hot rim cooling through amber, pink and violet to clear) that
+       zooms out across the bars; the hole opens on the biker's face. Title "Vice City" in the top bar.
+     Everything is drawn from timeline time through one Look.drive, so every frame is seek-safe (no onUpdate, no randomness).
+     Variables: variant "0"/"1"; bg "plate" (footage + finishing) / "none" (transparent overlay: the sweep and the title only). -->
+<html lang="en" data-composition-variables='[
+  {"id":"variant","type":"enum","label":"Variant","default":"0","options":[{"value":"0","label":"Diagonal bands"},{"value":"1","label":"Iris"}]},
+  {"id":"bg","type":"enum","label":"Background","default":"plate","options":[{"value":"plate","label":"Sample footage"},{"value":"none","label":"Transparent"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link rel="stylesheet" href="assets/fonts/fonts.css" />
+    <link rel="stylesheet" href="assets/kit/look/look.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="assets/kit/look/look.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: transparent; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; background: #000; color: #fff;
+        font-family: "Inter", sans-serif; -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; }
+      #root.transparent { background: transparent; }
+      /* the picture: full frame (v0) or a centred 16:9 letterbox band (v1) */
+      #band { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; overflow: hidden; }
+      #shake, .lay, .vw { position: absolute; inset: 0; }
+      .shot { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      /* the title layer is clipped to clip B's side of the cut, so the sweep reveals it */
+      #type { position: absolute; inset: 0; z-index: 4; }
+      #scrim { position: absolute; left: 0; right: 0; bottom: 0; height: 1040px; opacity: .8; }
+      #glow { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; z-index: 5; mix-blend-mode: screen; opacity: .46; filter: blur(14px); }
+      #fx { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; z-index: 6; }
+      #post { position: absolute; inset: 0; z-index: 7; }
+
+      /* v0: lower-left title block over the golden-hour shots */
+      .blk0 { position: absolute; left: 72px; width: 864px; }
+      .kick { display: flex; align-items: center; gap: 20px; height: 34px; top: 1104px; }
+      .slash { display: block; width: 13px; height: 34px; transform: skewX(-25deg); margin-left: 8px;
+        background: linear-gradient(0deg, #FEB747 0%, #FE8E4E 30%, #F84FA4 64%, #A341C0 100%); }
+      .kick .t-label-wide { font-size: 27px; color: rgba(255,255,255,.92); letter-spacing: .34em; }
+      .hero0 { font-size: 136px; font-weight: 800; line-height: .9; color: #fff; }
+      .hero0 .ln { display: block; white-space: nowrap; }
+      /* v1: hero in the top bar, Rockstar-style label in the bottom bar */
+      .hero1 { position: absolute; left: 0; width: 1080px; top: 252px; text-align: center; font-size: 200px; font-weight: 800;
+        line-height: .9; letter-spacing: .05em; color: #fff; }
+      .hero1 .ln { display: block; white-space: nowrap; padding-left: .05em; }
+      .label1 { position: absolute; left: 0; width: 1080px; top: 1316px; text-align: center; font-size: 34px; letter-spacing: .44em;
+        color: #fff; padding-left: .44em; font-weight: 600;
+        text-shadow: 2px 2px 0 #EE08F2, 0 0 16px rgba(238,8,242,.3); }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="5" data-width="1080" data-height="1920">
+      <div id="band" data-layout-allow-overflow><div id="shake" data-layout-allow-overflow>
+        <!-- clip A (outgoing) -->
+        <div class="lay" id="layA"><div class="vw" id="wA" data-layout-allow-overflow>
+          <video id="a0" class="clip shot" data-variant="0" src="assets/shots/s011-vice-highway-v.mp4" muted playsinline data-start="0" data-duration="1.85" data-media-start="1.7" data-track-index="0"></video>
+          <video id="a1" class="clip shot" data-variant="1" src="assets/shots/s047-car-hood-golden-h.mp4" muted playsinline data-start="0" data-duration="0.5" data-media-start="0.3" data-track-index="2"></video>
+          <video id="a2" class="clip shot" data-variant="1" src="assets/shots/s108-balcony-sunset-h.mp4" muted playsinline data-start="0.5" data-duration="1.32" data-media-start="0" data-track-index="2"></video>
+        </div></div>
+        <!-- clip B (incoming): three shots cut on rhythm, each in its own wrapper so each can push -->
+        <div class="lay" id="layB">
+          <div class="vw" id="wB1" data-layout-allow-overflow>
+            <video id="b0a" class="clip shot" data-variant="0" src="assets/shots/s026-sunset-pier-v.mp4" muted playsinline data-start="0.75" data-duration="1.55" data-media-start="0" data-track-index="1"></video>
+            <video id="b1a" class="clip shot" data-variant="1" src="assets/shots/s065-biker-plane-h.mp4" muted playsinline data-start="0.68" data-duration="1.72" data-media-start="0" data-track-index="3"></video>
+          </div>
+          <div class="vw" id="wB2" data-layout-allow-overflow>
+            <video id="b0b" class="clip shot" data-variant="0" src="assets/shots/s108-balcony-sunset-v.mp4" muted playsinline data-start="2.3" data-duration="1.3" data-media-start="0.02" data-track-index="1"></video>
+            <video id="b1b" class="clip shot" data-variant="1" src="assets/shots/s135-skydive-city-h.mp4" muted playsinline data-start="2.4" data-duration="1.5" data-media-start="0.05" data-track-index="3"></video>
+          </div>
+          <div class="vw" id="wB3" data-layout-allow-overflow>
+            <video id="b0c" class="clip shot" data-variant="0" src="assets/shots/s036-beach-bar-v.mp4" muted playsinline data-start="3.6" data-duration="1.4" data-media-start="0" data-track-index="1"></video>
+            <video id="b1c" class="clip shot" data-variant="1" src="assets/shots/s012-muscle-beach-h.mp4" muted playsinline data-start="3.9" data-duration="1.1" data-media-start="0.5" data-track-index="3"></video>
+          </div>
+        </div>
+      </div></div>
+
+      <div id="ov" class="clip" data-start="0" data-duration="5" data-track-index="4">
+        <div id="type"><div id="scrim" class="lk-scrim-bottom"></div></div>
+        <canvas id="glow" width="270" height="480" data-layout-allow-overflow data-layout-allow-occlusion></canvas>
+        <canvas id="fx" width="1080" height="1920" data-layout-allow-overflow data-layout-allow-occlusion></canvas>
+        <div id="post"></div>
+      </div>
+    </div>
+
+    <script>
+      const CONFIG = {
+        duration: 5.0,
+        fps: 30,
+        // Leonida sunset, warm -> cool (the official logo sweep, read from the sun outward)
+        palette: ["#FEB747", "#FE8E4E", "#F84FA4", "#A341C0", "#365ECE"],
+        variants: {
+          "0": {
+            name: "Diagonal bands",
+            frame: "full",                                   // full-bleed vertical footage
+            kicker: "Next stop",
+            title: ["Leonida", "Keys"],                      // one line per entry (a real region of Leonida)
+            clips: {                                         // must match the <video> src of this variant (others are hidden)
+              a: ["assets/shots/s011-vice-highway-v.mp4"],   // outgoing: Vice City highway, daylight
+              b: ["assets/shots/s026-sunset-pier-v.mp4", "assets/shots/s108-balcony-sunset-v.mp4", "assets/shots/s036-beach-bar-v.mp4"]
+            },
+            cuts: [2.3, 3.6],      // B shot changes (for the pushes): keep in step with the <video> data-start values
+            // bands as [from, to] px measured back from the leading edge (along the sweep). The A/B cut sits inside the slab.
+            bands: [[0, 26], [62, 170], [204, 600], [634, 740], [776, 796]],
+            cut: 402,
+            angle: 25,             // tilt from vertical ("/"); the sweep runs left -> right and down
+            lag: 0.01,             // s of delay per band: the group spreads while it is fast and bunches while it hangs
+            start: 0.7, dur: 1.1,  // the leading edge enters at `start`; the last band is gone `dur` later
+            hang: 0.12,            // speed ramp: 0 = the bands stop dead mid-frame, 1 = constant speed
+            edge: "rgba(255,247,236,0.95)"                   // the lit leading edge of each band
+          },
+          "1": {
+            name: "Iris",
+            frame: "letterbox",                              // a 16:9 band (1080x608, y 656-1264) on black
+            title: ["Vice", "City"],                         // stacked, big, filling the top bar
+            label: "State of Leonida",                       // Rockstar-style tracked caps in the bottom bar
+            clips: {
+              a: ["assets/shots/s047-car-hood-golden-h.mp4", "assets/shots/s108-balcony-sunset-h.mp4"],   // golden hour -> sunset
+              b: ["assets/shots/s065-biker-plane-h.mp4", "assets/shots/s135-skydive-city-h.mp4", "assets/shots/s012-muscle-beach-h.mp4"]
+            },
+            cuts: [2.4, 3.9],
+            center: [324, 765],    // where the sun forms (frame px): in clear sky in A, clear of both faces
+            land: [1080, 514],     // B's landing zoom origin (px in the band), chosen so the biker's face starts at the centre
+            sunAt: 0.5, sunDur: 0.22,                        // the sun gathers (corona 0 -> corona px) ...
+            openAt: 0.72, r0: 14, r1: 1500, openDur: 1.05,   // ... then burns open: hole radius r0 -> r1 at a constant zoom rate
+            corona: 140,                                     // the sun's corona while it gathers (px)
+            burn: [64, 0.2], burnIn: 0.22,                   // then the burning edge: width = burn[0] + burn[1] x hole radius (eased in over burnIn s)
+            through: 170,                                    // the hole starts white-hot and clip B burns through by this radius
+            // the light from the hole's edge outward: [position 0-1, colour, alpha]: white-hot, cooling through the sunset to clear
+            stops: [[0, "#FFF8EC", 1], [0.07, "#FFE6B0", 1], [0.2, "#FEB747", 0.95], [0.4, "#FE8E4E", 0.72],
+                    [0.64, "#F84FA4", 0.38], [0.85, "#A341C0", 0.12], [1, "#365ECE", 0]]
+          }
+        },
+        // the payoff on the frame the sweep clears the title: shake + exposure pulse (no white flash)
+        hit: { amp: 9, zoom: 1.035, peak: 1.6, chroma: 4 },
+        exitAt: 4.3
+      };
+
+      (function () {
+        const VARS = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+        const vKey = CONFIG.variants[String(VARS.variant)] ? String(VARS.variant) : "0";
+        const V = CONFIG.variants[vKey], plate = VARS.bg !== "none";
+        const W = 1080, H = 1920, FPS = CONFIG.fps, D = CONFIG.duration, BANDS = !!V.bands;
+        const $ = (s) => document.querySelector(s);
+        const root = $("#root");
+
+        // ---- footage: only this variant's clips (src must match CONFIG); none at all for bg:none ----
+        const want = V.clips.a.concat(V.clips.b);
+        document.querySelectorAll("video.shot").forEach((v) => {
+          if (!plate || v.dataset.variant !== vKey || want.indexOf(v.getAttribute("src")) < 0) v.style.display = "none";
+        });
+        if (!plate) root.classList.add("transparent");
+
+        // ---- frame geometry ----
+        const LB = V.frame === "letterbox";
+        const BT = LB ? 656 : 0, BH = LB ? 608 : H;      // the picture band (frame px)
+        $("#band").style.top = BT + "px"; $("#band").style.height = BH + "px";
+
+        // ---- type ----
+        const type = $("#type"), post = $("#post");
+        let hero, kick = null, slash = null, klabel = null, label = null;
+        if (BANDS) {
+          // the hero sits on B's side of the cut (#type, revealed by the sweep); the kicker arrives on the hit (#post)
+          kick = document.createElement("div"); kick.className = "kick blk0";
+          slash = document.createElement("i"); slash.className = "slash";
+          klabel = document.createElement("span"); klabel.className = "t-label-wide"; klabel.textContent = V.kicker;
+          kick.appendChild(slash); kick.appendChild(klabel); post.appendChild(kick);
+          const hb = document.createElement("div"); hb.className = "blk0"; hb.style.top = "1166px";
+          hero = document.createElement("div"); hero.className = "hero0 t-wide";
+          V.title.forEach((t) => { const l = document.createElement("span"); l.className = "ln"; l.textContent = t; hero.appendChild(l); });
+          hb.appendChild(hero); type.appendChild(hb);
+        } else {
+          $("#scrim").style.display = "none";
+          hero = document.createElement("div"); hero.className = "hero1 t-wide";
+          V.title.forEach((t) => { const l = document.createElement("span"); l.className = "ln"; l.textContent = t; hero.appendChild(l); });
+          type.appendChild(hero);
+          label = document.createElement("div"); label.className = "label1 t-label-wide"; label.textContent = V.label;
+          post.appendChild(label);
+          $("#glow").style.opacity = "0.35";
+        }
+        // the sweep passes over the title on purpose (it is the reveal), and the blur exit scales it a little
+        [hero, kick, label].concat(Array.prototype.slice.call(hero.querySelectorAll(".ln"))).forEach((n) => {
+          if (n) { n.setAttribute("data-layout-allow-occlusion", ""); n.setAttribute("data-layout-allow-overflow", ""); }
+        });
+
+        // ---- the sweep ----
+        const hexRgb = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+        const PAL = CONFIG.palette.map(hexRgb);
+        const rgba = (c, a) => "rgba(" + c[0] + "," + c[1] + "," + c[2] + "," + (a == null ? 1 : a) + ")";
+        const clamp01 = (x) => Math.min(1, Math.max(0, x));
+        const cv = $("#fx"), ctx = cv.getContext("2d");
+        const off = document.createElement("canvas"); off.width = W; off.height = H; const octx = off.getContext("2d");
+        const gl = $("#glow"), gctx = gl.getContext("2d");
+        let drawn = false;
+
+        // bands: s = position along the sweep normal d, k = position along the bands u
+        let d, u, sMax, kLo, kHi, Fpos, shape, cutAt, bandGrad, cx, cy, Rat, Wc;
+        if (BANDS) {
+          const a = V.angle * Math.PI / 180, SH = V.bands, GW = SH[SH.length - 1][1];
+          const MAIN = SH.reduce((m, b, i) => (b[1] - b[0] > SH[m][1] - SH[m][0] ? i : m), 0);
+          d = [Math.cos(a), Math.sin(a)]; u = [Math.sin(a), -Math.cos(a)];
+          sMax = W * d[0] + H * d[1];
+          const ks = [[0, 0], [W, 0], [0, H], [W, H]].map((p) => p[0] * u[0] + p[1] * u[1]);
+          kLo = Math.min.apply(null, ks); kHi = Math.max.apply(null, ks);
+          const F0 = -8, F1 = sMax + GW + 60, m = V.hang;
+          // speed ramp: fast in, a slow hang with the slab across the middle of the frame, fast out
+          const g = (p) => m * p + (1 - m) * (0.5 + 4 * Math.pow(p - 0.5, 3));
+          Fpos = (t) => F0 + (F1 - F0) * g(clamp01((t - V.start) / V.dur));
+          shape = (i, t) => { const F = Fpos(t - i * V.lag); return [F - SH[i][1], F - SH[i][0]]; };
+          cutAt = (t) => Fpos(t - MAIN * V.lag) - V.cut;
+          const p0 = P(0, kLo), p1 = P(0, kHi);         // a frame-space sunset along the bands: slices of one sky
+          bandGrad = octx.createLinearGradient(p0[0], p0[1], p1[0], p1[1]);
+          PAL.forEach((c, i) => bandGrad.addColorStop(i / (PAL.length - 1), rgba(c)));
+        } else {
+          cx = V.center[0]; cy = V.center[1];
+          sMax = Math.max(Math.hypot(cx, cy), Math.hypot(W - cx, cy), Math.hypot(cx, H - cy), Math.hypot(W - cx, H - cy));
+          // the hole radius: shut while the sun gathers, then a constant zoom rate r0 -> r1
+          Rat = (t) => (t < V.openAt ? 0 : V.r0 * Math.pow(V.r1 / V.r0, clamp01((t - V.openAt) / V.openDur)));
+          // the light's width: the sun's corona grows in (power3.out) while it gathers, then eases into a burning edge
+          // that scales with the hole
+          Wc = (t) => {
+            if (t <= V.sunAt) return 0;
+            if (t < V.openAt) return V.corona * (1 - Math.pow(1 - (t - V.sunAt) / V.sunDur, 3));
+            const k = clamp01((t - V.openAt) / V.burnIn), e = k * k * (3 - 2 * k);
+            return V.corona + (V.burn[0] + V.burn[1] * Rat(t) - V.corona) * e;
+          };
+          Fpos = (t) => Rat(t) + Wc(t);
+          cutAt = (t) => Rat(t);
+        }
+        function P(s, k) { return [s * d[0] + k * u[0], s * d[1] + k * u[1]]; }
+        function quad(c, lo, hi) {
+          const a1 = P(lo, kLo - 40), a2 = P(hi, kLo - 40), a3 = P(hi, kHi + 40), a4 = P(lo, kHi + 40);
+          c.beginPath(); c.moveTo(a1[0], a1[1]); c.lineTo(a2[0], a2[1]); c.lineTo(a3[0], a3[1]); c.lineTo(a4[0], a4[1]); c.closePath();
+        }
+        const STOPS = BANDS ? null : V.stops.map((s) => [s[0], hexRgb(s[1]), s[2]]);
+
+        // draw the sweep once, at time t, into octx
+        function drawSample(t) {
+          octx.clearRect(0, 0, W, H);
+          if (BANDS) {
+            for (let i = 0; i < V.bands.length; i++) {
+              const sh = shape(i, t), lo = sh[0], hi = sh[1];
+              if (hi < -4 || lo > sMax + 4) continue;
+              drawn = true;
+              quad(octx, lo, hi); octx.fillStyle = bandGrad; octx.fill();
+              // a lit slab: light on the leading edge, a touch of depth toward the trailing edge
+              const a = P(hi, 0), b = P(lo, 0), sg = octx.createLinearGradient(a[0], a[1], b[0], b[1]);
+              const w = hi - lo, lit = Math.min(1, 46 / Math.max(w, 1));
+              sg.addColorStop(0, "rgba(255,246,232,0.42)"); sg.addColorStop(lit, "rgba(255,246,232,0)");
+              sg.addColorStop(Math.max(lit, 0.55), "rgba(40,6,60,0)"); sg.addColorStop(1, "rgba(40,6,60,0.2)");
+              quad(octx, lo, hi); octx.fillStyle = sg; octx.fill();
+              const e = Math.min(3, w); quad(octx, hi - e, hi); octx.fillStyle = V.edge; octx.fill();
+            }
+          } else {
+            const R = Rat(t), w = Wc(t);
+            if (w < 0.5 || R > sMax + 4) return;
+            drawn = true;
+            const outer = R + w, rg = octx.createRadialGradient(cx, cy, R, cx, cy, outer);
+            STOPS.forEach((s) => rg.addColorStop(s[0], rgba(s[1], s[2])));
+            octx.beginPath(); octx.arc(cx, cy, outer, 0, Math.PI * 2); if (R > 0.5) octx.arc(cx, cy, R, 0, Math.PI * 2, true);
+            octx.fillStyle = rg; octx.fill("evenodd");
+            // burn-through: the young hole is still white-hot, and clip B clears into it as it widens
+            const th = R > 0.5 ? Math.pow(clamp01(1 - (R - V.r0) / (V.through - V.r0)), 1.4) : 0;
+            if (th > 0.004) {
+              const ig = octx.createRadialGradient(cx, cy, 0, cx, cy, R);
+              ig.addColorStop(0, "rgba(255,226,170," + (0.86 * th).toFixed(3) + ")");
+              ig.addColorStop(1, "rgba(255,248,236," + th.toFixed(3) + ")");
+              octx.beginPath(); octx.arc(cx, cy, R + 0.5, 0, Math.PI * 2); octx.fillStyle = ig; octx.fill();
+            }
+          }
+        }
+        // the frame: sub-frame samples averaged ('lighter' with alpha 1/n is an exact mean) = a 180-degree shutter
+        function drawFrame(t) {
+          ctx.clearRect(0, 0, W, H); drawn = false;
+          const sp = Math.abs(Fpos(t + 0.25 / FPS) - Fpos(t - 0.25 / FPS));        // px travelled in half a frame
+          const n = Math.max(1, Math.min(12, Math.ceil(sp / 5)));
+          if (n === 1) { drawSample(t); ctx.drawImage(off, 0, 0); }
+          else {
+            ctx.globalCompositeOperation = "lighter";
+            for (let j = 0; j < n; j++) { drawSample(t + (j / (n - 1) - 0.5) * 0.5 / FPS); ctx.globalAlpha = 1 / n; ctx.drawImage(off, 0, 0); }
+            ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
+          }
+          // glow: a quarter-res copy, blurred by CSS and screened over the picture, so the sweep lights the footage
+          gctx.clearRect(0, 0, gl.width, gl.height);
+          if (drawn) gctx.drawImage(cv, 0, 0, gl.width, gl.height);
+          // an empty canvas is hidden, so nothing sits over the title once the sweep has gone
+          cv.style.visibility = gl.style.visibility = drawn ? "visible" : "hidden";
+        }
+
+        // ---- clip B's side of the cut (B footage + the title), in the coordinates of a box whose top is at oy ----
+        function clipFor(t, oy, title) {
+          // the title only shows once the LAST band has passed it (never in glimpses through the gaps)
+          const c = (title && BANDS) ? shape(V.bands.length - 1, t)[0] : cutAt(t);
+          if (c <= 0.5) return "polygon(0px 0px, 0px 0px, 0px 0px)";
+          if (c >= sMax + 2) return "none";
+          if (BANDS) {
+            const a1 = P(c, kLo - 60), a2 = P(c, kHi + 60), a3 = P(c - 4000, kHi + 60), a4 = P(c - 4000, kLo - 60);
+            return "polygon(" + [a1, a2, a3, a4].map((p) => p[0].toFixed(1) + "px " + (p[1] - oy).toFixed(1) + "px").join(",") + ")";
+          }
+          return "circle(" + c.toFixed(1) + "px at " + cx + "px " + (cy - oy) + "px)";
+        }
+        const layB = $("#layB");
+
+        document.fonts.ready.then(() => {
+          const tl = gsap.timeline({ paused: true });
+          // ---- the hit: the first frame on which the sweep has cleared the whole title ----
+          const r = hero.getBoundingClientRect(), box = [[r.left, r.top], [r.right, r.top], [r.left, r.bottom], [r.right, r.bottom]];
+          let hf, far;
+          if (BANDS) {
+            far = Math.max.apply(null, box.map((p) => p[0] * d[0] + p[1] * d[1]));
+            hf = Math.ceil(V.start * FPS); while (hf < D * FPS && shape(V.bands.length - 1, hf / FPS)[0] < far + 6) hf++;
+          } else {
+            far = Math.max.apply(null, box.map((p) => Math.hypot(p[0] - cx, p[1] - cy)));
+            hf = Math.ceil(V.openAt * FPS); while (hf < D * FPS && Rat(hf / FPS) < far + 6) hf++;
+          }
+          const HIT = hf / FPS;
+          window.__sw = { HIT: HIT, far: far };
+
+          // ---- footage moves with the sweep ----
+          const T0 = BANDS ? V.start : V.sunAt, C0 = V.cuts[0], C1 = V.cuts[1];
+          if (plate) {
+            // A pushes, then is pulled into the sweep (toward where the light goes)
+            const oA = BANDS ? "78% 62%" : cx + "px " + (cy - BT) + "px";
+            gsap.set("#wA", { transformOrigin: oA, scale: 1 });
+            tl.fromTo("#wA", { scale: 1 }, { scale: 1.04, duration: T0, ease: "none", immediateRender: false }, 0);
+            tl.fromTo("#wA", { scale: 1.04 }, { scale: BANDS ? 1.13 : 1.2, duration: HIT - T0, ease: "power2.in", immediateRender: false }, T0);
+            // B lands: from a push-in down to 1.0 just after the hit, then a slow push to the next cut
+            const oB = BANDS ? "28% 40%" : V.land[0] + "px " + V.land[1] + "px", sB = BANDS ? 1.12 : 1.22;
+            const TB = BANDS ? T0 : V.openAt;   // iris: B holds its zoom (face on the centre) until the hole opens
+            gsap.set("#wB1", { transformOrigin: oB, scale: sB });
+            tl.fromTo("#wB1", { scale: sB }, { scale: 1.0, duration: HIT + 0.3 - TB, ease: BANDS ? "power3.out" : "power2.inOut", immediateRender: false }, TB);
+            tl.fromTo("#wB1", { scale: 1.0 }, { scale: 1.03, duration: C0 - (HIT + 0.3), ease: "none", immediateRender: false }, HIT + 0.3);
+            Look.push(tl, "#wB2", C0, C1 - C0, { from: 1.0, to: 1.05, origin: BANDS ? "50% 30%" : "50% 40%" });
+            Look.push(tl, "#wB3", C1, D - C1, { from: 1.0, to: 1.06, origin: BANDS ? "50% 30%" : "55% 55%" });
+          }
+
+          // ---- the sweep + the A/B cut, every frame ----
+          let lastF = -1;
+          Look.drive(tl, 0, D, (p) => {
+            const t = p * D, f = Math.round(t * FPS * 1000) / 1000; if (f === lastF) return; lastF = f;
+            drawFrame(t);
+            layB.style.clipPath = clipFor(t, BT);
+            type.style.clipPath = clipFor(t, 0, true);
+          });
+
+          // ---- the title: a small parallax drift with the sweep while it is revealed ----
+          const hx = BANDS ? -46 : 0, hy = BANDS ? 0 : 22;
+          gsap.set(hero, { x: hx, y: hy });
+          tl.fromTo(hero, { x: hx, y: hy }, { x: 0, y: 0, duration: HIT + 0.25 - T0, ease: "expo.out", immediateRender: false }, T0 + 0.1);
+          if (BANDS) hero.style.textShadow = "0 1px 1px rgba(0,0,0,.28), 0 4px 14px rgba(0,0,0,.34), 0 14px 48px rgba(0,0,0,.38), 0 0 42px rgba(255,200,143,.16)";
+          else Look.bloom(hero, { color: "#FFD6C2", strength: 0.3 });
+
+          // ---- the payoff hit ----
+          if (plate) {
+            Look.impact(tl, HIT, { shake: "#shake", amp: CONFIG.hit.amp, flash: 0, zoom: CONFIG.hit.zoom });
+            Look.expose(tl, HIT, { target: "#shake", peak: CONFIG.hit.peak });
+          }
+          if (CONFIG.hit.chroma) Look.chroma(tl, hero, HIT, 0.16, { px: CONFIG.hit.chroma });
+
+          // ---- second beat: the kicker (v0) / the label (v1) ----
+          if (BANDS) {
+            gsap.set(slash, { scaleY: 0, transformOrigin: "50% 100%" });
+            tl.fromTo(slash, { scaleY: 0 }, { scaleY: 1, duration: 0.5, ease: "expo.out", immediateRender: false }, HIT + 0.05);
+            Look.reveal(tl, klabel, HIT + 0.1, { by: "chars", stagger: 0.024, dur: 0.6 });
+          } else {
+            Look.enter(tl, label, HIT + 0.08, { from: "blur", dur: 0.6, blur: 12, scale: 1.06 });
+          }
+
+          // ---- exit ----
+          const X = CONFIG.exitAt;
+          if (BANDS) {
+            Look.exit(tl, kick, X, { to: "blur", dur: 0.36 });
+            Look.exit(tl, hero.querySelectorAll(".ln"), X + 0.06, { to: "blur", dur: 0.4, stagger: 0.07, blur: 16 });
+            tl.fromTo("#scrim", { opacity: 0.8 }, { opacity: 0, duration: 0.6, ease: "power2.inOut", immediateRender: false }, X + 0.1);
+          } else {
+            Look.exit(tl, label, X, { to: "blur", dur: 0.36 });
+            Look.exit(tl, hero.querySelectorAll(".ln"), X + 0.06, { to: "blur", dur: 0.42, stagger: 0.07, blur: 16 });
+          }
+
+          Look.install(tl, { duration: D, grain: 0.15, vignette: LB ? 0.38 : 0.5, enabled: plate });
+          tl.set({}, {}, D);
+          window.__timelines = window.__timelines || {};
+          window.__timelines["main"] = tl;
+          tl.seek(0);
+        });
+      })();
+    </script>
+  </body>
+</html>

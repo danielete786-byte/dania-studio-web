@@ -1,0 +1,390 @@
+<!doctype html>
+<!-- GTA 6 component #14 — Circle callout (craft v2). 1080x1920 (9:16), 30 fps, 5 s.
+     Points out one detail by drawing on the footage itself: a sunset ring of light (variant 0) or focus-lock corner
+     brackets (variant 1) lock onto a motion-tracked detail, a fine leader runs to a cinematic label set in the image's own
+     negative space. Variables: variant "0" Ring + label / "1" Bracket + label; bg "plate" (sample footage) / "none" (transparent overlay).
+     Safe zone: all text and key objects inside x 72–936, y 230–1480. -->
+<html lang="en" data-composition-variables='[
+  {"id":"variant","type":"enum","label":"Variant","default":"0","options":[{"value":"0","label":"Ring + label"},{"value":"1","label":"Bracket + label"}]},
+  {"id":"bg","type":"enum","label":"Background","default":"plate","options":[{"value":"plate","label":"Sample footage"},{"value":"none","label":"Transparent"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link rel="stylesheet" href="assets/fonts/fonts.css" />
+    <link rel="stylesheet" href="assets/kit/look/look.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="assets/kit/look/look.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: transparent; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; font-family: "Inter", sans-serif; color: #fff;
+        -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; }
+      #shake, #push { position: absolute; inset: 0; }
+      .shot { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+
+      /* footage-bound effects (inside #shake, so they move with the hit) */
+      #fx { position: absolute; inset: 0; pointer-events: none; }
+      /* v0 lens: lifts the footage inside the ring; its edge sits under the stroke */
+      #lens { position: absolute; left: 0; top: 0; border-radius: 50%; opacity: 0; display: none; }
+      /* v0 glint: a specular band that sweeps across the lens on the payoff (screen blend, clipped to the ring) */
+      #glint { position: absolute; left: 0; top: 0; border-radius: 50%; overflow: hidden; mix-blend-mode: screen; opacity: 0; display: none; }
+      #glint i { position: absolute; top: -20%; height: 140%; width: 46%; left: 27%;
+        background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,250,240,.75) 46%, rgba(255,255,255,.95) 50%, rgba(255,250,240,.75) 54%, rgba(255,255,255,0) 100%);
+        transform-origin: 50% 50%; }
+      /* v1 focus dim: the frame outside the brackets drops a touch darker when focus locks (CONFIG defocus.blur > 0 adds a soften) */
+      #defocus { position: absolute; inset: 0; display: none; }
+      /* payoff light: a warm exposure bloom centred on the detail (screen blend), instead of a flat full-frame flash */
+      #burst { position: absolute; left: 0; top: 0; width: 1400px; height: 1400px; border-radius: 50%; mix-blend-mode: screen; opacity: 0; display: none;
+        background: radial-gradient(circle, rgba(255,246,236,.95) 0%, rgba(255,214,186,.55) 12%, rgba(254,142,78,.22) 30%, rgba(248,79,164,.08) 48%, rgba(0,0,0,0) 68%); }
+      #shotA { filter: brightness(1.1) contrast(1.06) saturate(1.06); }
+
+      #markwrap { position: absolute; inset: 0; pointer-events: none; }
+      #marks { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; overflow: visible; }
+      #ringglow { filter: drop-shadow(0 0 6px rgba(248,79,164,.75)) drop-shadow(0 0 22px rgba(254,142,78,.45)); }
+      #brk { filter: drop-shadow(0 0 1px rgba(0,0,0,.5)) drop-shadow(0 3px 10px rgba(0,0,0,.45)); }
+      .lead { filter: drop-shadow(0 1px 1.5px rgba(0,0,0,.55)) drop-shadow(0 3px 10px rgba(0,0,0,.35)); }
+
+      /* overlay: scrim + label lockup (steady: it does not shake with the footage) */
+      #ov { position: absolute; inset: 0; z-index: 10; pointer-events: none; }
+      #scrim { position: absolute; left: 0; right: 0; opacity: 0; }
+      /* v0: weighted to the lower left, under the type, so Jason's lit shoulder on the right keeps its light */
+      #scrim.s-bottom { top: 880px; height: 1040px;
+        background: radial-gradient(ellipse 720px 340px at 380px 410px, rgba(5,5,9,.34) 0%, rgba(5,5,9,.16) 60%, rgba(5,5,9,0) 100%),
+                    linear-gradient(180deg, rgba(5,5,9,0) 0%, rgba(5,5,9,.36) 22%, rgba(5,5,9,.6) 46%, rgba(5,5,9,.78) 72%, rgba(5,5,9,.86) 100%); }
+      /* v1: a soft pool of shadow behind the lockup only; the sky and the man's face keep their daylight */
+      #scrim.s-top { top: 0; height: 900px;
+        background: radial-gradient(ellipse 700px 380px at 330px 400px, rgba(5,5,9,.58) 0%, rgba(5,5,9,.36) 50%, rgba(5,5,9,0) 100%),
+                    linear-gradient(180deg, rgba(5,5,9,.26) 0%, rgba(5,5,9,.14) 34%, rgba(5,5,9,0) 62%); }
+      #label { position: absolute; white-space: nowrap; }
+      #label .kicker { display: flex; align-items: center; gap: 18px; color: rgba(255,255,255,.88); }
+      #label .kicker .tick { width: 44px; height: 2px; background: rgba(255,255,255,.8); }
+      #label .hero { margin-top: 22px; }
+      #label .line { display: block; }
+      /* v0: Inter display, tight and huge, sentence case */
+      #label.f-display .line { font-family: "Inter", sans-serif; font-weight: 800; letter-spacing: -0.045em; line-height: .93;
+        font-feature-settings: "ss01" 1, "cv11" 1; }
+      /* v1: Archivo wide caps, the cinematic edit face */
+      #label.f-wide .line { font-family: "Archivo", "Inter", sans-serif; font-stretch: 125%; font-weight: 800; text-transform: uppercase;
+        letter-spacing: 0; line-height: .96; }
+      #label.f-wide .hero { margin-top: 26px; }
+      #label .lift { filter: drop-shadow(0 2px 2px rgba(0,0,0,.3)) drop-shadow(0 8px 26px rgba(0,0,0,.42)); }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="5" data-width="1080" data-height="1920">
+      <div id="shake">
+        <div id="push">
+          <!-- sample footage (framework-owned). v0: s008 Jason driving, pre-slowed 0.94x (5.1 s). v1: s004 palm-print shirt (5.03 s). -->
+          <video id="shotA" class="clip shot" src="assets/clips/s008-jason-driving-slow.mp4" muted playsinline data-start="0" data-duration="5" data-track-index="0"></video>
+          <video id="shotB" class="clip shot" src="assets/shots/s004-palm-shirt-truck-v.mp4" muted playsinline data-start="0" data-duration="5" data-track-index="1"></video>
+        </div>
+        <div id="fx">
+          <div id="defocus"></div>
+          <div id="lens"></div>
+          <div id="glint"><i></i></div>
+          <div id="burst"></div>
+        </div>
+        <div id="markwrap">
+          <svg id="marks" viewBox="0 0 1080 1920" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="sun" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#F84FA4" />
+                <stop offset="0.35" stop-color="#FE78A6" />
+                <stop offset="0.7" stop-color="#FE8E4E" />
+                <stop offset="1" stop-color="#FEB747" />
+              </linearGradient>
+              <filter id="flyblur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur id="flyblurk" stdDeviation="0" /></filter>
+            </defs>
+            <g id="shapes"></g>
+          </svg>
+        </div>
+      </div>
+
+      <div id="ov" class="clip" data-start="0" data-duration="5" data-track-index="2">
+        <div id="scrim"></div>
+        <div id="label">
+          <div class="kicker t-label-wide" id="kicker"><span class="tick"></span><span id="kickerText"></span></div>
+          <div class="hero lift" id="hero"><span class="line" id="l1"></span><span class="line" id="l2"></span></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const CONFIG = {
+        duration: 5.0,
+        variants: {
+          // Ring + label: a sunset ring of light draws around Jason's mirrored lens; the payoff glints the lens.
+          "0": {
+            style: "ring",
+            shot: "shotA",
+            kicker: "Detail 01",
+            lines: ["Real-time", "reflections"],
+            face: "display",                    // Inter display
+            target: { x: 494, y: 386 },          // detail centre at the track's reference frame (px on 1080x1920)
+            radius: 122,                          // ring radius (px)
+            label: { left: 72, top: 1128 },       // label block top-left (fixed on screen)
+            heroWidth: 740, heroMin: 140, heroMax: 172,  // widest hero line is fitted to heroWidth px, clamped to [min,max] font-size
+            leaderX: 84,                          // x of the leader's vertical drop (aligned with the type's left edge)
+            lift: { brightness: 1.16, contrast: 1.05 }, // lens lift inside the ring (plate only)
+            push: 1.06,                           // slow camera push over the whole clip (origin = target)
+            scrim: "bottom",
+            // lens offset every 0.1 s on the sample clip (SSD-tracked from the pre-slowed s008, ref frame 30 = 1.0 s)
+            track: [[-58,34],[-57,31],[-54,26],[-48,21],[-40,19],[-31,19],[-22,17],[-16,13],[-12,9],[-7,5],[-1,2],[5,0],[10,-1],[16,0],[17,1],[16,1],[12,-1],[6,-6],[0,-9],[-5,-10],[-7,-8],[-8,-5],[-9,-3],[-12,-1],[-17,1],[-24,6],[-30,12],[-35,17],[-38,21],[-42,25],[-46,27],[-50,29],[-52,27],[-52,25],[-49,24],[-46,24],[-43,25],[-38,20],[-31,10],[-24,-5],[-19,-15],[-14,-16],[-10,-13],[-4,-8],[1,-6],[6,-7],[10,-10],[12,-13],[14,-13],[14,-14],[14,-16]]
+          },
+          // Bracket + label: focus-lock corners snap onto the palm-print sleeve, the frame around it dims a touch.
+          "1": {
+            style: "bracket",
+            shot: "shotB",
+            kicker: "Detail 02",
+            lines: ["Cloth", "physics"],
+            face: "wide",                         // Archivo wide caps
+            accentLine: 1,                        // which hero line carries the sunset fill
+            target: { x: 500, y: 1050 },
+            box: { w: 330, h: 330 },              // bracket frame (px)
+            arm: 74,                              // bracket arm length (px)
+            label: { left: 72, top: 262 },
+            heroWidth: 600, heroMin: 110, heroMax: 132,
+            leaderFrom: { dx: 300, dy: 34 },      // leader dot: this far right of the label's left edge / below its bottom (under PHYSICS, clear of the raised hand)
+            defocus: { blur: 0, dim: 0.1 },         // focus dim outside the brackets when they lock (plate only; blur > 0 adds a rack-focus soften)
+            push: 1.05,
+            scrim: "top",
+            burst: 1.0,                           // payoff bloom strength on the detail (daylight needs a little more than v0's 0.8)
+            // palm-print sleeve offset every 0.1 s on s004 (SSD-tracked, ref frame 60 = 2.0 s)
+            track: [[-243,-56],[-222,-56],[-182,-52],[-132,-49],[-88,-46],[-57,-47],[-45,-48],[-52,-48],[-75,-48],[-102,-46],[-123,-40],[-131,-28],[-131,-14],[-128,-3],[-121,5],[-105,6],[-79,1],[-53,-6],[-29,-9],[-12,-6],[-3,0],[-4,5],[-11,6],[-20,2],[-28,1],[-32,6],[-32,13],[-32,16],[-47,15],[-80,17],[-124,20],[-156,27],[-170,35],[-167,47],[-157,62],[-146,79],[-144,108],[-148,139],[-160,164],[-176,166],[-198,156],[-223,143],[-242,136],[-256,134],[-262,135],[-261,140],[-256,148],[-254,158],[-264,167],[-284,176],[-300,181]]
+          }
+        },
+        trackStep: 0.1,
+        trackWithoutPlate: false,                 // bg "none": the mark holds still at `target`
+        sunset: "linear-gradient(100deg, #F84FA4 0%, #FE78A6 24%, #FE8E4E 62%, #FEB747 100%)",
+        // seconds
+        timing: {
+          v0: { mark: 0.08, markDur: 0.56, hit: 0.64, leader: 0.6, kicker: 0.74, hero: 0.7, out: 4.3 },
+          v1: { mark: 0.1,  markDur: 0.5,  hit: 0.6,  leader: 0.7, kicker: 0.84, hero: 0.8, out: 4.3 }
+        }
+      };
+
+      (function () {
+        const VARS = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+        const vKey = CONFIG.variants[String(VARS.variant)] ? String(VARS.variant) : "0";
+        const plate = VARS.bg !== "none";
+        const V = CONFIG.variants[vKey], T = CONFIG.timing["v" + vKey], D = CONFIG.duration;
+        const $ = (s) => document.querySelector(s);
+        const NS = "http://www.w3.org/2000/svg";
+        const mk = (tag, attrs, parent) => { const n = document.createElementNS(NS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); (parent || $("#shapes")).appendChild(n); return n; };
+
+        document.querySelectorAll("video.shot").forEach((v) => { if (!plate || v.id !== V.shot) v.style.display = "none"; });
+
+        const useTrack = (plate || CONFIG.trackWithoutPlate) && V.track && V.track.length;
+        function trackAt(t) {
+          if (!useTrack) return [0, 0];
+          const a = V.track, f = Math.max(0, Math.min(a.length - 1, t / CONFIG.trackStep));
+          const i = Math.floor(f), j = Math.min(a.length - 1, i + 1), u = f - i;
+          return [a[i][0] + (a[j][0] - a[i][0]) * u, a[i][1] + (a[j][1] - a[i][1]) * u];
+        }
+        const clamp01 = (x) => Math.max(0, Math.min(1, x));
+        const seg = (t, s, d) => clamp01((t - s) / d);
+        const O = V.target;
+
+        // ---------- label content ----------
+        const label = $("#label");
+        label.classList.add(V.face === "wide" ? "f-wide" : "f-display");
+        label.style.left = V.label.left + "px"; label.style.top = V.label.top + "px";
+        $("#kickerText").textContent = V.kicker;
+        $("#l1").textContent = V.lines[0]; $("#l2").textContent = V.lines[1];
+        const scrim = $("#scrim"); scrim.className = V.scrim === "top" ? "s-top" : "s-bottom";
+
+        // footage transforms pivot on the detail, so the push and the punch-zoom close in on it
+        $("#push").style.transformOrigin = `${O.x}px ${O.y}px`;
+        gsap.set("#shake", { transformOrigin: `${O.x}px ${O.y}px` });
+
+        document.fonts.ready.then(() => {
+          const E = (n) => gsap.parseEase(n);
+          const eOut = E("expo.out"), eIO = E("power3.inOut"), p2in = E("power2.in"), p3in = E("power3.in"), p2io = E("power2.inOut");
+
+          // fit the hero: the widest line spans heroWidth px (clamped to the size floor/ceiling)
+          const hero = $("#hero"), l1 = $("#l1"), l2 = $("#l2");
+          hero.style.fontSize = "100px";
+          const wMax = Math.max(l1.getBoundingClientRect().width, l2.getBoundingClientRect().width);
+          const fs = Math.max(V.heroMin, Math.min(V.heroMax, 100 * V.heroWidth / wMax));
+          hero.style.fontSize = fs.toFixed(1) + "px";
+          const lb = label.getBoundingClientRect();
+
+          const tl = gsap.timeline({ paused: true });
+          const push = $("#push");
+          const burst = $("#burst");
+          if (plate) burst.style.display = "block";
+          const BP = V.burst || 0.8;
+          const lightAt = (t, cx, cy) => {   // payoff exposure bloom on the detail (plate only)
+            if (!plate) return;
+            const b = seg(t, T.hit, 0.42);
+            const a = b > 0 && b < 1 ? BP * Math.pow(1 - b, 2.2) : 0;
+            burst.style.opacity = a.toFixed(3);
+            burst.style.transform = `translate(${(cx - 700).toFixed(1)}px, ${(cy - 700).toFixed(1)}px) scale(${(0.7 + 0.5 * b).toFixed(3)})`;
+          };
+          let render;
+
+          if (V.style === "ring") {
+            const R = V.radius;
+            const under = mk("circle", { fill: "none", stroke: "rgba(0,0,0,0.32)", "stroke-width": 15, "stroke-linecap": "round" });
+            const g = mk("g", { id: "ringglow" });
+            const ring = mk("circle", { fill: "none", stroke: "url(#sun)", "stroke-width": 7, "stroke-linecap": "round" }, g);
+            const head = mk("circle", { r: 7, fill: "#FFF4EA" }, g);
+            const lead = mk("path", { class: "lead", fill: "none", stroke: "#FFFFFF", "stroke-width": 3, "stroke-linecap": "round", "stroke-linejoin": "round" });
+            const dot = mk("circle", { class: "lead", r: 0, fill: "#FFFFFF" });
+            const lens = $("#lens"), glint = $("#glint"), gi = $("#glint i");
+            if (plate && V.lift) {
+              const f = `brightness(${V.lift.brightness}) contrast(${V.lift.contrast}) saturate(1.1)`;
+              lens.style.display = "block"; lens.style.webkitBackdropFilter = f; lens.style.backdropFilter = f;
+              glint.style.display = "block";
+            }
+            const START = -150; // the stroke starts at about 10 o'clock and draws clockwise
+            const yEnd = V.label.top - 22;
+            render = (t) => {
+              const s = plate ? 1 + (V.push - 1) * (t / D) : 1;
+              const [dx, dy] = trackAt(t);
+              const cx = O.x + dx * s, cy = O.y + dy * s;
+              const pIn = eIO(seg(t, T.mark, T.markDur));
+              const pOut = p2in(seg(t, T.out + 0.24, 0.4));
+              const r = R * s * (1 + 0.07 * (1 - eOut(seg(t, T.mark, T.markDur + 0.2))));
+              const C = 2 * Math.PI * r;
+              const on = pIn > 0.001 && pOut < 0.999;
+              [under, ring].forEach((c) => {
+                c.setAttribute("cx", cx); c.setAttribute("cy", cy); c.setAttribute("r", r);
+                c.setAttribute("transform", `rotate(${START} ${cx} ${cy})`);
+                c.setAttribute("stroke-dasharray", `${C} ${C}`);
+                c.setAttribute("stroke-dashoffset", pOut > 0 ? -C * pOut : C * (1 - pIn));
+                c.setAttribute("opacity", on ? 1 : 0);
+              });
+              // the light-pen head leads the stroke while it draws
+              const ha = (START + 360 * pIn) * Math.PI / 180;
+              head.setAttribute("cx", cx + r * Math.cos(ha)); head.setAttribute("cy", cy + r * Math.sin(ha));
+              head.setAttribute("opacity", (pIn > 0.001 && pIn < 0.999 ? 1 : 0) * (1 - clamp01((pIn - 0.85) / 0.15)));
+              // lens lift: fades in as the ring closes (its edge hides under the stroke), out as it un-draws
+              if (lens.style.display === "block") {
+                const lA = clamp01((pIn - 0.75) / 0.25) * (1 - clamp01(pOut / 0.3));
+                const ri = r - 2;
+                lens.style.width = lens.style.height = (2 * ri).toFixed(2) + "px";
+                lens.style.transform = `translate(${(cx - ri).toFixed(2)}px, ${(cy - ri).toFixed(2)}px)`;
+                lens.style.opacity = lA.toFixed(3);
+                // payoff glint: one specular band sweeps across the lens
+                const gp = seg(t, T.hit - 0.02, 0.5);
+                glint.style.width = glint.style.height = (2 * ri).toFixed(2) + "px";
+                glint.style.transform = `translate(${(cx - ri).toFixed(2)}px, ${(cy - ri).toFixed(2)}px)`;
+                glint.style.opacity = (gp > 0 && gp < 1 ? Math.sin(Math.PI * gp) * 0.85 : 0).toFixed(3);
+                gi.style.transform = `translateX(${((p2io(gp) - 0.5) * 2 * 2.2 * ri).toFixed(1)}px) rotate(18deg)`;
+              }
+              // leader: leaves the ring at 9 o'clock, runs left, then drops down the dark left edge to the label
+              const x0 = cx - r, xL = V.leaderX;
+              const hLen = Math.max(0, x0 - xL), vLen = Math.max(0, yEnd - cy), L = hLen + vLen;
+              const lIn = eOut(seg(t, T.leader, 0.5));
+              const lOut = p3in(seg(t, T.out + 0.1, 0.32));
+              const vis = L * lIn * (1 - lOut);
+              lead.setAttribute("d", `M ${x0} ${cy} H ${xL} V ${yEnd}`);
+              lead.setAttribute("stroke-dasharray", `${vis.toFixed(2)} ${L + 40}`);
+              lead.setAttribute("opacity", vis > 1 ? 1 : 0);
+              const dIn = seg(t, T.leader + 0.36, 0.14), dOut = seg(t, T.out, 0.1);
+              dot.setAttribute("cx", xL); dot.setAttribute("cy", yEnd); dot.setAttribute("r", (5.5 * E("back.out(2)")(dIn) * (1 - dOut)).toFixed(2));
+              lightAt(t, cx, cy);
+            };
+          } else {
+            const W = V.box.w, H = V.box.h, ARM = V.arm, ER = 8;
+            const gB = mk("g", { id: "brk" });
+            const gF = mk("g", { filter: "url(#flyblur)" }, gB);
+            const corners = [0, 1, 2, 3].map(() => mk("path", { fill: "none", stroke: "#FFFFFF", "stroke-width": 6, "stroke-linecap": "round", "stroke-linejoin": "round" }, gF));
+            const lead = mk("line", { class: "lead", stroke: "#FFFFFF", "stroke-width": 3, "stroke-linecap": "round" });
+            const pin = mk("circle", { class: "lead", r: 0, fill: "#FFFFFF" });
+            const dot = mk("circle", { class: "lead", r: 0, fill: "#FFFFFF" });
+            const fly = $("#flyblurk");
+            const dfc = $("#defocus");
+            const useDefocus = plate && V.defocus;
+            if (useDefocus) dfc.style.display = "block";
+            const A = { x: V.label.left + V.leaderFrom.dx, y: lb.bottom + V.leaderFrom.dy };
+            render = (t) => {
+              const s = plate ? 1 + (V.push - 1) * (t / D) : 1;
+              const [dx, dy] = trackAt(t);
+              const cx = O.x + dx * s, cy = O.y + dy * s;
+              const bIn = eOut(seg(t, T.mark, T.markDur));
+              const bOut = p2in(seg(t, T.out + 0.26, 0.34));
+              const lock = seg(t, T.hit, 0.24);
+              const spread = 1 + 0.75 * (1 - bIn) - 0.045 * Math.sin(Math.PI * lock) + 0.3 * bOut;
+              const hw = (W / 2) * s * spread, hh = (H / 2) * s * spread;
+              const op = seg(t, T.mark, 0.1) * (1 - bOut);
+              // lock flare: the corners flash white-hot on the lock, then settle (part of the payoff)
+              const lk = seg(t, T.hit, 0.5), gl = t >= T.hit && lk < 1 ? Math.pow(1 - lk, 2) : 0;
+              gB.style.filter = gl > 0.01 ? `drop-shadow(0 0 1px rgba(0,0,0,.5)) drop-shadow(0 3px 10px rgba(0,0,0,.45)) drop-shadow(0 0 ${(4 + 14 * gl).toFixed(1)}px rgba(255,236,220,${(0.95 * gl).toFixed(3)}))` : "";
+              fly.setAttribute("stdDeviation", (7 * (1 - bIn) + 6 * bOut).toFixed(2));
+              [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([sx, sy], k) => {
+                const x = cx + sx * hw, y = cy + sy * hh;
+                corners[k].setAttribute("d", `M ${x} ${y - sy * ARM} L ${x} ${y - sy * ER} Q ${x} ${y} ${x - sx * ER} ${y} L ${x - sx * ARM} ${y}`);
+                corners[k].setAttribute("opacity", op.toFixed(3));
+              });
+              // focus dim: outside the brackets drops a touch darker once focus locks (optional soften)
+              if (useDefocus) {
+                const f = eOut(seg(t, T.hit, 0.55)) * (1 - p2in(seg(t, T.out + 0.2, 0.4)));
+                const flt = f > 0.002 ? `${V.defocus.blur ? `blur(${(V.defocus.blur * f).toFixed(2)}px) ` : ""}brightness(${(1 - V.defocus.dim * f).toFixed(3)})` : "none";
+                dfc.style.webkitBackdropFilter = flt; dfc.style.backdropFilter = flt;
+                const m = `radial-gradient(ellipse ${(hw * 1.75).toFixed(1)}px ${(hh * 1.75).toFixed(1)}px at ${cx.toFixed(1)}px ${cy.toFixed(1)}px, rgba(0,0,0,0) 66%, #000 100%)`;
+                dfc.style.webkitMaskImage = m; dfc.style.maskImage = m;
+              }
+              // leader: from a pin on the middle of the top edge (between the corner arms, so it never lines up with one)
+              // up to the label. It draws from the mark to the label.
+              const px = cx, py = cy - hh - 12;
+              const lIn = eOut(seg(t, T.leader, 0.42)), lOut = p3in(seg(t, T.out + 0.08, 0.3));
+              const k = lIn * (1 - lOut);
+              lead.setAttribute("x1", px); lead.setAttribute("y1", py);
+              lead.setAttribute("x2", px + (A.x - px) * k); lead.setAttribute("y2", py + (A.y - py) * k);
+              lead.setAttribute("opacity", k > 0.004 ? 1 : 0);
+              const pinIn = seg(t, T.leader - 0.06, 0.14), pinOut = seg(t, T.out + 0.3, 0.12);
+              pin.setAttribute("cx", px); pin.setAttribute("cy", py); pin.setAttribute("r", (5 * E("back.out(2)")(pinIn) * (1 - pinOut)).toFixed(2));
+              const dIn = seg(t, T.leader + 0.3, 0.14), dOut = seg(t, T.out, 0.1);
+              dot.setAttribute("cx", A.x); dot.setAttribute("cy", A.y); dot.setAttribute("r", (5.5 * E("back.out(2)")(dIn) * (1 - dOut)).toFixed(2));
+              lightAt(t, cx, cy);
+            };
+          }
+
+          // every mark/footage frame is a pure function of time (seek-safe), including the push
+          Look.drive(tl, 0, D, (p) => {
+            const t = p * D;
+            if (plate) push.style.transform = `scale(${(1 + (V.push - 1) * (t / D)).toFixed(5)})`;
+            render(t);
+          });
+
+          // scrim: part of the graphic (it stays with bg "none")
+          tl.fromTo(scrim, { opacity: 0 }, { opacity: 1, duration: 0.6, ease: "power2.out", immediateRender: false }, T.hit - 0.25);
+          tl.fromTo(scrim, { opacity: 1 }, { opacity: 0, duration: 0.5, ease: "power2.in", immediateRender: false }, T.out + 0.15);
+          gsap.set(scrim, { opacity: 0 });
+
+          // label: kicker blurs in, hero lines rise out of masks (words for Inter display, characters for Archivo wide)
+          Look.enter(tl, "#kicker", T.kicker, { from: "blur", dur: 0.55, blur: 10 });
+          const by = V.face === "wide" ? "chars" : "words";
+          Look.reveal(tl, "#l1", T.hero, { by, stagger: by === "chars" ? 0.03 : 0.09, dur: 0.7 });
+          Look.reveal(tl, "#l2", T.hero + (by === "chars" ? 0.16 : 0.12), { by, stagger: by === "chars" ? 0.03 : 0.09, dur: 0.75 });
+          if (V.accentLine != null) {
+            const acc = V.accentLine === 0 ? "#l1" : "#l2";
+            Look.fill(acc, CONFIG.sunset, { sheen: true });
+            Look.sheen(tl, acc, T.hero + 0.95, { dur: 1.0 });
+          } else {
+            Look.bloom("#hero .line", { color: "#FFFFFF", strength: 0.22 });
+          }
+
+          // the payoff: the mark closes / locks on the beat
+          Look.impact(tl, T.hit, { shake: "#shake", amp: V.style === "ring" ? 7 : 6, flash: 0, zoom: V.style === "ring" ? 1.035 : 1.03 });
+          Look.chroma(tl, "#markwrap", T.hit, 0.32, { px: 9 });
+          Look.chroma(tl, "#hero", T.hit + 0.06, 0.3, { px: 7 });
+
+          // exit: the type falls back into its masks, the kicker blurs out, then the leader retracts and the mark clears
+          const outTargets = Array.from(document.querySelectorAll(by === "chars" ? "#hero .lk-c" : "#hero .lk-in"));
+          tl.fromTo(outTargets, { yPercent: 0 }, { yPercent: -115, duration: 0.42, ease: "power3.in", stagger: by === "chars" ? 0.012 : 0.04, immediateRender: false }, T.out);
+          Look.exit(tl, "#kicker", T.out + 0.04, { to: "blur", dur: 0.32, blur: 10 });
+
+          Look.install(tl, { duration: D, grain: 0.12, vignette: 0.46, enabled: plate });
+          tl.set({}, {}, D);
+          window.__timelines = window.__timelines || {};
+          window.__timelines["main"] = tl;
+          tl.seek(0);
+        });
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,533 @@
+<!doctype html>
+<!-- #05 GTA 5 vs GTA 6 split (craft v2), 1080x1920 (9:16), 30 fps, 5.9 s.
+     Full-frame component: it always shows footage (the split IS the footage). bg "none" only turns off the finishing
+     stack (grain, vignette, flash, leak); the seam light is part of the graphic and stays.
+     The edit: like-for-like pairs (car with car, sign with sign, city with city), both sides cutting on the same frame.
+     The type tells the upgrade: GTA V is the smaller, 86%-white name; GTA VI is the big one in the Leonida sunset.
+     The seam between the eras is the light source: on the payoff a specular glint runs its length and it blooms warm.
+     Variant 0 "Stacked": GTA V above, GTA VI below a seam of light at y=860. GTA VI drops out of the seam on the
+       first cut with the hit.
+     Variant 1 "Diagonal reveal": GTA V owns the frame, then a blade of light slashes up from the bottom-right and parks
+       high, giving GTA VI two thirds of the frame (the hit). At the end the blade sweeps on through, wiping GTA V and
+       its name away, the GTA VI title rises to the centre as the end card, and the end card lands on its own cut.
+     All content, clips, in-points, framing and cut times live in CONFIG. The static <video> attributes mirror CONFIG
+     (the script also corrects them at load). -->
+<html lang="en" data-composition-variables='[
+  {"id":"variant","type":"enum","label":"Variant","default":"0","options":[{"value":"0","label":"Stacked"},{"value":"1","label":"Diagonal reveal"}]},
+  {"id":"bg","type":"enum","label":"Background","default":"plate","options":[{"value":"plate","label":"Sample footage + finishing"},{"value":"none","label":"No finishing (footage still shows: full-frame split)"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link rel="stylesheet" href="assets/fonts/fonts.css" />
+    <link rel="stylesheet" href="assets/kit/look/look.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="assets/kit/look/look.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: #050509; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; background: #050509; color: #fff;
+        font-family: "Inter", sans-serif; -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; }
+      #shake, #push { position: absolute; inset: 0; }
+      .layout { position: absolute; inset: 0; display: none; }
+      .lay-stacked #L0, .lay-stacked .ov0 { display: block; }
+      .lay-diagonal #L1, .lay-diagonal .ov1 { display: block; }
+      .ov0, .ov1 { display: none; }
+      .shot { position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: cover; }
+
+      /* ---------- the seam of light (shared by both variants) ----------
+         Settled: a 2 px line at 70% white with a 1 px dark under-edge, so it reads as a cut, not a hairline.
+         Its glow (box-shadow) is painted per frame by seamLight(); .spec is the specular glint that runs its length. */
+      .seam { position: absolute; height: 2px; background: rgba(255,255,255,.7); }
+      .spec { position: absolute; left: 0; top: 50%; width: 560px; height: 120px; margin-top: -60px; opacity: 0; pointer-events: none; mix-blend-mode: screen;
+        background: radial-gradient(ellipse 50% 50% at 50% 50%, rgba(255,253,248,1) 0%, rgba(255,240,218,.78) 16%, rgba(255,224,190,.34) 42%, rgba(255,214,170,0) 74%); }
+      .spec::before { content: ""; position: absolute; left: -220px; right: -220px; top: 50%; height: 10px; margin-top: -5px;
+        background: linear-gradient(90deg, rgba(255,230,200,0), rgba(255,230,200,.6) 38%, rgba(255,255,255,1) 50%, rgba(255,230,200,.6) 62%, rgba(255,230,200,0)); filter: blur(3px); }
+      .spec::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 4px; margin-top: -2px;
+        background: linear-gradient(90deg, rgba(255,255,255,0), #fff 50%, rgba(255,255,255,0)); }
+
+      /* ---------- v0: stacked ---------- */
+      .panel { position: absolute; left: 0; width: 1080px; overflow: hidden; background: #050509; }
+      #seam0 { left: 0; width: 1080px; transform-origin: 0 50%; }
+      /* legibility comes from a soft valley of shadow either side of the seam (no boxes) */
+      .valley { position: absolute; left: 0; width: 1080px; pointer-events: none; }
+      #valA { background: linear-gradient(0deg, rgba(5,5,9,.55) 0%, rgba(5,5,9,.38) 32%, rgba(5,5,9,.14) 68%, rgba(5,5,9,0) 100%); }
+      #valB { background: linear-gradient(180deg, rgba(5,5,9,.55) 0%, rgba(5,5,9,.38) 32%, rgba(5,5,9,.14) 68%, rgba(5,5,9,0) 100%); }
+
+      /* ---------- v1: diagonal ---------- */
+      #L1 { --d: 0px; }
+      #layA, #layB, #wrapB, #clipA { position: absolute; inset: 0; }
+      #blade { left: -200px; width: 1480px; transform-origin: 50% 50%; }
+      #scrimTL { position: absolute; left: 0; top: 0; width: 1080px; height: 760px;
+        background: linear-gradient(180deg, rgba(5,5,9,.6) 0%, rgba(5,5,9,.54) 32%, rgba(5,5,9,.28) 62%, rgba(5,5,9,0) 100%); }
+      #scrimBR { position: absolute; left: 0; top: 1040px; width: 1080px; height: 880px;
+        background: linear-gradient(180deg, rgba(5,5,9,0) 0%, rgba(5,5,9,.36) 30%, rgba(5,5,9,.62) 52%, rgba(5,5,9,.7) 100%); }
+      /* end-card spot: a wide, flat ellipse so the whole title (the "VI" end too) sits on the same depth of shadow */
+      #scrimEnd { position: absolute; left: -130px; width: 1340px; height: 640px; opacity: 0;
+        background: radial-gradient(ellipse 50% 50% at 50% 50%, rgba(18,6,20,.66) 0%, rgba(18,6,20,.56) 42%, rgba(12,5,14,.24) 74%, rgba(5,5,9,0) 100%); }
+
+      /* ---------- overlay type ---------- */
+      #ov { position: absolute; inset: 0; z-index: 10; pointer-events: none; }
+      .lock { position: absolute; white-space: nowrap; }
+      .lock.right { text-align: right; }
+      .lbl { display: block; font-size: 26px; color: rgba(255,255,255,.88); font-variant-numeric: tabular-nums lining-nums;
+        text-shadow: 0 1px 2px rgba(0,0,0,.55), 0 0 10px rgba(0,0,0,.35), 0 6px 22px rgba(0,0,0,.5); }
+      .lbl .yr { display: inline-block; }
+      /* the place slot: on each paired cut the old place lifts out (rise + blur + fade) and the new one rises in sharp.
+         No hard mask (a clipped glyph or a clipped shadow edge reads as a glitch on a still); the slot's width tweens
+         so a right-aligned label re-flows smoothly. */
+      .plm { position: relative; display: inline-block; vertical-align: top; height: 1.2em; }
+      .pli { position: absolute; top: 0; left: 0; line-height: 1.2em; white-space: nowrap; }
+      .lock.right .pli { left: auto; right: 0; }
+      .hero { display: block; font-size: 150px; font-weight: 800; color: #fff; }
+      #heroA { color: rgba(255,255,255,.86); }
+      .heroWrap { display: block; }
+      /* gradient type: lift + glow on the WRAPPER (Look.fill clears text-shadow on the leaves) */
+      .heroWrap.new { filter: drop-shadow(0 6px 24px rgba(40,10,30,.5)) drop-shadow(0 0 30px rgba(248,79,164,.24)); }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="5.9" data-width="1080" data-height="1920">
+      <div id="shake"><div id="push">
+
+        <!-- ===== v0 Stacked: four like-for-like pairs, both halves cut on frames 26, 64 and 95 ===== -->
+        <div id="L0" class="layout">
+          <div class="panel" id="panA0">
+            <video id="a0s0" class="clip shot" data-side="a0" data-shot="0" src="assets/shots/g33-gta5-oil-sunset-h.mp4" muted playsinline data-start="0" data-media-start="0.2" data-duration="0.867" data-track-index="0"></video>
+            <video id="a0s1" class="clip shot" data-side="a0" data-shot="1" src="assets/shots/g07-gta5-red-convertible-h.mp4" muted playsinline data-start="0.867" data-media-start="0.5" data-duration="1.266" data-track-index="0"></video>
+            <video id="a0s2" class="clip shot" data-side="a0" data-shot="2" src="assets/shots/g39-gta5-vinewood-h.mp4" muted playsinline data-start="2.133" data-media-start="0" data-duration="1.034" data-track-index="0"></video>
+            <video id="a0s3" class="clip shot" data-side="a0" data-shot="3" src="assets/shots/g16-gta5-michael-skyline-h.mp4" muted playsinline data-start="3.167" data-media-start="0.15" data-duration="2.733" data-track-index="0"></video>
+          </div>
+          <div class="panel" id="panB0">
+            <video id="b0s0" class="clip shot" data-side="b0" data-shot="0" src="assets/shots/s084-swamp-sunset-h.mp4" muted playsinline data-start="0" data-media-start="0.1" data-duration="0.867" data-track-index="1"></video>
+            <video id="b0s1" class="clip shot" data-side="b0" data-shot="1" src="assets/shots/s083-duo-convertible-h.mp4" muted playsinline data-start="0.867" data-media-start="0.033" data-duration="1.266" data-track-index="1"></video>
+            <video id="b0s2" class="clip shot" data-side="b0" data-shot="2" src="assets/shots/s074-keys-sign-h.mp4" muted playsinline data-start="2.133" data-media-start="1.15" data-duration="1.034" data-track-index="1"></video>
+            <video id="b0s3" class="clip shot" data-side="b0" data-shot="3" src="assets/shots/s011-vice-highway-h.mp4" muted playsinline data-start="3.167" data-media-start="0" data-duration="2.733" data-track-index="1"></video>
+          </div>
+          <div class="valley" id="valA"></div>
+          <div class="valley" id="valB"></div>
+          <div class="seam" id="seam0"><div class="spec" id="spec0" data-layout-allow-overflow></div></div>
+        </div>
+
+        <!-- ===== v1 Diagonal reveal: GTA V alone, the blade reveals GTA VI at 0.45 s, paired cut at 2.05 s, takeover at 3.85 s, end-card cut at 4.6 s ===== -->
+        <div id="L1" class="layout">
+          <div id="layA">
+            <video id="a1s0" class="clip shot" data-side="a1" data-shot="0" src="assets/shots/g16-gta5-michael-skyline-h.mp4" muted playsinline data-start="0" data-media-start="0" data-duration="2.05" data-track-index="2"></video>
+            <video id="a1s1" class="clip shot" data-side="a1" data-shot="1" src="assets/shots/g33-gta5-oil-sunset-h.mp4" muted playsinline data-start="2.05" data-media-start="0" data-duration="2.25" data-playback-rate="0.68" data-track-index="2"></video>
+          </div>
+          <div id="wrapB"><div id="layB">
+            <video id="b1s0" class="clip shot" data-side="b1" data-shot="0" src="assets/shots/s135-skydive-city-v.mp4" muted playsinline data-start="0.45" data-media-start="0" data-duration="1.6" data-track-index="3"></video>
+            <video id="b1s1" class="clip shot" data-side="b1" data-shot="1" src="assets/shots/s027-sunset-dock-v.mp4" muted playsinline data-start="2.05" data-media-start="0.03" data-duration="2.55" data-playback-rate="0.68" data-track-index="3"></video>
+            <video id="b1s2" class="clip shot" data-side="b1" data-shot="2" src="assets/shots/s026-sunset-pier-v.mp4" muted playsinline data-start="4.6" data-media-start="0.2" data-duration="1.3" data-track-index="3"></video>
+          </div></div>
+          <!-- GTA V's title lives inside its own wedge, so the blade wipes it away with the footage on the takeover -->
+          <div id="clipA"><div id="scrimTL"></div></div>
+          <div class="seam" id="blade"><div class="spec" id="spec1" data-layout-allow-overflow></div></div>
+        </div>
+
+      </div></div>
+
+      <div id="ov">
+        <div class="ov1" id="scrimBR"></div>
+        <div class="ov1" id="scrimEnd"></div>
+        <div class="lock" id="lockA">
+          <span class="lbl t-label-wide" id="lblA"><span class="yr" id="yrA"></span><span class="sep"> · </span><span class="plm" id="plA"></span></span>
+          <span class="heroWrap" id="wrapHA"><span class="hero t-wide" id="heroA"></span></span>
+        </div>
+        <div class="lock" id="lockB">
+          <span class="heroWrap new" id="wrapHB"><span class="hero t-wide" id="heroB"></span></span>
+          <span class="lbl t-label-wide" id="lblB"><span class="yr" id="yrB"></span><span class="sep" id="sepB"> · </span><span class="plm" id="plB"></span></span>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const CONFIG = {
+        duration: 5.9,
+        sunset: "linear-gradient(100deg, #F84FA4 0%, #FE78A6 24%, #FE8E4E 62%, #FEB747 100%)",
+        // The hierarchy is in the type: GTA 6 (b) is fitted to bWidth (86% of the 864 px safe width, clamped 110-200 px);
+        // GTA V (a) is aRatio x that size (never under aMin, never wider than 70% of the safe width), in 86% white.
+        type: { bWidth: 744, aRatio: 0.7, aMin: 112 },
+        // The seam is the light moment: at the payoff a specular glint runs its length (sweep s, expo.out),
+        // then it blooms warm at `peak` and decays to `rest` over `decay` s. Settled line alpha = `alpha`.
+        // rest 0.08 keeps the settled seam a crisp line of light, not a frosted band; a variant can override it (lightRest).
+        light: { color: "#FFE6C8", peak: 0.55, rest: 0.08, alpha: 0.7, sweep: 0.35, decay: 0.8 },
+        // Every later paired cut gets its own smaller beat: the glint re-runs the seam at cutLight.peak, and the place
+        // names swap (old lifts out with blur, new rises in sharp, `swap` s) when a pair's `places` differ from the pair before.
+        cutLight: { peak: 0.4, decay: 0.6 }, swap: 0.25,
+        a: { name: "GTA V",  year: "2013" },                      // older game (top / upper-left)
+        // GTA 6 (bottom / lower-right). The label's year rolls countFrom -> year (null = no roll) in `roll` s, power2.out,
+        // and the digits stay blurred while they roll, so no wrong year is ever readable.
+        b: { name: "GTA VI", year: "2026", countFrom: 2013, roll: 0.45 },
+        variants: {
+          // Stacked. seam = y of the line of light (860 = centre of the 230-1480 safe zone).
+          // pairs: one entry per cut, both halves switch on the same frame.
+          //   places = [GTA V place, GTA 6 place] for the labels while this pair is on screen (real places only)
+          //   a/b = { clip, start (in-point, s), focus (object-position), zoom?, origin? (zoom origin), y?, grade? (CSS filter),
+          //           scrim? (stacked only: extra bottom scrim on that half, 0-1, for busy shots under the label) }
+          // flashCuts: extra 2-frame flashes on these cuts (so the hard cuts don't feel metronomic).
+          "0": {
+            layout: "stacked", seam: 860,
+            payoff: 0.867,             // GTA 6 lands on this cut (frame 26): both names read inside ~1 s
+            flashCuts: [3.167], flash: 0.15,
+            exit: 5.0,                 // the type leaves as the airliner arrives over Vice City: the last 0.5 s is the plane, not the label
+            pairs: [
+              { at: 0,     places: ["Los Santos", "Leonida"],
+                           a: { clip: "assets/shots/g33-gta5-oil-sunset-h.mp4",       start: 0.2,   focus: "62% 50%" },   // sunset silhouettes
+                           b: { clip: "assets/shots/s084-swamp-sunset-h.mp4",          start: 0.1,   focus: "52% 50%" } },
+              { at: 0.867, places: ["Los Santos", "Leonida"],
+                           a: { clip: "assets/shots/g07-gta5-red-convertible-h.mp4",  start: 0.5,   focus: "62% 50%" },   // the red convertible
+                           b: { clip: "assets/shots/s083-duo-convertible-h.mp4",       start: 0.033, focus: "38% 50%", zoom: 1.05 } },   // zoom from the top edge: Lucia's hairline drops clear of the label
+              { at: 2.133, places: ["Vinewood", "Leonida Keys"],   // the signs themselves: VINEWOOD / "The Keys"
+                           a: { clip: "assets/shots/g39-gta5-vinewood-h.mp4",          start: 0,     focus: "50% 50%", zoom: 1.22, origin: "50% 100%", scrim: 0.6 },   // the landmark sign: zoomed from the seam (letters rise) + a scrim under the label
+                           b: { clip: "assets/shots/s074-keys-sign-h.mp4",             start: 1.15,  focus: "52% 50%" } },
+              { at: 3.167, places: ["Los Santos", "Vice City"],
+                           a: { clip: "assets/shots/g16-gta5-michael-skyline-h.mp4",  start: 0.15,   focus: "30% 50%" },   // the city
+                           b: { clip: "assets/shots/s011-vice-highway-h.mp4",          start: 0,      focus: "22% 50%" } }   // in-point 0: the hold is the drive + the tilt up; the airliner only enters (top right) as the type exits at 5.0 s, so it never crosses a label
+            ]
+          },
+          // Diagonal. The blade runs from (0, seamLeftY) to (1080, seamRightY) when parked: high, so GTA 6 gets two thirds
+          // of the frame. GTA V plays alone until `reveal`; GTA 6's first shot starts there. At `takeover` the blade sweeps
+          // on through (wiping GTA V and its name) and the GTA 6 title rises to an end card centred on `endY`.
+          // aEnd = when the GTA V side stops (after the takeover has covered it).
+          // A pair with only `b` is a GTA 6-only cut after the takeover (the end card's own shot). `rate` = playback rate
+          // (0.6-1; below 0.6 frame repeats judder, so nothing here goes under 0.68).
+          "1": {
+            layout: "diagonal", seamLeftY: 860, seamRightY: 220,
+            reveal: 0.45, takeover: 3.85, aEnd: 4.3, endY: 1060, lightRest: 0.2, R: 918, lblInset: 14, cardOut: 5.5,
+            payoffDecay: 0.8,    // the payoff bloom ends (1.82 s) before the cut's glint starts (2.03 s)
+            pairs: [
+              { at: 0,   places: ["Los Santos", "Vice City"],
+                         a: { clip: "assets/shots/g16-gta5-michael-skyline-h.mp4",   start: 0,    focus: "16% 50%", grade: "contrast(1.22) saturate(1.1)" },   // the skyline, graded out of the 2013 haze so the 0.45 s hook reads
+                         b: { clip: "assets/shots/s135-skydive-city-v.mp4",           start: 0,    focus: "50% 50%", y: 20 } },   // she is on the edge as the blade lands and steps off under the hit; spread-eagle by the hero frame
+              { at: 2.05, places: ["Los Santos", "Leonida"],
+                         a: { clip: "assets/shots/g33-gta5-oil-sunset-h.mp4",        start: 0,    rate: 0.68, focus: "28% 50%", box: [0, 1000], grade: "saturate(.84) contrast(1.1) brightness(1.06) hue-rotate(-8deg)" },   // the Los Santos skyline at dusk, raised so the lit towers stand in the wedge; 0.68x so it lasts until the wipe has covered it
+                         b: { clip: "assets/shots/s027-sunset-dock-v.mp4",            start: 0.03, rate: 0.68, focus: "50% 50%", zoom: 1.05, y: 200, rise: 0.25, grade: "brightness(.9) contrast(1.14) saturate(1.04)" } },   // 0.68x by frame repeat (no interpolation, no smear). Sits 200 px low so the string lights and the cloud's sculpted top edge run under the blade (its empty top strip hides behind the parked blade); it rises to 0 as the takeover starts
+              { at: 4.6,  places: ["Los Santos", "Leonida"],
+                         b: { clip: "assets/shots/s026-sunset-pier-v.mp4",            start: 0.2,  focus: "50% 50%" } }   // the end card lands on its own cut: Lucia and Jason on the pier
+            ]
+          }
+        }
+      };
+
+      (function () {
+        const VARS = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+        const vKey = CONFIG.variants[String(VARS.variant)] ? String(VARS.variant) : "0";
+        const V = CONFIG.variants[vKey], D = CONFIG.duration, A = CONFIG.a, B = CONFIG.b;
+        const plate = VARS.bg !== "none";
+        const diag = V.layout === "diagonal";
+        const $ = (s) => document.querySelector(s);
+        $("#root").classList.add(diag ? "lay-diagonal" : "lay-stacked");
+        $("#lockA").classList.add(diag ? "ov1" : "ov0"); $("#lockB").classList.add(diag ? "ov1" : "ov0");
+        $("#lockA").style.display = $("#lockB").style.display = "block";
+
+        // ---- footage: only the active variant's videos play; src / in-point / timing come from CONFIG ----
+        const r3 = (n) => Math.round(n * 1000) / 1000;
+        const setAttr = (el, k, val) => { val = String(val); if (el.getAttribute(k) !== val) el.setAttribute(k, val); };
+        document.querySelectorAll("video[data-side]").forEach((v) => {
+          const side = v.getAttribute("data-side");
+          if (side[1] !== vKey) { v.style.display = "none"; return; }
+          const i = parseInt(v.getAttribute("data-shot"), 10), p = V.pairs[i];
+          if (!p) { v.style.display = "none"; return; }
+          const s = side[0] === "a" ? p.a : p.b;
+          if (!s) { v.style.display = "none"; return; }
+          let at = p.at, end = V.pairs[i + 1] ? V.pairs[i + 1].at : D;
+          if (diag && side[0] === "b" && i === 0) at = V.reveal;
+          // the GTA V side's last shot runs until the takeover has covered it (later pairs are GTA 6 only)
+          if (diag && side[0] === "a" && !(V.pairs[i + 1] && V.pairs[i + 1].a)) end = V.aEnd;
+          setAttr(v, "src", s.clip);
+          setAttr(v, "data-start", r3(at));
+          setAttr(v, "data-media-start", r3(s.start || 0));
+          setAttr(v, "data-duration", r3(end - at));
+          if (s.rate && s.rate !== 1) setAttr(v, "data-playback-rate", s.rate); else v.removeAttribute("data-playback-rate");
+          v.style.objectPosition = s.focus || "50% 50%";
+          if (s.grade) v.style.filter = s.grade;
+          // per-shot reframe: box = [top, height] sizes the shot to a band instead of the full frame (diagonal GTA V side:
+          // the band only has to cover the wedge above the blade, so the shot can sit smaller and sharper);
+          // zoom grows from `origin` (default the top edge, so no gap opens at the top), y shifts the shot
+          if (s.box) { v.style.top = s.box[0] + "px"; v.style.height = s.box[1] + "px"; }
+          if (s.zoom || s.y) { v.style.transformOrigin = s.origin || "50% 0%"; v.style.transform = "translateY(" + (s.y || 0) + "px) scale(" + (s.zoom || 1) + ")"; }
+        });
+
+        // ---- type content ----
+        $("#heroA").textContent = A.name; $("#heroB").textContent = B.name;
+        $("#yrA").textContent = A.year; $("#yrB").textContent = B.year;
+        // places: one line per run of identical places across the pairs (side 0 = GTA V, 1 = GTA 6)
+        const PL = [0, 1].map((side) => {
+          const box = $(side ? "#plB" : "#plA"), runs = [];
+          V.pairs.forEach((p) => {
+            const name = (p.places || [])[side] || "";
+            if (!runs.length || runs[runs.length - 1].name !== name) {
+              const el = document.createElement("span"); el.className = "pli"; el.textContent = name; box.appendChild(el);
+              runs.push({ name: name, el: el, at: p.at, w: 0 });
+            }
+          });
+          return { box: box, runs: runs };
+        });
+
+        document.fonts.ready.then(() => {
+          const tl = gsap.timeline({ paused: true });
+          // size each place slot to its first place (the swaps tween the width, so a right-aligned label re-flows smoothly)
+          PL.forEach((pl) => {
+            pl.runs.forEach((r) => { r.w = Math.ceil(r.el.getBoundingClientRect().width); });
+            pl.box.style.width = pl.runs[0].w + "px";
+          });
+
+          // the hierarchy: GTA 6 fitted to type.bWidth, GTA V a step down
+          const T = CONFIG.type, hA = $("#heroA"), hB = $("#heroB");
+          hA.style.fontSize = hB.style.fontSize = "100px";
+          const wA = hA.getBoundingClientRect().width, wB = hB.getBoundingClientRect().width;
+          const fsB = Math.max(110, Math.min(200, Math.floor(100 * T.bWidth / wB)));
+          const fsA = Math.max(T.aMin, Math.min(Math.round(fsB * T.aRatio), Math.floor(100 * 864 * 0.7 / wA)));
+          hA.style.fontSize = fsA + "px"; hB.style.fontSize = fsB + "px";
+
+          if (!diag) stacked(tl, fsA, fsB); else diagonal(tl, fsA, fsB);
+
+          Look.install(tl, { duration: D, grain: 0.15, vignette: 0.45, enabled: plate });
+          tl.set({}, {}, D);
+          window.__timelines = window.__timelines || {};
+          window.__timelines["main"] = tl;
+          tl.seek(0);
+        });
+
+        // 2013 -> 2026, fast (power2.out), and the digits stay blurred until the roll lands: no wrong year is readable
+        function yearRoll(tl, at) {
+          if (B.countFrom == null) return;
+          const d = B.roll || 0.45;
+          Look.count(tl, "#yrB", at, d, Number(B.countFrom), Number(B.year), { ease: "power2.out", format: (v) => String(Math.round(v)) });
+          gsap.set("#yrB", { filter: "blur(4px)" });
+          tl.fromTo("#yrB", { filter: "blur(4px)" }, { filter: "blur(0px)", duration: 0.16, ease: "power1.out", immediateRender: false }, at + d - 0.16);
+        }
+        // the paired-cut beat, part 1: each place that changes on a cut swaps: the old one lifts out (rise + blur + fade)
+        // just before the cut, the new one rises in sharp just after it. They never overlap, and nothing is clipped.
+        function placeSwaps(tl) {
+          const S = CONFIG.swap, OUT = -18, IN = 22, BL = 6;
+          PL.forEach((pl) => pl.runs.forEach((r, k) => {
+            if (k === 0) { gsap.set(r.el, { y: 0, autoAlpha: 1 }); return; }
+            const prev = pl.runs[k - 1], t = r.at, outAt = t - S * 0.5, outDur = S * 0.5 + 0.02, inAt = t + 0.03, inDur = S * 1.4;
+            gsap.set(r.el, { y: IN, autoAlpha: 0 });
+            tl.fromTo(prev.el, { y: 0, autoAlpha: 1, filter: "blur(0px)" }, { y: OUT, autoAlpha: 0, filter: "blur(" + BL + "px)", duration: outDur, ease: "power2.in", immediateRender: false }, outAt);
+            tl.fromTo(r.el, { y: IN, autoAlpha: 0, filter: "blur(" + BL + "px)" }, { y: 0, autoAlpha: 1, filter: "blur(0px)", duration: inDur, ease: "expo.out", immediateRender: false }, inAt);
+            tl.set(r.el, { filter: "none" }, inAt + inDur);
+            // the slot grows before the wider name arrives, or shrinks once the wider one has gone
+            if (r.w >= prev.w) tl.fromTo(pl.box, { width: prev.w }, { width: r.w, duration: S * 0.5, ease: "power3.out", immediateRender: false }, outAt);
+            else tl.fromTo(pl.box, { width: prev.w }, { width: r.w, duration: S * 1.4, ease: "power3.inOut", immediateRender: false }, t - 0.01);
+          }));
+        }
+        function chars(sel) { return Array.prototype.slice.call(document.querySelectorAll(sel + " .lk-c")); }
+
+        /* The seam as the light source. One drive owns the line's glow for the whole hit (seek-safe: fn(0) = rest):
+           flare to peak + full white in 2 frames, hold through the glint, then decay to rest over `decay`.
+           The glint (.spec) runs the length of the line with expo.out, from x0 to x1 (its centre, in the line's own px). */
+        function seamLight(tl, line, spec, at, x0, x1, o) {
+          // o overrides peak / decay (the smaller beat on later cuts). Calls on one line must not overlap in time.
+          const L = Object.assign({}, CONFIG.light, V.lightRest != null ? { rest: V.lightRest } : {}, o || {}), c = hexRgb(L.color);
+          const paint = (s, a) => {
+            line.style.background = "rgba(255,255,255," + a.toFixed(3) + ")";
+            line.style.boxShadow = "0 1px 0 rgba(5,5,9,.6), " +
+              "0 0 3px 1px rgba(255,255,255," + Math.min(1, 1.8 * s).toFixed(3) + "), " +
+              "0 0 16px 4px rgba(" + c + "," + Math.min(1, 1.6 * s).toFixed(3) + "), " +
+              "0 0 56px 16px rgba(" + c + "," + Math.min(1, 1.05 * s).toFixed(3) + "), " +
+              "0 0 150px 46px rgba(" + c + "," + (0.6 * s).toFixed(3) + ")";
+          };
+          const up = 0.066, total = L.sweep + L.decay;
+          paint(L.rest, L.alpha);
+          Look.drive(tl, at, total, (p) => {
+            const t = p * total;
+            if (p <= 0) { paint(L.rest, L.alpha); return; }
+            if (t < up) { const k = t / up; paint(L.rest + (L.peak - L.rest) * k, L.alpha + (1 - L.alpha) * k); return; }
+            if (t < L.sweep) { paint(L.peak, 1); return; }
+            const k = 1 - Math.pow(1 - (t - L.sweep) / L.decay, 2);   // power2.out
+            paint(L.peak + (L.rest - L.peak) * k, 1 + (L.alpha - 1) * k);
+          });
+          const half = 280;   // x0 / x1 = where the glint's centre starts and ends, in the line's own px
+          gsap.set(spec, { x: x0 - half, opacity: 0 });
+          tl.fromTo(spec, { x: x0 - half }, { x: x1 - half, duration: L.sweep, ease: "expo.out", immediateRender: false }, at);
+          tl.fromTo(spec, { opacity: 0 }, { opacity: 1, duration: 0.04, ease: "none", immediateRender: false }, at);
+          tl.fromTo(spec, { opacity: 1 }, { opacity: 0, duration: 0.16, ease: "power2.in", immediateRender: false }, at + L.sweep - 0.12);
+        }
+        function hexRgb(h) { h = h.replace("#", ""); const n = parseInt(h, 16); return ((n >> 16) & 255) + "," + ((n >> 8) & 255) + "," + (n & 255); }
+
+        /* ================= Stacked ================= */
+        function stacked(tl, fsA, fsB) {
+          const S = V.seam, H = 1920;
+          Object.assign($("#panA0").style, { top: "0px", height: S + "px" });
+          Object.assign($("#panB0").style, { top: S + "px", height: (H - S) + "px" });
+          $("#seam0").style.top = (S - 1) + "px";
+          Object.assign($("#valA").style, { top: (S - 440) + "px", height: "440px" });
+          Object.assign($("#valB").style, { top: S + "px", height: "460px" });
+          // optional per-pair scrim under the GTA V label on busy shots (cuts with the footage)
+          const scr = document.createElement("div");
+          scr.className = "lk-scrim-bottom";
+          Object.assign(scr.style, { position: "absolute", left: "0px", width: "1080px", top: (S - 420) + "px", height: "420px", opacity: "0" });
+          $("#panA0").appendChild(scr);
+          tl.set(scr, { opacity: 0 }, 0);
+          V.pairs.forEach((p) => tl.set(scr, { opacity: p.a.scrim || 0 }, p.at));
+
+          // lockups hug the seam: GTA V sits on it, GTA 6 hangs from it (optical gap ~0.24 x each size)
+          const lockA = $("#lockA"), lockB = $("#lockB");
+          Object.assign(lockA.style, { left: "72px", top: "0px" });
+          Object.assign(lockB.style, { left: "72px", top: "0px" });
+          $("#lblA").style.marginBottom = "16px"; $("#lblB").style.marginTop = "8px";   // 8 px: the label clears Lucia's hairline on the convertible pair
+          lockA.style.top = (S - Math.round(fsA * 0.24) - lockA.offsetHeight) + "px";
+          lockB.style.top = (S + Math.round(fsB * 0.24)) + "px";
+
+          // footage: a slow push anchored on the seam, so both halves grow away from it
+          if (plate) Look.push(tl, "#push", 0, D, { from: 1.0, to: 1.05, origin: "50% " + (S / H * 100).toFixed(2) + "%" });
+          else gsap.set("#push", { transformOrigin: "50% " + (S / H * 100).toFixed(2) + "%" });
+
+          // the seam draws out from the left as the first name rises
+          gsap.set("#seam0", { scaleX: 0 });
+          tl.fromTo("#seam0", { scaleX: 0 }, { scaleX: 1, duration: 0.7, ease: "expo.out", immediateRender: false }, 0.06);
+
+          Look.bloom("#heroA", { color: "#FFFFFF", strength: 0.3 });
+          // GTA V lands fast: it has to read before GTA 6 drops in at 0.867 s
+          Look.enter(tl, "#lblA", 0.1, { from: "blur", dur: 0.5, blur: 10 });
+          Look.reveal(tl, "#heroA", 0.12, { by: "chars", stagger: 0.032, dur: 0.66 });
+
+          // PAYOFF on the cut to the convertibles: the seam lights up (glint + warm bloom), GTA 6 drops out of it,
+          // its half flashes, RGB split, then a sheen
+          const P = V.payoff;
+          seamLight(tl, $("#seam0"), $("#spec0"), P + 0.03, -120, 1000);
+          Look.reveal(tl, "#heroB", P, { by: "chars", stagger: 0.028, dur: 0.6, from: -118 });
+          Look.fill("#heroB", CONFIG.sunset, { sheen: true });
+          Look.chroma(tl, "#heroB", P, 0.34, { px: 14 });
+          if (plate) {
+            Look.impact(tl, P, { shake: "#shake", amp: 9, flash: 0.5, zoom: 1.03, host: "#panB0" });
+            Look.impact(tl, P, { flash: 0.12 });
+            (V.flashCuts || []).forEach((t) => Look.impact(tl, t, { flash: V.flash || 0.15 }));
+          }
+          Look.enter(tl, "#lblB", P + 0.14, { from: "blur", dur: 0.55, blur: 10 });
+          yearRoll(tl, P + 0.14);
+          Look.sheen(tl, "#heroB", P + 0.85, { dur: 1.0 });
+
+          // every later paired cut gets its own beat: the glint re-runs the seam (smaller), and the places swap so the
+          // labels name what each pair compares (Vinewood / Leonida Keys, then Los Santos / Vice City)
+          V.pairs.forEach((p) => { if (p.at > P + 0.01) seamLight(tl, $("#seam0"), $("#spec0"), p.at + 0.03, -120, 1000, CONFIG.cutLight); });
+          placeSwaps(tl);
+
+          // exit: labels blur out, the names sink back into the seam, the seam retracts to the right
+          const X = V.exit != null ? V.exit : D - 0.75;
+          Look.exit(tl, ["#lblA", "#lblB"], X, { to: "blur", dur: 0.35 });
+          tl.fromTo(chars("#heroA"), { yPercent: 0 }, { yPercent: 118, duration: 0.42, ease: "power3.in", stagger: 0.022, immediateRender: false }, X + 0.04);
+          tl.fromTo(chars("#heroB"), { yPercent: 0 }, { yPercent: -118, duration: 0.42, ease: "power3.in", stagger: 0.022, immediateRender: false }, X + 0.04);
+          tl.set("#seam0", { transformOrigin: "100% 50%" }, X + 0.3);
+          tl.fromTo("#seam0", { scaleX: 1 }, { scaleX: 0, duration: 0.36, ease: "power3.in", immediateRender: false }, X + 0.3);
+        }
+
+        /* ================= Diagonal reveal ================= */
+        function diagonal(tl, fsA, fsB) {
+          const yL = V.seamLeftY, yR = V.seamRightY, W = 1080, H = 1920;
+          const ang = Math.atan2(yR - yL, W) * 180 / Math.PI, midY = (yL + yR) / 2;
+          const below = H - Math.min(yL, yR) + 120;   // parks the blade fully below the frame
+          const above = -(Math.max(yL, yR) + 140);    // and fully above it (takeover)
+          const L1 = $("#L1");
+          $("#wrapB").style.clipPath = `polygon(0px calc(${yL}px + var(--d)), ${W}px calc(${yR}px + var(--d)), ${W}px 2600px, 0px 2600px)`;
+          $("#clipA").style.clipPath = `polygon(0px -20px, ${W}px -20px, ${W}px calc(${yR}px + var(--d)), 0px calc(${yL}px + var(--d)))`;
+          Object.assign($("#blade").style, { top: `calc(${midY - 1}px + var(--d))`, transform: `rotate(${ang}deg)` });
+
+          // GTA V: top-left, in the sky, inside its own wedge (the blade wipes it on the takeover).
+          // GTA 6: bottom-right, right-aligned clear of the action rail; both names hug the blade, labels on the outside.
+          const lockA = $("#lockA"), lockB = $("#lockB");
+          $("#clipA").appendChild(lockA);
+          lockB.classList.add("right");
+          $("#lblA").style.marginBottom = "16px"; $("#lblB").style.marginTop = "16px";
+          const AX = 72, AY = 250;
+          Object.assign(lockA.style, { left: AX + "px", top: AY + "px" });
+          const R = V.R || 918, bottom = 1474;   // R = right edge of the GTA 6 lockup (the label must stay inside x=936)
+          lockB.style.top = (bottom - lockB.offsetHeight) + "px";
+          lockB.style.left = (R - lockB.offsetWidth) + "px";
+
+          // GTA V's name lives inside the footage layers (so the blade's wipe clips it exactly), so it is counter-transformed
+          // against the push (scale s about 540,864) AND the payoff punch-zoom on #shake (scale k about 540,960; same
+          // envelope as Look.impact: 1 + (zoom-1)(1-p)^2): it stays at x=72, y=250 for the whole shot.
+          // T(x) = Op + (x-Op)/(k s) + (Os-Op)(k-1)/(k s)  ->  translateY + scale about the push origin.
+          const PU = { from: 1.0, to: 1.05, ox: 0.5 * W, oy: 0.45 * H }, HIT = { at: V.reveal + 0.06, dur: 0.32, zoom: 1.03 };
+          if (plate) {
+            Look.push(tl, "#push", 0, D, { from: PU.from, to: PU.to, origin: "50% 45%" });
+            lockA.style.transformOrigin = (PU.ox - AX) + "px " + (PU.oy - AY) + "px";
+            Look.drive(tl, 0, D, (p) => {
+              const t = p * D, sc = PU.from + (PU.to - PU.from) * p, q = (t - HIT.at) / HIT.dur;
+              const k = q > 0 && q < 1 ? 1 + (HIT.zoom - 1) * Math.pow(1 - q, 2) : 1;
+              const ty = (H / 2 - PU.oy) * (k - 1) / (k * sc);
+              lockA.style.transform = "translateY(" + ty.toFixed(2) + "px) scale(" + (1 / (k * sc)).toFixed(5) + ")";
+            });
+          }
+
+          // GTA V alone first, landing fast: the blade arrives at 0.45 s, so both names read inside the first 0.6 s
+          Look.bloom("#heroA", { color: "#FFFFFF", strength: 0.3 });
+          Look.enter(tl, "#lblA", 0.04, { from: "blur", dur: 0.45, blur: 10 });
+          Look.reveal(tl, "#heroA", 0.05, { by: "chars", stagger: 0.03, dur: 0.55 });
+
+          // PAYOFF: the blade slashes up from below the bottom-right corner and parks; GTA 6 is revealed behind it.
+          // As it parks, a glint runs up its length and it blooms warm: the cut between the eras is the light source.
+          const R0 = V.reveal;
+          gsap.set(L1, { "--d": below + "px" });
+          tl.fromTo(L1, { "--d": below + "px" }, { "--d": "0px", duration: 0.62, ease: "expo.out", immediateRender: false }, R0);
+          Look.mblur(tl, "#blade", R0, 0.3, { y: 26 });
+          // the glint starts once the blade is ~95% parked (expo.out), so it reads as light running along a still edge
+          seamLight(tl, $("#blade"), $("#spec1"), R0 + 0.22, 40, 1290, V.payoffDecay != null ? { decay: V.payoffDecay } : null);
+          // GTA V gives way a little as the blade passes; GTA 6 rides up with it
+          gsap.set("#layA", { y: 0 }); gsap.set("#layB", { y: 300 });
+          tl.fromTo("#layA", { y: 0 }, { y: -40, duration: 0.8, ease: "expo.out", immediateRender: false }, R0);
+          tl.fromTo("#layB", { y: 300 }, { y: 0, duration: 0.8, ease: "expo.out", immediateRender: false }, R0);
+          gsap.set("#scrimBR", { opacity: 0 });
+          tl.fromTo("#scrimBR", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out", immediateRender: false }, R0 + 0.05);
+          if (plate) Look.impact(tl, HIT.at, { shake: "#shake", amp: 10, dur: HIT.dur, flash: 0.42, zoom: HIT.zoom });
+          const H0 = R0 + 0.1;
+          Look.reveal(tl, "#heroB", H0, { by: "chars", stagger: 0.028, dur: 0.6, from: -118 });
+          Look.fill("#heroB", CONFIG.sunset, { sheen: true });
+          // the char split widens the lockup a little: re-anchor its right edge on R once the chars exist.
+          // lblInset pulls the tracked label in so its ink ends under the ink of the "I" (optical right edge).
+          $("#lblB").style.marginRight = (V.lblInset || 0) + "px";
+          lockB.style.left = (R - lockB.offsetWidth) + "px";
+          Look.chroma(tl, "#heroB", H0, 0.36, { px: 14 });
+          Look.enter(tl, "#lblB", H0 + 0.14, { from: "blur", dur: 0.55, blur: 10 });
+          yearRoll(tl, H0 + 0.14);
+          Look.sheen(tl, "#heroB", H0 + 0.85, { dur: 1.0 });
+
+          // the paired cut gets its own beat: a smaller glint runs up the parked blade and the GTA 6 place swaps
+          // (Vice City for the skydive, then Leonida, which the end card keeps)
+          V.pairs.forEach((p) => { if (p.at > R0 + 0.01 && p.at < V.takeover) seamLight(tl, $("#blade"), $("#spec1"), p.at + 0.03, 40, 1290, CONFIG.cutLight); });
+          placeSwaps(tl);
+
+          // TAKEOVER: the blade sweeps on through the top-left, wiping GTA V (footage, scrim and name) off the frame,
+          // while the GTA 6 title rises to the centre and lands as the end card (leak, sheen, held to the end).
+          const TK = V.takeover;
+          tl.fromTo(L1, { "--d": "0px" }, { "--d": above + "px", duration: 0.62, ease: "power3.inOut", immediateRender: false }, TK);
+          Look.mblur(tl, "#blade", TK + 0.12, 0.4, { y: 22, to: [0, 22] });
+          tl.fromTo("#scrimBR", { opacity: 1 }, { opacity: 0, duration: 0.5, ease: "power2.in", immediateRender: false }, TK);
+          // a GTA 6 shot framed low (`y` + `rise`) climbs back to y 0 as the blade starts to sweep. power2.inOut over
+          // ~0.25 s stays ahead of the blade's power3.inOut, so its empty top strip is never uncovered.
+          V.pairs.forEach((p, i) => {
+            if (!p.b || !p.b.rise || !(p.at < TK && (!V.pairs[i + 1] || V.pairs[i + 1].at > TK))) return;
+            const v = document.querySelector('video[data-side="b1"][data-shot="' + i + '"]'), z = p.b.zoom || 1;
+            v.style.transform = "";
+            gsap.set(v, { y: p.b.y || 0, scale: z, transformOrigin: p.b.origin || "50% 0%" });
+            tl.fromTo(v, { y: p.b.y || 0 }, { y: 0, duration: p.b.rise, ease: "power2.inOut", immediateRender: false }, TK);
+          });
+          // end card: centred on endY; the right-aligned label slides to centre under the name
+          const bw = lockB.offsetWidth, bh = lockB.offsetHeight, bTop = parseFloat(lockB.style.top), bLeft = parseFloat(lockB.style.left);
+          const dx = Math.round(W / 2 - (bLeft + bw / 2)), dy = Math.round(V.endY - (bTop + bh / 2));
+          // label width on the end card = year + separator + the LAST place (the slot is that wide by then)
+          const plRuns = PL[1].runs;
+          const lblText = $("#yrB").getBoundingClientRect().width + $("#sepB").getBoundingClientRect().width + plRuns[plRuns.length - 1].w;
+          const lblShift = -Math.round((bw - lblText) / 2) + (V.lblInset || 0);
+          const G = TK + 0.08, gd = 0.72;
+          gsap.set("#scrimEnd", { top: (V.endY - 320) + "px" });   // the spot is centred on the end-card lockup
+          tl.fromTo("#scrimEnd", { opacity: 0 }, { opacity: 1, duration: 0.6, ease: "power2.out", immediateRender: false }, G + 0.1);
+          tl.fromTo(lockB, { x: 0, y: 0 }, { x: dx, y: dy, duration: gd, ease: "power3.inOut", immediateRender: false }, G);
+          tl.fromTo("#lblB", { x: 0 }, { x: lblShift, duration: gd, ease: "power3.inOut", immediateRender: false }, G);
+          Look.mblur(tl, lockB, G + 0.14, 0.44, { y: 16 });
+          if (plate) Look.leak(tl, TK - 0.05, 1.2, { colors: ["#FE8E4E", "#F84FA4"], y: 0.5, opacity: 0.5, from: 1.3, to: -0.3 });
+          Look.sheen(tl, "#heroB", G + gd + 0.02, { dur: 0.95 });
+          // the end card hands off: it blurs out with its spot scrim, leaving the last frames clean footage
+          if (V.cardOut != null) {
+            Look.exit(tl, lockB, V.cardOut, { to: "blur", dur: 0.35 });
+            tl.fromTo("#scrimEnd", { opacity: 1 }, { opacity: 0, duration: 0.4, ease: "power2.in", immediateRender: false }, V.cardOut);
+          }
+        }
+      })();
+    </script>
+  </body>
+</html>

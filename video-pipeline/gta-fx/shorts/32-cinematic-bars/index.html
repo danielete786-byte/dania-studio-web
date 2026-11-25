@@ -1,0 +1,329 @@
+<!doctype html>
+<!-- GTA 6 component #32 · Cinematic bars (craft v2) — 1080x1920 (9:16), 30 fps, 5.6 s.
+     The bars are the edit: a vertical clip plays full-bleed, the gate closes, and on the beat the picture opens up to a
+     real widescreen 4K shot inside the band. All type lives in the letterbox black.
+     Variant 0 "Letterbox + time": a 16:9 film gate (y 656–1264). VICE CITY in Archivo wide above the picture, the time in
+       Rockstar's date style below it. Payoff 0.9 s: bars landed + title complete -> cut to the wide pier, impact + expose.
+     Variant 1 "CCTV stamp": a 4:3 security feed (y 555–1365). Rockstar's two-line CCTV OSD (camera / clock) at poster scale,
+       a ticking clock, camera switches on the cuts. Payoff 2.9 s: switch to STREET as the police car turns in, auto-iris expose.
+     bg "plate" = sample footage + Look finishing; bg "none" = transparent overlay (bars + type; v1 also keeps its scanlines/lens).
+     Safe zones: text inside x 72–936, y 230–1480. -->
+<html lang="en" data-composition-variables='[
+  {"id":"variant","type":"enum","label":"Variant","default":"0","options":[{"value":"0","label":"Letterbox + time"},{"value":"1","label":"CCTV stamp"}]},
+  {"id":"bg","type":"enum","label":"Background","default":"plate","options":[{"value":"plate","label":"Sample footage"},{"value":"none","label":"Transparent"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link rel="stylesheet" href="assets/fonts/fonts.css" />
+    <link rel="stylesheet" href="assets/kit/look/look.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="assets/kit/look/look.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: transparent; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; font-family: "Inter", sans-serif; color: #fff;
+        -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; }
+
+      /* footage: full-bleed vertical shots underneath, the widescreen band above them */
+      #full, #shakeF, #pushF { position: absolute; inset: 0; }
+      #band { position: absolute; left: 0; width: 1080px; overflow: hidden; }
+      #grade, #shake, #push { position: absolute; inset: 0; }
+      .shot { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+
+      /* v1 lens: scanlines, barrel falloff and a slow roll bar, inside the feed only */
+      #bandFx { position: absolute; inset: 0; opacity: 0; pointer-events: none; }
+      #bandFx .scan { position: absolute; inset: 0;
+        background: repeating-linear-gradient(180deg, rgba(0,0,0,.13) 0px, rgba(0,0,0,.13) 2px, rgba(0,0,0,0) 2px, rgba(0,0,0,0) 5px); }
+      #bandFx .vig { position: absolute; inset: 0;
+        background: radial-gradient(ellipse 72% 70% at 50% 50%, rgba(0,0,0,0) 62%, rgba(0,0,0,.30) 88%, rgba(0,0,0,.58) 100%); }
+      #roll { position: absolute; left: 0; width: 1080px; height: 220px; top: -240px;
+        background: linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.05) 45%, rgba(255,255,255,.07) 52%, rgba(255,255,255,0) 100%); }
+
+      /* the bars: pure black, like film letterbox */
+      #ov { position: absolute; inset: 0; }   /* no z-index: the grain must blend with the real picture (see Look.install below) */
+      .bar { position: absolute; left: 0; width: 1080px; background: #000; }
+      #barTop { top: 0; }
+      #barBot { bottom: 0; }
+
+      /* ---------- v0 · Letterbox + time ---------- */
+      #lbHeroWrap { position: absolute; left: 0; right: 0; text-align: center; }
+      #lbHero { display: inline-block; white-space: nowrap; color: #fff;
+        font-family: "Archivo", "Inter", sans-serif; font-stretch: 125%; font-weight: 800; text-transform: uppercase;
+        line-height: .92; letter-spacing: var(--ls); padding-left: var(--ls); }
+      #lbTimeWrap { position: absolute; left: 0; right: 0; text-align: center; }
+      /* Rockstar date style: white wide-tracked caps, a magenta kiss and a soft magenta bloom */
+      #lbTime { display: inline-block; white-space: nowrap; color: #fff;
+        font-family: "Archivo", "Inter", sans-serif; font-stretch: 125%; font-weight: 600; text-transform: uppercase;
+        line-height: 1.2; letter-spacing: .34em; padding-left: .34em;
+        text-shadow: 2px 0 0 rgba(238,8,242,.7), 0 0 16px rgba(238,8,242,.34); }
+
+      /* ---------- v1 · CCTV stamp ---------- */
+      #ccOsd { position: absolute; left: 72px; color: #fff; font-family: "JetBrains Mono", monospace; font-weight: 600;
+        line-height: 1; letter-spacing: .02em; text-transform: uppercase; font-feature-settings: "zero" 0, "tnum" 1; }
+      #ccNames { position: relative; }
+      .cc-name { position: absolute; left: 0; top: 0; white-space: pre; }
+      .cc-name.first { position: relative; }
+      #ccClock { white-space: pre; }
+      #ccMeta { position: absolute; left: 72px; color: rgba(255,255,255,.88); white-space: pre;
+        font-family: "JetBrains Mono", monospace; font-weight: 500; font-size: 30px; line-height: 1.2; letter-spacing: .14em; text-transform: uppercase;
+        text-shadow: 0 0 10px rgba(255,255,255,.18); }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="5.6" data-width="1080" data-height="1920">
+      <!-- full-bleed vertical shots: the clip before the gate closes and after it opens -->
+      <div id="full"><div id="shakeF"><div id="pushF">
+        <video id="a1" class="clip shot" src="assets/shots/s036-beach-bar-v.mp4" muted playsinline data-start="0" data-duration="0.9" data-media-start="0" data-track-index="0"></video>
+        <video id="a5" class="clip shot" src="assets/shots/s047-car-hood-golden-v.mp4" muted playsinline data-start="4.4" data-duration="1.2" data-media-start="0" data-track-index="0"></video>
+        <video id="b1" class="clip shot" src="assets/shots/s004-palm-shirt-truck-v.mp4" muted playsinline data-start="0" data-duration="0.5" data-media-start="0" data-track-index="2"></video>
+        <video id="b6" class="clip shot" src="assets/shots/s004-palm-shirt-truck-v.mp4" muted playsinline data-start="4.9" data-duration="0.7" data-media-start="3.5" data-track-index="2"></video>
+      </div></div></div>
+
+      <!-- the letterbox band: widescreen 4K shots cut on the beats (16:9 for v0, 4:3 for v1) -->
+      <div id="band"><div id="grade"><div id="shake"><div id="push">
+        <video id="a2" class="clip shot" src="assets/shots/s026-sunset-pier-h.mp4" muted playsinline data-start="0.9" data-duration="1.5" data-media-start="0" data-track-index="0"></video>
+        <video id="a3" class="clip shot" src="assets/shots/s108-balcony-sunset-h.mp4" muted playsinline data-start="2.4" data-duration="1.3" data-media-start="0.02" data-track-index="0"></video>
+        <video id="a4" class="clip shot" src="assets/shots/s105-lucia-rooftop-h.mp4" muted playsinline data-start="3.7" data-duration="0.7" data-media-start="0" data-track-index="0"></video>
+        <video id="b2" class="clip shot" src="assets/shots/s004-palm-shirt-truck-h.mp4" muted playsinline data-start="0.5" data-duration="1.2" data-media-start="0.5" data-track-index="2"></video>
+        <video id="b3" class="clip shot" src="assets/shots/s012-muscle-beach-h.mp4" muted playsinline data-start="1.7" data-duration="1.2" data-media-start="0.4" data-track-index="2"></video>
+        <video id="b4" class="clip shot" src="assets/shots/s096-police-street-h.mp4" muted playsinline data-start="2.9" data-duration="1.0" data-media-start="0.75" data-track-index="2"></video>
+        <video id="b5" class="clip shot" src="assets/shots/s004-palm-shirt-truck-h.mp4" muted playsinline data-start="3.9" data-duration="1.0" data-media-start="2.5" data-track-index="2"></video>
+      </div></div></div>
+        <div id="bandFx"><div class="scan"></div><div class="vig"></div><div id="roll"></div></div>
+      </div>
+
+      <div id="ov" class="clip" data-start="0" data-duration="5.6" data-track-index="1">
+        <div id="barTop" class="bar">
+          <div id="lbHeroWrap"><div id="lbHero"></div></div>
+          <div id="ccOsd">
+            <div id="ccNames"></div>
+            <div id="ccClock"></div>
+          </div>
+        </div>
+        <div id="barBot" class="bar">
+          <div id="lbTimeWrap"><div id="lbTime"></div></div>
+          <div id="ccMeta"><span id="ccCamId"></span><span id="ccDate"></span></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const CONFIG = {
+        duration: 5.6,
+        variants: {
+          "0": {
+            style: "letterbox",
+            aspect: 16 / 9,                    // band shape: 1080x608, bars 656 px each
+            shots: ["a1", "a2", "a3", "a4", "a5"],
+            place: "Vice City",                // hero, Archivo wide 800, centred in the top bar
+            placeSize: 120,                    // px; only shrinks if the line would pass placeMaxWidth
+            placeTracking: 0.05,               // em
+            placeMaxWidth: 790,                // centred, so the line stays inside x 145–935
+            placeGap: 66,                      // px from the picture's top edge to the bottom of the caps
+            time: "November 19 · 5:24 PM",     // Rockstar date style under the picture. Match it to the light in your clip
+            timeSize: 28,
+            timeGap: 60,                       // px from the picture's bottom edge to the top of the line
+            bloom: ["#FEB747", "#F84FA4"],     // warm title bloom (inner, outer), matched to golden hour
+            t: { barsIn: 0.06, barsDur: 0.72, hero: 0.3, hit: 0.9, time: 1.02, out: 3.92, barsOut: 4.4, barsOutDur: 0.55 },   // type clears by ~4.36, before the cut
+            pushes: [["#pushF", 0, 0.9, 1.035], ["#push", 0.9, 1.5, 1.05], ["#push", 2.4, 1.3, 1.045], ["#push", 3.7, 0.7, 1.03], ["#pushF", 4.4, 1.2, 1.04]]
+          },
+          "1": {
+            style: "cctv",
+            aspect: 4 / 3,                     // band shape: 1080x810, bars 555 px each
+            shots: ["b1", "b2", "b3", "b4", "b5", "b6"],
+            // one entry per camera switch; the cut times match the <video> data-start values
+            cams: [
+              { at: 0.5, name: "Rear Lot", id: "CAM 06" },
+              { at: 1.7, name: "Beach Gym", id: "CAM 02" },
+              { at: 2.9, name: "Street",   id: "CAM 09", payoff: true },
+              { at: 3.9, name: "Rear Lot", id: "CAM 06" }
+            ],
+            clock: "14:07:32",                 // HH:MM:SS at the first cut; ticks once a second. Match it to the light
+            date: "THU 11-19-2026",
+            osdSize: 128,                      // px, both OSD lines
+            osdGap: 46,                        // px from the picture's top edge to the bottom of the clock
+            metaGap: 40,                       // px from the picture's bottom edge to the meta line
+            grade: "saturate(.8) contrast(1.1) brightness(1.03)",   // plate only: a slightly drained security-camera grade
+            t: { barsIn: 0.18, barsDur: 0.32, live: 0.5, out: 4.9, barsOutDur: 0.42 },
+            pushes: [["#pushF", 0, 0.5, 1.03], ["#push", 2.9, 1.0, 1.07], ["#push", 3.9, 1.0, 1.0], ["#pushF", 4.9, 0.7, 1.035]]
+          }
+        }
+      };
+
+      (function () {
+        const VARS = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+        const vKey = CONFIG.variants[String(VARS.variant)] ? String(VARS.variant) : "0";
+        const plate = VARS.bg !== "none";
+        const V = CONFIG.variants[vKey], D = CONFIG.duration;
+        const $ = (s) => document.querySelector(s);
+        const $$ = (s) => Array.from(document.querySelectorAll(s));
+
+        document.querySelectorAll("video.shot").forEach((v) => { if (!plate || !V.shots.includes(v.id)) v.style.display = "none"; });
+
+        // geometry: the band is centred; each bar fills the rest
+        const bandH = Math.round(1080 / V.aspect), barH = Math.round((1920 - bandH) / 2);
+        Object.assign($("#band").style, { top: barH + "px", height: bandH + "px" });
+        $("#barTop").style.height = barH + "px";
+        $("#barBot").style.height = barH + "px";
+
+        const isLB = V.style === "letterbox";
+        $("#lbHeroWrap").style.display = isLB ? "" : "none";
+        $("#lbTimeWrap").style.display = isLB ? "" : "none";
+        $("#ccOsd").style.display = isLB ? "none" : "";
+        $("#ccMeta").style.display = isLB ? "none" : "";
+        $("#bandFx").style.display = isLB ? "none" : "";
+
+        if (isLB) {
+          $("#lbHero").textContent = V.place;
+          $("#lbHero").style.setProperty("--ls", V.placeTracking + "em");
+          $("#lbTime").textContent = V.time;
+          $("#lbTime").style.fontSize = V.timeSize + "px";
+        } else {
+          const names = $("#ccNames");
+          const uniq = [];
+          V.cams.forEach((c) => { if (!uniq.includes(c.name)) uniq.push(c.name); });
+          uniq.forEach((n, i) => { const d = document.createElement("div"); d.className = "cc-name" + (i === 0 ? " first" : ""); d.textContent = n; d.dataset.name = n; names.appendChild(d); });
+          $("#ccClock").textContent = V.clock;
+          $("#ccDate").textContent = " · " + V.date;
+          $("#ccCamId").textContent = V.cams[0].id;
+          if (plate && V.grade) $("#grade").style.filter = V.grade;
+        }
+
+        document.fonts.ready.then(() => {
+          const tl = gsap.timeline({ paused: true });
+          const T = V.t;
+          if (plate) V.pushes.forEach(([el, at, dur, to]) => Look.push(tl, el, at, dur, { from: 1, to: to }));
+
+          if (isLB) {
+            // ---- layout: hero sits placeGap above the picture, the time line timeGap below it ----
+            const hero = $("#lbHero"); let fs = V.placeSize; hero.style.fontSize = fs + "px";
+            while (hero.offsetWidth > V.placeMaxWidth && fs > 110) { fs -= 1; hero.style.fontSize = fs + "px"; }
+            // the caps' baseline: line box bottom minus the descent share of a .92 line (measured: ~0.13em)
+            $("#lbHeroWrap").style.bottom = Math.round(V.placeGap - fs * 0.13) + "px";
+            $("#lbTimeWrap").style.top = Math.round(V.timeGap - V.timeSize * 0.24) + "px";
+            const [c1, c2] = V.bloom.map((h) => { const n = parseInt(h.slice(1), 16); return ((n >> 16) & 255) + "," + ((n >> 8) & 255) + "," + (n & 255); });
+            const bloomAt = (s) => `drop-shadow(0 0 1px rgba(255,255,255,${(0.35 * s).toFixed(3)})) drop-shadow(0 0 18px rgba(${c1},${(0.36 * s).toFixed(3)})) drop-shadow(0 0 54px rgba(${c2},${(0.2 * s).toFixed(3)}))`;
+            const wrap = $("#lbHeroWrap");
+
+            // the gate closes, moving from the second frame and settling into place
+            gsap.set("#barTop", { yPercent: -100 }); gsap.set("#barBot", { yPercent: 100 });
+            tl.fromTo("#barTop", { yPercent: -100 }, { yPercent: 0, duration: T.barsDur, ease: "power3.out", immediateRender: false }, T.barsIn);
+            tl.fromTo("#barBot", { yPercent: 100 }, { yPercent: 0, duration: T.barsDur, ease: "power3.out", immediateRender: false }, T.barsIn);
+
+            // the title rides in on the top bar and rises out of its own mask, complete before the hit
+            Look.reveal(tl, hero, T.hero, { by: "chars", stagger: 0.03, dur: 0.5 });
+
+            // payoff: the picture opens up to the wide shot, lit by an exposure hit; the title's bloom swells with it
+            if (plate) {
+              Look.impact(tl, T.hit, { shake: "#shake", amp: 6, flash: 0, zoom: 1.045, dur: 0.36 });
+              Look.expose(tl, T.hit, { target: "#shake", peak: 1.8 });
+            }
+            const a = 1 / 30, hold = 2 / 30, dec = 0.5, tot = a + hold + dec, E = gsap.parseEase("power2.out");
+            Look.drive(tl, T.hit, tot, (p) => {
+              const t = p * tot; let k = 0;
+              if (p > 0 && p < 1) k = t < a ? t / a : (t < a + hold ? 1 : 1 - E((t - a - hold) / dec));
+              wrap.style.filter = bloomAt(0.55 + 0.75 * k);
+            });
+
+            // the time line rises under the picture
+            Look.reveal(tl, "#lbTime", T.time, { by: "words", stagger: 0.07, dur: 0.6 });
+
+            // exit: type masks out, then the gate opens on the last shot
+            tl.fromTo($$("#lbHero .lk-c"), { yPercent: 0 }, { yPercent: -118, duration: 0.3, ease: "power3.in", stagger: 0.018, immediateRender: false }, T.out);
+            tl.fromTo($$("#lbTime .lk-in"), { yPercent: 0 }, { yPercent: -118, duration: 0.26, ease: "power3.in", stagger: 0.03, immediateRender: false }, T.out + 0.04);
+            tl.fromTo("#barTop", { yPercent: 0 }, { yPercent: -100, duration: T.barsOutDur, ease: "power3.inOut", immediateRender: false }, T.barsOut);
+            tl.fromTo("#barBot", { yPercent: 0 }, { yPercent: 100, duration: T.barsOutDur, ease: "power3.inOut", immediateRender: false }, T.barsOut);
+          } else {
+            // ---- layout: the OSD block sits osdGap above the feed, flush to x 72 by its ink, not its box ----
+            const osd = $("#ccOsd"), fs = V.osdSize;
+            osd.style.fontSize = fs + "px";
+            $("#ccNames").style.height = fs + "px";
+            osd.style.bottom = Math.round(V.osdGap - fs * 0.2) + "px";
+            $("#ccMeta").style.top = Math.round(V.metaGap - 30 * 0.1) + "px";
+            const cv = document.createElement("canvas").getContext("2d");
+            const inkLeft = (el, font) => { cv.font = font; const m = cv.measureText(el.textContent.trim()); return -m.actualBoundingBoxLeft; };
+            const osdFont = `600 ${fs}px "JetBrains Mono"`;
+            $$(".cc-name").forEach((n) => { n.style.marginLeft = (-inkLeft(n, osdFont)).toFixed(1) + "px"; });
+            $("#ccClock").style.marginLeft = (-inkLeft($("#ccClock"), osdFont)).toFixed(1) + "px";
+            $("#ccMeta").style.marginLeft = (-inkLeft($("#ccMeta"), `500 30px "JetBrains Mono"`)).toFixed(1) + "px";
+            osd.style.filter = "drop-shadow(0 0 2px rgba(255,255,255,.45)) drop-shadow(0 0 22px rgba(255,255,255,.16))";
+
+            // the monitor snaps shut over the clip: fast, mechanical, landing on the cut to the feed
+            gsap.set("#barTop", { yPercent: -100 }); gsap.set("#barBot", { yPercent: 100 });
+            tl.fromTo("#barTop", { yPercent: -100 }, { yPercent: 0, duration: T.barsDur, ease: "power3.in", immediateRender: false }, T.barsIn);
+            tl.fromTo("#barBot", { yPercent: 100 }, { yPercent: 0, duration: T.barsDur, ease: "power3.in", immediateRender: false }, T.barsIn);
+
+            // the feed goes live: lens fx on, the camera's auto-iris settles
+            const fx = $("#bandFx");
+            Look.drive(tl, 0, D, (p) => { const t = p * D; fx.style.opacity = (t >= T.live - 1e-6 && t < T.out - 1e-6) ? 1 : 0; });
+            if (plate) Look.expose(tl, T.live, { target: "#shake", peak: 1.4, dur: 0.3 });
+
+            // the OSD writes on: camera name, then the clock, char by char out of their masks
+            const firstName = $(".cc-name.first");
+            Look.reveal(tl, firstName, T.live - 0.08, { by: "chars", stagger: 0.022, dur: 0.38 });
+            Look.reveal(tl, "#ccClock", T.live, { by: "chars", stagger: 0.022, dur: 0.38 });
+            Look.enter(tl, "#ccMeta", T.live + 0.14, { from: "blur", dur: 0.5, blur: 8, scale: 1.04 });
+
+            // camera switches: the name and CAM id cut with the picture; the OSD drops one frame like a real DVR switch
+            const nameEls = $$(".cc-name"), camId = $("#ccCamId");
+            // half-frame tolerance: the renderer's seek time for a cut frame can land a hair before the cut (seen at 1.7 s)
+            const camAt = (t) => { let c = V.cams[0]; V.cams.forEach((k) => { if (t >= k.at - 1 / 60) c = k; }); return c; };
+            let lastName = null;
+            Look.drive(tl, 0, D, (p) => {
+              const c = camAt(p * D);
+              if (c.name !== lastName) { nameEls.forEach((n) => { n.style.visibility = n.dataset.name === c.name ? "visible" : "hidden"; }); lastName = c.name; }
+              if (camId.textContent !== c.id) camId.textContent = c.id;
+            });
+            V.cams.slice(1).forEach((c) => {
+              // the dip covers exactly the cut frame: the drive starts 5 ms early so p is ~.05 on that frame and ~.38 on the next
+              Look.drive(tl, c.at - 0.005, 3 / 30, (p) => { osd.style.opacity = p > 0 && p < 0.2 ? 0.25 : 1; });
+              if (!plate) return;
+              if (c.payoff) {
+                Look.impact(tl, c.at, { shake: "#shake", amp: 7, flash: 0, zoom: 1.05, dur: 0.34 });
+                Look.expose(tl, c.at, { target: "#shake", peak: 1.85 });
+              } else {
+                Look.expose(tl, c.at, { target: "#shake", peak: 1.3, dur: 0.22 });
+              }
+            });
+            const pay = V.cams.find((c) => c.payoff);
+            if (pay) Look.chroma(tl, "#ccClock", pay.at, 0.16, { px: 4 });
+
+            // the clock ticks once a second from the first cut; the roll bar drifts down the feed
+            const clockChars = $$("#ccClock .lk-c");
+            const [hh, mm, ss] = V.clock.split(":").map(Number), base = hh * 3600 + mm * 60 + ss;
+            const pad = (n) => String(n).padStart(2, "0"), roll = $("#roll");
+            Look.drive(tl, 0, D, (p) => {
+              const t = p * D, s = (base + Math.max(0, Math.floor(t - T.live + 1e-6))) % 86400;
+              const str = pad(Math.floor(s / 3600)) + ":" + pad(Math.floor(s / 60) % 60) + ":" + pad(s % 60);
+              clockChars.forEach((c, i) => { if (c.textContent !== str[i]) c.textContent = str[i]; });
+              roll.style.top = Math.round(-240 + (((t - T.live) / 2.6) % 1 + 1) % 1 * (bandH + 480)) + "px";
+            });
+
+            // exit: the OSD powers off, the feed cuts back to the clip and the monitor opens
+            // (every drive writes the state that is true before it starts at p=0, so backward seeks stay correct)
+            Look.drive(tl, T.out - 0.1, 0.12, (p) => {
+              const e = p * 0.12;
+              osd.style.opacity = p <= 0 ? 1 : p >= 1 ? 0 : (e < 0.034 ? 0.3 : e < 0.067 ? 0.9 : 0);
+            });
+            tl.fromTo("#ccMeta", { opacity: 1 }, { opacity: 0, duration: 0.1, ease: "steps(3)", immediateRender: false }, T.out - 0.1);
+            // the release is a snap too: the bars leave on the first frame of the cut instead of easing in
+            tl.fromTo("#barTop", { yPercent: 0 }, { yPercent: -100, duration: T.barsOutDur, ease: "expo.out", immediateRender: false }, T.out);
+            tl.fromTo("#barBot", { yPercent: 0 }, { yPercent: 100, duration: T.barsOutDur, ease: "expo.out", immediateRender: false }, T.out);
+          }
+
+          const fin = Look.install(tl, { duration: D, grain: 0.15, vignette: 0.45, enabled: plate });
+          // The kit's overlay wrapper has a z-index, which makes it its own stacking context: the grain then "overlays" a
+          // transparent backdrop and lifts black to ~#121212. Letterbox bars must stay pure black, so drop the wrapper's
+          // z-index (it is the last child of #root, so it still paints on top) and the grain blends with the real frame:
+          // texture on the picture, none on the black.
+          if (fin) fin.el.style.zIndex = "auto";
+          tl.set({}, {}, D);
+          window.__timelines = window.__timelines || {};
+          window.__timelines["main"] = tl;
+          tl.seek(0);
+        });
+      })();
+    </script>
+  </body>
+</html>

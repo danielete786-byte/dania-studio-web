@@ -1,0 +1,349 @@
+<!doctype html>
+<!-- #21 Before/after slider: GTA 5 vs GTA 6, 1080x1920 (9:16), 30 fps, 5.0 s.
+     Full-frame component: two clips are stacked full frame and a slider seam wipes between them. The footage always
+     shows (bg "none" does not hide it, because the comparison IS the footage).
+     Each side holds ONE shot for the whole loop, and the two shots are matched like for like (the sample clips in
+     assets/clips are single shots cut from official trailers, slowed with motion interpolation to last the full 5 s).
+     Variant 0 "Vertical slider": the handle travels up/down (TwentyTwenty convention). GTA 5 above, GTA 6 below,
+       horizontal seam; two ink-navy era cards ride the seam (GTA 5 card 40 px above it, GTA 6 card 40 px below it).
+       Sample: red convertible at the kerb (GTA V trailer) vs a parked red sports car (GTA 6 launch trailer).
+     Variant 1 "Horizontal slider": the handle travels left/right. GTA 5 left, GTA 6 right, vertical seam; two
+       smoked-glass era chips ride the seam (40 px either side of it).
+       Sample: the green "5 · Los Puerta Fwy" overhead sign (GTA V trailer) vs the "35 North · VCI Airport" signs
+       (GTA 6 Trailer 2); the two signs sit at the same height across the seam.
+     Motion: GTA 6 wipes in from off-frame to a 50/50 home, holds, the handle is grabbed and dragged so GTA 5 nearly
+       fills the frame, then all the way across so GTA 6 nearly fills it, then back home; the seam then retracts the
+       way it came, so frame 0 and the last frame are both full-frame GTA 5 (clean loop). A label whose side gets too
+       narrow to hold it inside the safe zone fades out over the 0.15 s before it would reach the safe-zone edge (and
+       back in over 0.15 s once there is room again), so the seam never cuts a label. In the vertical slider the GTA 5 footage drifts up as GTA 6 wipes in (parallax, beforeShift) and
+       the GTA 6 footage sits in a box that starts at afterTop, so each subject sits in the half it is seen in.
+     Clip paths and offsets live in CONFIG. Each <video> carries data-slot; a slot's video is shown only for its own
+     variant. Keep the static src / data-media-start / data-duration in sync with CONFIG (the script also corrects
+     them at load). -->
+<html lang="en" data-composition-variables='[
+  {"id":"variant","type":"enum","label":"Variant","default":"0","options":[{"value":"0","label":"Vertical slider"},{"value":"1","label":"Horizontal slider"}]},
+  {"id":"bg","type":"enum","label":"Background","default":"plate","options":[{"value":"plate","label":"Sample footage"},{"value":"none","label":"Transparent (footage still shows)"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link rel="stylesheet" href="assets/fonts/fonts.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      /* declared inline as well as in fonts.css so the renderer's static font guard resolves Barlow Condensed */
+      @font-face { font-family: "Barlow Condensed"; font-style: normal; font-weight: 800; font-display: block; src: url("assets/fonts/BarlowCondensed-ExtraBold.ttf") format("truetype"); }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: #0B0B0E; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; background: #0B0B0E; font-family: "Inter", sans-serif;
+        -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; font-feature-settings: "tnum" 1, "ss01" 1; }
+      :root {
+        --ink: #0B0B0E; --navy: #1F202B;
+        --sunset: linear-gradient(90deg, #F84FA4 0%, #FE8E4E 55%, #FEB747 100%);
+        --shadow-card: 0 1px 2px rgba(0,0,0,.30), 0 26px 60px -18px rgba(0,0,0,.66);
+      }
+
+      /* ---------- footage layers ---------- */
+      .layer { position: absolute; inset: 0; overflow: hidden; }
+      .layer video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      #layB { will-change: clip-path; }
+
+      /* ---------- era chips (shared) ---------- */
+      .chip { position: absolute; left: 0; top: 0; z-index: 2; white-space: nowrap; border-radius: 20px; will-change: transform, opacity; opacity: 0; }
+      .chip .nm { font-family: "Barlow Condensed", sans-serif; font-weight: 800; text-transform: uppercase; line-height: 1; }
+      .chip.new .nm { background: var(--sunset); -webkit-background-clip: text; background-clip: text; color: transparent;
+        -webkit-text-fill-color: transparent; }
+
+      /* variant 0: wide solid cards  [ NAME | 2013 / PLACE ], one material (ink-navy) for both eras; the sunset gradient
+         on "GTA 6" is the only accent. Content is left-aligned: both names share one fixed-width column (set at build to
+         the wider name), so the rules and the year/place column sit at the same x in both cards. Right padding is 30px
+         minus the place line's trailing 0.24em tracking (6.7px). */
+      .chip.card { display: flex; align-items: center; justify-content: flex-start; height: 112px; padding: 0 23px 0 30px; transform-origin: 0 0;
+        background: var(--navy); color: #fff; box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), var(--shadow-card); }
+      .chip.card .nm { font-size: 80px; letter-spacing: 0.02em; padding-top: 6px; flex: none; }
+      .chip.card .rule { width: 2px; height: 60px; margin: 0 26px 0 24px; border-radius: 1px; flex: none; background: rgba(255,255,255,.22); }
+      .chip.card .meta { display: flex; flex-direction: column; justify-content: center; gap: 7px; }
+      .chip.card .yr { font-family: "Inter", sans-serif; font-weight: 700; font-size: 34px; line-height: 1; letter-spacing: -0.01em; }
+      .chip.card .pl { font-family: "Inter", sans-serif; font-weight: 600; font-size: 28px; line-height: 1; letter-spacing: 0.24em;
+        text-transform: uppercase; color: rgba(255,255,255,.90); }
+      .chip.card.old .nm { color: rgba(255,255,255,.92); }
+
+      /* variant 1: stacked smoked-glass chips   NAME / 2013 — see-through tinted glass (the sky shows through, blurred, at 30%;
+         .70 keeps the pink end of "GTA 6" at 3:1 or better even over white cloud),
+         so it reads as a different material from variant 0's solid card; a short, light shadow keeps the sky clean */
+      .chip.glass { display: flex; flex-direction: column; align-items: center; padding: 22px 32px 24px; transform-origin: 50% 50%;
+        background: rgba(14,14,20,.70); -webkit-backdrop-filter: blur(20px) saturate(1.4); backdrop-filter: blur(20px) saturate(1.4);
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,.14), inset 0 1px 0 rgba(255,255,255,.18), 0 10px 28px -10px rgba(0,0,0,.28); }
+      .chip.glass .nm { font-size: 92px; letter-spacing: 0.02em; color: #fff; padding-top: 4px; }
+      .chip.glass .yr { margin-top: 10px; font-family: "Inter", sans-serif; font-weight: 700; font-size: 32px; line-height: 1;
+        letter-spacing: 0.42em; padding-left: 0.42em; color: rgba(255,255,255,.92); }
+
+      /* ---------- slider UI: 6px seam + 104px smoked-glass handle (reads at 360x640) ---------- */
+      #ui { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
+      #seam { position: absolute; left: 0; top: 0; background: #fff; will-change: transform;
+        box-shadow: 0 0 0 1px rgba(0,0,0,.25), 0 2px 8px rgba(0,0,0,.30); }
+      .o-h #seam { width: 6px; height: 1920px; }
+      .o-v #seam { width: 1080px; height: 6px; }
+      #knob { position: absolute; left: 0; top: 0; width: 104px; height: 104px; will-change: transform; }
+      #knobFace { position: absolute; inset: 0; border-radius: 50%; background: rgba(14,14,20,.80);
+        -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+        box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.22), 0 1px 2px rgba(0,0,0,.30), 0 14px 34px -8px rgba(0,0,0,.55);
+        display: flex; align-items: center; justify-content: center; }
+      #knobFace svg { width: 104px; height: 104px; display: block; }
+      .o-v #knobFace svg { transform: rotate(90deg); }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="5" data-width="1080" data-height="1920">
+
+      <!-- ===== BEFORE layer (GTA 5): full frame, never clipped; the AFTER layer covers it past the seam ===== -->
+      <div id="layA" class="layer">
+        <video id="clipA0" data-slot="0a" data-layout-allow-overflow class="clip" src="assets/clips/g01-convertible.mp4" muted playsinline data-start="0" data-media-start="0" data-duration="5" data-track-index="0"></video>
+        <video id="clipA1" data-slot="1a" class="clip" src="assets/clips/g-freeway.mp4" muted playsinline data-start="0" data-media-start="0" data-duration="5" data-track-index="1"></video>
+        <div class="chip" id="chipA" data-layout-allow-occlusion></div>
+      </div>
+
+      <!-- ===== AFTER layer (GTA 6): clipped to its side of the seam ===== -->
+      <div id="layB" class="layer">
+        <video id="clipB0" data-slot="0b" class="clip" style="top: 400px; height: 1520px;" src="assets/clips/t1-redcar.mp4" muted playsinline data-start="0" data-media-start="0" data-duration="5" data-track-index="2"></video>
+        <video id="clipB1" data-slot="1b" class="clip" src="assets/clips/t2-freeway.mp4" muted playsinline data-start="0" data-media-start="0" data-duration="5" data-track-index="3"></video>
+        <div class="chip new" id="chipB" data-layout-allow-occlusion></div>
+      </div>
+
+      <!-- ===== slider UI ===== -->
+      <div id="ui">
+        <div id="seam"></div>
+        <div id="knob"><div id="knobFace">
+          <svg viewBox="0 0 104 104" aria-hidden="true">
+            <path d="M45 41 L34 52 L45 63" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M59 41 L70 52 L59 63" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div></div>
+      </div>
+    </div>
+
+    <script>
+      const CONFIG = {
+        duration: 5.0,
+        // Per variant:
+        //   orient    "vertical"   = handle travels up/down, BEFORE on top, AFTER below (horizontal seam)
+        //             "horizontal" = handle travels left/right, BEFORE left, AFTER right (vertical seam)
+        //   chip      "card" (solid ink-navy) or "glass" (smoked glass). Either way the labels ride the seam, `gap` px
+        //             from it, and fade out (timing.labelFade) just before their side gets too narrow to hold
+        //             them inside `safe`.
+        //   before / after: name, year, place (card only), clip (src: ONE held shot, at least `duration` long),
+        //             start (offset into the clip, s)
+        //   beforeShift px the BEFORE footage drifts against the slider axis (up for vertical) while the seam wipes in,
+        //             so its subject sits in the half it is seen in; it drifts back as the seam retracts. 0 = none.
+        //             Keep it <= FRAME - seam.showBefore, or a gap would open under the seam.
+        //   afterTop  (vertical only) px from the top where the AFTER footage box starts (it runs to the bottom); the
+        //             clip should be baked at 1080 x (1920 - afterTop). Keep it <= seam.showAfter. 0 = full frame.
+        //   seam      px positions (y for vertical, x for horizontal): home = resting 50/50 position,
+        //             showAfter = GTA 6 nearly fills the frame, showBefore = GTA 5 nearly fills it,
+        //             off = off-frame start/end position, knob = the handle's fixed cross-axis position
+        //   chipTop   (horizontal) y of both chips;  safe = [lo, hi] px the labels must stay inside along the slider axis
+        variants: {
+          "0": {
+            orient: "vertical", chip: "card",
+            before: { name: "GTA 5", year: "2013", place: "Los Santos", clip: "assets/clips/g01-convertible.mp4", start: 0 },
+            after:  { name: "GTA 6", year: "2026", place: "Vice City",  clip: "assets/clips/t1-redcar.mp4",       start: 0 },
+            beforeShift: 500,
+            afterTop: 400,
+            seam: { home: 960, showAfter: 420, showBefore: 1400, off: 2030, knob: 800 },
+            gap: 40, safe: [230, 1480], chipX: 72
+          },
+          "1": {
+            orient: "horizontal", chip: "glass",
+            before: { name: "GTA 5", year: "2013", place: "Los Santos", clip: "assets/clips/g-freeway.mp4",  start: 0 },
+            after:  { name: "GTA 6", year: "2026", place: "Vice City",  clip: "assets/clips/t2-freeway.mp4", start: 0 },
+            beforeShift: 0,
+            afterTop: 0,
+            seam: { home: 540, showAfter: 180, showBefore: 870, off: 1190, knob: 640 },   // knob spans x 818-922 at showBefore (inside 936)
+            gap: 40, safe: [72, 936], chipTop: 250
+          }
+        },
+        timing: {
+          seamIn: 0.08, seamInDur: 0.56,     // GTA 6 wipes in from off-frame to home (expo.out)
+          chipA: 0.12, chipB: 0.40,          // era labels land (0.38 s, power3.out)
+          drag: [                            // the payoff: one grab, three legs, 0.5 s holds between them:
+            { at: 1.10, dur: 0.55, to: "showBefore", ease: "power3.inOut" },   // GTA 5 nearly fills the frame ("before")
+            { at: 2.15, dur: 0.80, to: "showAfter",  ease: "power2.inOut" },   // one long drag across reveals GTA 6
+            { at: 3.45, dur: 0.55, to: "home",       ease: "power3.inOut" }    // back to the 50/50 split
+          ],
+          labelFade: 0.15,                   // a label that runs out of room fades over this long
+          shiftIn: 0.08, shiftInDur: 0.90,   // beforeShift drift in (power2.out, about 37 px/frame at most)
+          shiftOut: 4.25, shiftOutDur: 0.55, // ... and back (sine.inOut, about 48 px/frame at most), done before the seam leaves the frame
+          out: 4.36,                         // labels leave
+          retract: 4.46, retractDur: 0.42    // seam leaves the way it came (power3.in); last frames are full-frame GTA 5
+        }
+      };
+
+      (function () {
+        const VARS = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+        const vKey = CONFIG.variants[String(VARS.variant)] ? String(VARS.variant) : "0";
+        const V = CONFIG.variants[vKey], T = CONFIG.timing, D = CONFIG.duration;
+        const $ = (s) => document.querySelector(s);
+        const root = $("#root");
+        const vertical = V.orient === "vertical";
+        root.classList.add(vertical ? "o-v" : "o-h");
+        const FRAME = vertical ? 1920 : 1080;   // length of the slider axis
+
+        // ---------- footage: only the active variant's slots play; src / offset come from CONFIG ----------
+        const setAttr = (el, k, val) => { val = String(val); if (el.getAttribute(k) !== val) el.setAttribute(k, val); };
+        const r3 = (n) => Math.round(n * 1000) / 1000;
+        let vidA = null;
+        document.querySelectorAll("video[data-slot]").forEach((v) => {
+          const slot = v.getAttribute("data-slot");
+          if (slot[0] !== vKey) { v.style.display = "none"; return; }
+          const c = slot[1] === "a" ? V.before : V.after;
+          setAttr(v, "src", c.clip);
+          setAttr(v, "data-media-start", r3(c.start || 0));
+          setAttr(v, "data-start", 0);
+          setAttr(v, "data-duration", r3(D));
+          if (slot[1] === "a") vidA = v;
+          if (slot[1] === "b") {
+            // AFTER footage box: starts at afterTop (vertical) and runs to the bottom, object-fit: cover inside it
+            const top = vertical ? (V.afterTop || 0) : 0;
+            v.style.top = top + "px";
+            v.style.height = (1920 - top) + "px";
+          }
+        });
+
+        // ---------- era labels ----------
+        const esc = (s) => String(s).replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]));
+        function chipHTML(c) {
+          if (V.chip === "card") return `<span class="nm">${esc(c.name)}</span><span class="rule"></span>` +
+            `<span class="meta"><span class="yr">${esc(c.year)}</span><span class="pl">${esc(c.place)}</span></span>`;
+          return `<span class="nm">${esc(c.name)}</span><span class="yr">${esc(c.year)}</span>`;
+        }
+        const chipA = $("#chipA"), chipB = $("#chipB");
+        [chipA, chipB].forEach((el) => el.classList.add(V.chip === "card" ? "card" : "glass"));
+        chipA.classList.add("old");
+        chipA.innerHTML = chipHTML(V.before);
+        chipB.innerHTML = chipHTML(V.after);
+
+        const seam = $("#seam"), knob = $("#knob"), knobFace = $("#knobFace"), layB = $("#layB");
+        const S = V.seam, KR = 52, SEAM_HALF = 3;   // knob radius, half the seam thickness
+
+        // ---------- keyframe tracks (pure functions of time: seek-safe) ----------
+        const easeCache = {};
+        const ez = (n) => easeCache[n] || (easeCache[n] = gsap.parseEase(n));
+        function track(keys, t) {
+          if (t <= keys[0][0]) return keys[0][1];
+          for (let i = 1; i < keys.length; i++) {
+            const k = keys[i];
+            if (t <= k[0]) {
+              const p = keys[i - 1], u = (t - p[0]) / (k[0] - p[0] || 1);
+              return p[1] + (k[1] - p[1]) * ez(k[2] || "none")(u);
+            }
+          }
+          return keys[keys.length - 1][1];
+        }
+        const t1 = T.seamIn + T.seamInDur;
+        const SEAM = [[0, S.off], [T.seamIn, S.off], [t1, S.home, "expo.out"]];
+        let last = S.home;
+        T.drag.forEach((leg) => { SEAM.push([leg.at, last]); last = S[leg.to]; SEAM.push([leg.at + leg.dur, last, leg.ease]); });
+        SEAM.push([T.retract, last], [T.retract + T.retractDur, S.off, "power3.in"]);
+        const dragIn = T.drag[0].at, dragEnd = T.drag[T.drag.length - 1].at + T.drag[T.drag.length - 1].dur;
+        // knob "grab": presses in just before the first leg, holds through the whole drag, releases as it lands home
+        const PRESS = [[0, 1], [dragIn - 0.16, 1], [dragIn, 0.9, "power2.out"], [dragEnd - 0.06, 0.9], [dragEnd + 0.24, 1, "back.out(2)"]];
+
+        const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+        const ramp = (t, t0, dur, e) => ez(e)(clamp((t - t0) / dur, 0, 1));
+
+        // BEFORE footage parallax: it drifts in on its own gentle ramp as GTA 6 wipes in (power2.out over shiftInDur,
+        // so it never lurches with the seam's fast expo start), holds the full drift for the whole drag (the comparison
+        // is a pure wipe), and drifts back (sine.inOut) as the labels leave, finishing before the seam exits the frame.
+        // Its far edge never rises above the seam (clamped).
+        function beforeShift(pos, t) {
+          if (!V.beforeShift) return 0;
+          const k = ramp(t, T.shiftIn, T.shiftInDur, "power2.out") * (1 - ramp(t, T.shiftOut, T.shiftOutDur, "sine.inOut"));
+          return Math.min(0, Math.max(Math.min(pos, FRAME) - FRAME, -V.beforeShift * k));
+        }
+
+        // label geometry: measured once at build, after the fonts have loaded (never inside the timeline callback)
+        let wA = 0, wB = 0, hA = 0, hB = 0;
+        // where each label sits for a seam position: it rides the seam, V.gap px clear of it, on its own side
+        function placeA(pos) { return vertical ? [V.chipX, pos - V.gap - hA] : [pos - V.gap - wA, V.chipTop]; }
+        function placeB(pos) { return vertical ? [V.chipX, pos + V.gap] : [pos + V.gap, V.chipTop]; }
+        // does the label fit inside the safe zone along the slider axis?
+        function fits(xy, w, h) { const a = vertical ? xy[1] : xy[0], len = vertical ? h : w; return a >= V.safe[0] && a + len <= V.safe[1]; }
+
+        // fit-fade tables, precomputed on a fine grid from the (pure) seam track so render(t) stays a pure function of t.
+        // The seam's future is known, so a label fades OUT over the labelFade seconds that END as it reaches the safe-zone
+        // edge, and fades IN over the labelFade seconds after it is back inside: a visible label is always fully inside
+        // the safe zone, never crossed by the seam and never cut by the frame edge.
+        const STEP = 1 / 600, NSTEP = Math.ceil(D / STEP) + 1;
+        function buildFit(place, w, h) {
+          const ok = new Uint8Array(NSTEP), tab = new Float32Array(NSTEP), W = T.labelFade / STEP;
+          for (let i = 0; i < NSTEP; i++) ok[i] = fits(place(track(SEAM, i * STEP)), w, h) ? 1 : 0;
+          let since = 1e9, until = 1e9;    // grid steps since the label last entered / until it next leaves
+          for (let i = 0; i < NSTEP; i++) { since = ok[i] ? since + 1 : 0; tab[i] = ok[i] ? Math.min(1, since / W) : 0; }
+          for (let i = NSTEP - 1; i >= 0; i--) { until = ok[i] ? until + 1 : 0; if (ok[i]) tab[i] = Math.min(tab[i], until / W); }
+          return tab;
+        }
+        function sample(tab, t) {
+          const f = clamp(t / STEP, 0, NSTEP - 1), i = Math.floor(f), j = Math.min(i + 1, NSTEP - 1);
+          return tab[i] + (tab[j] - tab[i]) * (f - i);
+        }
+        let fitA = null, fitB = null;
+
+        // one label's state at time t: lands (rise + fade, power3.out), leaves (lift + fade, power2.in), times its
+        // fit-fade. Always scale 1 once landed (the 0.96 -> 1 settle is part of the entrance only).
+        function chipState(el, t, tIn, xy, fit) {
+          const a = ramp(t, tIn, 0.38, "power3.out"), b = ramp(t, T.out, 0.26, "power2.in");
+          const dy = 22 * (1 - a) - 12 * b, s = 0.96 + 0.04 * a;
+          el.style.opacity = (a * (1 - b) * fit).toFixed(4);
+          el.style.transform = `translate3d(${xy[0].toFixed(2)}px, ${(xy[1] + dy).toFixed(2)}px, 0px) scale(${s.toFixed(4)})`;
+        }
+
+        function render(t) {
+          const pos = track(SEAM, t);
+          const sc = track(PRESS, t);
+          if (vertical) {
+            layB.style.clipPath = `inset(${pos.toFixed(2)}px 0px 0px 0px)`;
+            seam.style.transform = `translate3d(0px, ${(pos - SEAM_HALF).toFixed(2)}px, 0px)`;
+            knob.style.transform = `translate3d(${(S.knob - KR).toFixed(2)}px, ${(pos - KR).toFixed(2)}px, 0px)`;
+            if (vidA && V.beforeShift) vidA.style.transform = `translate3d(0px, ${beforeShift(pos, t).toFixed(2)}px, 0px)`;
+          } else {
+            layB.style.clipPath = `inset(0px 0px 0px ${pos.toFixed(2)}px)`;
+            seam.style.transform = `translate3d(${(pos - SEAM_HALF).toFixed(2)}px, 0px, 0px)`;
+            knob.style.transform = `translate3d(${(pos - KR).toFixed(2)}px, ${(S.knob - KR).toFixed(2)}px, 0px)`;
+            if (vidA && V.beforeShift) vidA.style.transform = `translate3d(${beforeShift(pos, t).toFixed(2)}px, 0px, 0px)`;
+          }
+          chipState(chipA, t, T.chipA, placeA(pos), fitA ? sample(fitA, t) : 0);
+          chipState(chipB, t, T.chipB, placeB(pos), fitB ? sample(fitB, t) : 0);
+          knobFace.style.transform = `scale(${sc.toFixed(4)})`;
+        }
+
+        const fontsIn = Promise.all([
+          document.fonts.load('800 92px "Barlow Condensed"'), document.fonts.load('800 80px "Barlow Condensed"'),
+          document.fonts.load('700 32px "Inter"'), document.fonts.load('700 34px "Inter"'), document.fonts.load('600 28px "Inter"')
+        ]).catch(() => {}).then(() => document.fonts.ready);
+
+        fontsIn.then(() => {
+          if (V.chip === "card") {
+            // one name column for both cards (the wider name), then one card width (the wider card)
+            const nA = chipA.querySelector(".nm"), nB = chipB.querySelector(".nm");
+            const nw = Math.ceil(Math.max(nA.offsetWidth, nB.offsetWidth));
+            nA.style.width = nB.style.width = nw + "px";
+            const w = Math.max(chipA.offsetWidth, chipB.offsetWidth);
+            chipA.style.width = chipB.style.width = w + "px";
+          }
+          wA = chipA.offsetWidth; wB = chipB.offsetWidth; hA = chipA.offsetHeight; hB = chipB.offsetHeight;
+          fitA = buildFit(placeA, wA, hA);
+          fitB = buildFit(placeB, wB, hB);
+          render(0);
+
+          const tl = gsap.timeline({ paused: true });
+          const clock = { t: 0 };
+          tl.fromTo(clock, { t: 0 }, { t: D, duration: D, ease: "none", onUpdate: () => render(clock.t) }, 0);
+          tl.set({}, {}, D);
+
+          window.__timelines = window.__timelines || {};
+          window.__timelines["main"] = tl;
+          tl.seek(0);
+        });
+      })();
+    </script>
+  </body>
+</html>

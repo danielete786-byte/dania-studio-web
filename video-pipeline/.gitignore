@@ -3,6 +3,7 @@ remotion/out
 remotion/public/voice.wav
 remotion/public/sfx/
 remotion/public/img/
+remotion/public/fx/
 __pycache__/
 # de cada historia solo se guarda el guion (nunca vídeos ni audio)
 stories/*/*

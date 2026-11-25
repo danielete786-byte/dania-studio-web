@@ -1,0 +1,343 @@
+<!doctype html>
+<!-- 46 Cash payout: money rolls up for heist / payout moments. 1080x1920 (9:16), 30 fps, 5.5 s.
+     Variables: variant "0" HUD corner (top-right game-HUD balance + teal "+$" delta) / "1" Centre card (smoked-glass payout card),
+     bg "plate" (sample GTA VI footage underneath) / "none" (transparent overlay).
+     Safe zones: everything sits inside x 72–936, y 230–1480. -->
+<html lang="en" data-composition-variables='[
+  {"id":"variant","type":"enum","label":"Variant","default":"0","options":[{"value":"0","label":"HUD corner"},{"value":"1","label":"Centre card"}]},
+  {"id":"bg","type":"enum","label":"Background","default":"plate","options":[{"value":"plate","label":"Sample footage"},{"value":"none","label":"Transparent"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link rel="stylesheet" href="assets/fonts/fonts.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="assets/kit/motion/motion.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: transparent; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; font-family: "Inter", sans-serif;
+        -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; font-feature-settings: "tnum" 1, "ss01" 1; }
+      .plate { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      #ov { position: absolute; inset: 0; }
+      :root {
+        --ink: #0B0B0E; --paper: #FFFFFF; --navy: #1F202B;
+        --teal: #2EC4B6;
+        --sunset: linear-gradient(90deg, #F84FA4 0%, #FE8E4E 55%, #FEB747 100%);
+        --hair: rgba(255,255,255,.14);
+        --shadow-card: 0 1px 2px rgba(0,0,0,.25), 0 30px 80px -24px rgba(0,0,0,.65);
+      }
+
+      /* ---- rolling counter (built by makeCounter) ---- */
+      .ctr { display: flex; align-items: flex-start; white-space: nowrap; font-family: "Barlow Condensed", sans-serif;
+        font-variant-numeric: tabular-nums; line-height: 1; }
+      .ctr .c { position: relative; display: block; flex: none; overflow: hidden; text-align: center; }
+      .ctr .col { display: block; }
+      .ctr .col > i { display: block; font-style: normal; text-align: center; }
+      .ctr .s { display: block; flex: none; overflow: visible; }
+      .ctr .probe { position: absolute; visibility: hidden; white-space: nowrap; }
+
+      /* ---- V0: HUD corner (Rockstar HUD restraint: solid white condensed numerals, right column) ---- */
+      #hud { position: absolute; right: 144px; top: 252px; display: none; flex-direction: column; align-items: flex-end; color: #fff;
+        filter: drop-shadow(0 2px 2px rgba(0,0,0,.45)) drop-shadow(0 6px 24px rgba(0,0,0,.5)); }
+      /* soft dark halo behind the HUD stack: keeps thin white type legible on sequins / sky without a visible box */
+      #halo { position: absolute; right: 60px; top: 150px; width: 820px; height: 420px; display: none; pointer-events: none;
+        background: radial-gradient(closest-side, rgba(6,6,10,.5), rgba(6,6,10,.26) 55%, rgba(6,6,10,0)); }
+      #bal { font-weight: 700; font-size: 120px; letter-spacing: 0; transform-origin: 100% 60%; }
+      #drow { display: flex; align-items: center; gap: 22px; margin-top: 4px; }
+      #dlbl { font: 700 30px/1 "Inter", sans-serif; letter-spacing: .24em; text-transform: uppercase; color: #fff; }
+      #dval { font: 700 80px/1 "Barlow Condensed", sans-serif; letter-spacing: .005em; color: var(--teal); }
+
+      /* ---- V1: Centre card (smoked glass, one sunset accent on the progress rule) ---- */
+      #card { position: absolute; left: 72px; top: 500px; width: 864px; display: none; padding: 40px 44px 38px; color: #fff;
+        border-radius: 36px; background: rgba(14,14,20,.68); -webkit-backdrop-filter: blur(20px) saturate(1.4); backdrop-filter: blur(20px) saturate(1.4);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.16), inset 0 0 0 1px rgba(255,255,255,.10), var(--shadow-card); }
+      #card .hd { display: flex; justify-content: space-between; align-items: center; }
+      .lbl { font: 600 28px/1 "Inter", sans-serif; letter-spacing: .4em; text-transform: uppercase; margin-right: -.4em; }
+      #clbl { color: rgba(255,255,255,.82); }
+      #cplace { color: rgba(255,255,255,.64); }
+      #amt { font-weight: 800; justify-content: center; margin-top: 18px; transform-origin: 50% 60%; }
+      .rule { position: relative; height: 8px; margin-top: 20px; border-radius: 4px; background: rgba(255,255,255,.12); overflow: hidden; }
+      .rule .fill { position: absolute; inset: 0; border-radius: 4px; background: var(--sunset); clip-path: inset(0 100% 0 0 round 4px); }
+      .rule .sheen { position: absolute; top: 0; bottom: 0; left: -160px; width: 160px;
+        background: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,.85), rgba(255,255,255,0)); }
+      #splitWrap { height: 0; overflow: hidden; }
+      .split { display: grid; grid-template-columns: 1fr 1px 1fr; margin-top: 30px; padding-top: 28px; border-top: 1px solid var(--hair); }
+      .split .div { background: var(--hair); }
+      .split .cell { display: flex; flex-direction: column; gap: 12px; }
+      .split .cell + .div + .cell { padding-left: 36px; }
+      .split .nm { font: 600 28px/1 "Inter", sans-serif; letter-spacing: .32em; text-transform: uppercase; color: rgba(255,255,255,.56); }
+      .split .am { font: 700 44px/1 "Inter", sans-serif; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="5.5" data-width="1080" data-height="1920">
+      <!-- sample footage: one framework-owned muted video per plate; the script hides all but the one the variant names -->
+      <video id="plateA" class="clip plate" src="assets/plates/p07-convertible-v.mp4" muted playsinline data-start="0" data-duration="5.5" data-track-index="0"></video>
+      <video id="plateB" class="clip plate" src="assets/plates/p04-driveby-mural-v.mp4" muted playsinline data-start="0" data-duration="5.5" data-track-index="0"></video>
+
+      <div id="ov" class="clip" data-start="0" data-duration="5.5" data-track-index="1">
+        <!-- V0 HUD corner -->
+        <div id="halo"></div>
+        <div id="hud">
+          <div id="bal" class="ctr"></div>
+          <div id="drow"><span id="dlbl"></span><span id="dval"></span></div>
+        </div>
+        <!-- V1 Centre card -->
+        <div id="card">
+          <div class="hd"><span id="clbl" class="lbl"></span><span id="cplace" class="lbl"></span></div>
+          <div id="amt" class="ctr"></div>
+          <div class="rule"><div class="fill" id="fill"></div><div class="sheen" id="sheen"></div></div>
+          <div id="splitWrap"><div class="split" id="split"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      /* ======================= CONFIG: all content and timing ======================= */
+      const CONFIG = {
+        currency: "$",
+        variants: {
+          "0": {                                   // HUD corner: wallet balance top-right, "+$" delta under it
+            plate: "assets/plates/p07-convertible-v.mp4",
+            balanceFrom: 12500,                    // wallet before the payout
+            payout: 1250000,                       // the amount credited (shown as +$1,250,000)
+            label: "Heist payout",                 // small caps label beside the +$ line ("" hides it)
+            accent: "#2EC4B6"                      // Vice teal = credited / success
+          },
+          "1": {                                   // Centre card: smoked-glass payout card
+            plate: "assets/plates/p04-driveby-mural-v.mp4",
+            payout: 1250000,                       // rolls up from a centred $0 that grows digit by digit
+            label: "Heist payout",                 // top-left caps label
+            place: "Vice City",                    // top-right caps label ("" hides it)
+            split: [                               // the crew split row ([] hides it)
+              { name: "Jason", amount: 625000 },
+              { name: "Lucia", amount: 625000 }
+            ]
+          }
+        },
+        timing: {           // keep count + countDur on the 1/30 s frame grid so the hit lands on a real frame
+          in: 0.2,          // overlay appears
+          delta: 0.3,       // V0: "+$" line slides in
+          count: 0.5,       // V0: balance starts rolling
+          countDur: 1.5,    // V0: lands at count + countDur = 2.0 s (flash + punch on that exact frame)
+          cardCount: 0.5,   // V1: card numeral starts rolling
+          cardCountDur: 1.6,// V1: lands at 2.1 s (punch + sheen on that exact frame)
+          rush: 9,          // roll ease: exponential rush that still moves on its last frame, then stops dead (higher = settles earlier)
+          deltaOut: 3.9,    // V0: "+$" line fades like the in-game HUD
+          out: 4.75,        // everything clears (loop tail after this)
+          end: 5.5
+        }
+      };
+
+      (function () {
+        const VARS = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+        const vKey = CONFIG.variants[String(VARS.variant)] ? String(VARS.variant) : "0";
+        const showPlate = VARS.bg !== "none";
+        const V = CONFIG.variants[vKey], T = CONFIG.timing, CUR = CONFIG.currency;
+        const $ = (s) => document.querySelector(s);
+        const fmt = (n) => CUR + Math.round(n).toLocaleString("en-US");
+
+        document.querySelectorAll("video.plate").forEach((v) => {
+          if (!showPlate || v.getAttribute("src") !== V.plate) v.style.display = "none";
+        });
+
+        /* ---------- rolling counter: per-digit columns, seek-safe (pure function of time) ---------- */
+        function el(tag, cls, txt) { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
+
+        function makeCounter(host, o) {
+          // o: { digits, prefix }
+          host.innerHTML = "";
+          const fs = parseFloat(getComputedStyle(host).fontSize);
+          const H = Math.round(fs * 1.0);
+          // widest digit advance at this size → fixed (tabular) cell width
+          const probe = el("span", "probe"); host.appendChild(probe);
+          let W = 0;
+          for (let k = 0; k < 10; k++) { probe.textContent = String(k); W = Math.max(W, probe.getBoundingClientRect().width); }
+          host.removeChild(probe);
+          W = Math.ceil(W);
+          const lh = H + "px";
+          const cells = [], commas = [];
+          if (o.prefix) { const p = el("span", "s cur", o.prefix); p.style.height = lh; p.style.lineHeight = lh; host.appendChild(p); }
+          for (let i = o.digits - 1; i >= 0; i--) {
+            const c = el("span", "c"), col = el("span", "col");
+            c.setAttribute("data-layout-allow-overflow", ""); col.setAttribute("data-layout-allow-overflow", "");
+            c.style.width = W + "px"; c.style.height = lh;
+            for (let k = 0; k < 10; k++) { const g = el("i", null, String(k)); g.style.height = lh; g.style.lineHeight = lh; col.appendChild(g); }
+            c.appendChild(col); host.appendChild(c);
+            cells[i] = { c, col, glyphs: Array.from(col.children), shown: -1, appear: 1 };
+            if (i > 0 && i % 3 === 0) { const cm = el("span", "s cm", ","); cm.style.height = lh; cm.style.lineHeight = lh; host.appendChild(cm); commas.push({ el: cm, place: i, w: 0 }); }
+          }
+          commas.forEach((cm) => { cm.w = cm.el.getBoundingClientRect().width; });
+          return { cells, commas, W, H };
+        }
+
+        const easeOutCubic = (x) => 1 - Math.pow(1 - x, 3);
+        const hexRgb = (h) => { const m = h.replace("#", ""); return [0, 2, 4].map((i) => parseInt(m.substr(i, 2), 16)); };
+
+        // Roll ease: normalised exponential ease-out. It rushes from the first frame, still moves on its last
+        // frame (a few hundred $ per frame) and reaches the exact total at x = 1, so the count stops dead
+        // instead of crawling. Exact inverse, so the time each digit changed is known (for the tick).
+        function rushEase(K) {
+          const den = 1 - Math.pow(2, -K);
+          return {
+            f: (x) => x <= 0 ? 0 : x >= 1 ? 1 : (1 - Math.pow(2, -K * x)) / den,
+            df: (x) => K * Math.LN2 * Math.pow(2, -K * x) / den,
+            inv: (y) => y <= 0 ? 0 : y >= 1 ? 1 : -Math.log2(1 - y * den) / K
+          };
+        }
+
+        // Returns render(tLocal): tLocal = seconds since the count started (0 = V0 shown, no motion).
+        // tLocal >= dur is the landing: the exact total, every digit at rest, no tick in flight.
+        const TICK = 0.24;  // a ticking digit rises this fraction of the cell height into place
+        function counterDriver(C, V0, V1, dur, K, slide, onValue) {
+          const E = rushEase(K), D = V1 - V0;
+          return function (tl) {
+            const landed = tl >= dur - 1e-4;
+            const x = landed ? 1 : Math.max(0, tl / dur);
+            const v = landed ? V1 : V0 + D * E.f(x);
+            const n = landed ? V1 : Math.floor(v + 1e-6);
+            const rate = landed || tl <= 0 ? 0 : Math.abs(D) * E.df(x) / dur;   // $ per second
+            for (let i = 0; i < C.cells.length; i++) {
+              const P = Math.pow(10, i), cell = C.cells[i];
+              const d = Math.floor(n / P) % 10;
+              let appear = (i === 0 || n >= P) ? 1 : 0, rise = 0, op = 1;
+              const interval = rate > 0 ? P / rate : Infinity;     // seconds between changes of this digit
+              if (!landed && tl > 0 && interval > slide * 1.5) {   // slow enough to see: the new digit ticks up into place (never on the landing frame)
+                const B = Math.floor(n / P) * P;                   // value at which this digit last changed
+                if (B > V0) {
+                  const dt = tl - E.inv((B - V0) / D) * dur;
+                  if (dt >= 0 && dt < slide) {
+                    const s = easeOutCubic(dt / slide);
+                    rise = 1 - s; op = 0.55 + 0.45 * s;
+                    if (B === P) appear = s;                       // digit just became significant
+                  }
+                }
+              }                                                    // fast digits snap (the GTA flicker)
+              // one glyph per cell, ever: no stacked half-glyphs mid-roll
+              if (cell.shown !== d) { if (cell.shown >= 0) cell.glyphs[cell.shown].style.visibility = "hidden"; else cell.glyphs.forEach((g) => { g.style.visibility = "hidden"; }); cell.glyphs[d].style.visibility = "visible"; cell.shown = d; }
+              cell.col.style.transform = "translateY(" + ((-d + TICK * rise) * C.H).toFixed(2) + "px)";
+              cell.col.style.opacity = op.toFixed(3);
+              cell.appear = appear;
+              cell.c.style.width = (C.W * appear).toFixed(2) + "px";
+              cell.c.style.opacity = appear.toFixed(3);
+            }
+            C.commas.forEach((cm) => {   // a comma follows the digit to its left in and out
+              const a = C.cells[cm.place].appear;
+              cm.el.style.width = (cm.w * a).toFixed(2) + "px"; cm.el.style.opacity = a.toFixed(3);
+            });
+            if (onValue) onValue(n, D ? (n - V0) / D : 1);
+          };
+        }
+        // load the exact faces before measuring digit cells (fonts.ready alone only waits for faces already in use)
+        const faces = ['700 120px "Barlow Condensed"', '800 120px "Barlow Condensed"', '600 28px "Inter"', '700 30px "Inter"', '700 44px "Inter"'];
+        Promise.all(faces.map((f) => document.fonts.load(f, "$0123456789,+ABC"))).catch(() => {}).then(() => document.fonts.ready).then(() => {
+          const K = window.KitMotion;
+          const tl = gsap.timeline({ paused: true });
+          const drive = (at, dur, fn) => {
+            if (K && K.drive) return K.drive(tl, at, dur, fn);
+            const proxy = { _p: 0, get p() { return this._p; }, set p(x) { this._p = x; fn(x); } };
+            tl.fromTo(proxy, { p: 0 }, { p: 1, duration: dur, ease: "none", immediateRender: false }, at);
+          };
+          const SLIDE = 0.08;          // a slow digit's tick: ~2 frames, one glyph per cell (no stacked half-glyphs)
+          const PRE = 1 / 60;          // hits start half a frame early so the landing frame itself carries the peak
+
+          if (vKey === "0") {
+            /* ======================= V0 HUD corner ======================= */
+            $("#hud").style.display = "flex";
+            $("#halo").style.display = "block";
+            const V1 = V.balanceFrom + V.payout;
+            $("#dlbl").textContent = V.label || "";
+            if (!V.label) $("#dlbl").style.display = "none";
+            $("#dval").textContent = "+" + fmt(V.payout);
+            $("#dval").style.color = V.accent;
+            const C = makeCounter($("#bal"), { digits: String(Math.max(V.balanceFrom, V1)).length, prefix: CUR });
+            const render = counterDriver(C, V.balanceFrom, V1, T.countDur, T.rush, SLIDE);
+            render(0);
+
+            gsap.set("#hud", { opacity: 0, x: 22 });
+            gsap.set("#halo", { opacity: 0 });
+            tl.fromTo("#halo", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out", immediateRender: false }, T.in);
+            tl.fromTo("#halo", { opacity: 1 }, { opacity: 0, duration: 0.35, ease: "power2.in", immediateRender: false }, T.out);
+            gsap.set("#drow", { opacity: 0, x: 44 });
+            tl.fromTo("#hud", { opacity: 0, x: 22 }, { opacity: 1, x: 0, duration: 0.36, ease: "power3.out", immediateRender: false }, T.in);
+            tl.fromTo("#drow", { opacity: 0, x: 44 }, { opacity: 1, x: 0, duration: 0.34, ease: "expo.out", immediateRender: false }, T.delta);
+            const cd = T.countDur + 0.1;
+            drive(T.count, cd, (p) => render(p * cd));
+            // landing: credited flash (teal → white) + a small punch from the right edge, on the exact frame
+            // that first shows the final balance (count + countDur), never before it
+            const land = T.count + T.countDur;
+            const bal = $("#bal"), acc = hexRgb(V.accent);
+            drive(land - PRE, 0.55, (p) => {   // p = 0 is the resting state (seek-safe)
+              const k = p <= 0 ? 0 : 1 - easeOutCubic(p);
+              bal.style.transform = "scale(" + (1 + 0.06 * k).toFixed(4) + ")";
+              bal.style.color = "rgb(" + acc.map((c) => Math.round(255 + (c - 255) * k)).join(",") + ")";
+            });
+            tl.fromTo("#drow", { opacity: 1 }, { opacity: 0, duration: 0.3, ease: "power2.in", immediateRender: false }, T.deltaOut);
+            tl.fromTo("#hud", { opacity: 1 }, { opacity: 0, duration: 0.35, ease: "power2.in", immediateRender: false }, T.out);
+          } else {
+            /* ======================= V1 Centre card ======================= */
+            $("#card").style.display = "block";
+            $("#clbl").textContent = V.label || "";
+            $("#cplace").textContent = V.place || "";
+            const amt = $("#amt");
+            // fit the numeral to the card's inner width (776px), capped at 200px
+            const inner = 864 - 88;
+            amt.style.fontSize = "100px";
+            const digits = String(V.payout).length;
+            let C = makeCounter(amt, { digits, prefix: CUR });
+            const w100 = Array.from(amt.children).reduce((w, c) => w + c.getBoundingClientRect().width, 0);
+            const fs = Math.min(200, Math.floor(100 * (inner - 8) / w100));
+            amt.style.fontSize = fs + "px";
+            C = makeCounter(amt, { digits, prefix: CUR });   // starts as a centred "$0" that grows as digits become significant
+            const fill = $("#fill");
+            const render = counterDriver(C, 0, V.payout, T.cardCountDur, T.rush, SLIDE, (v, p) => {
+              fill.style.clipPath = "inset(0 " + (100 - 100 * p).toFixed(3) + "% 0 0 round 4px)";
+            });
+            render(0);
+
+            const split = $("#split");
+            if (V.split && V.split.length) {
+              V.split.forEach((s, k) => {
+                if (k) split.appendChild(el("div", "div"));
+                const cell = el("div", "cell");
+                cell.appendChild(el("span", "nm", s.name));
+                cell.appendChild(el("span", "am", fmt(s.amount)));
+                split.appendChild(cell);
+              });
+              split.style.gridTemplateColumns = V.split.map(() => "1fr").join(" 1px ");
+            } else split.style.display = "none";
+
+            gsap.set("#card", { opacity: 0, y: 44, scale: 0.965 });
+            tl.fromTo("#card", { opacity: 0, y: 44, scale: 0.965 }, { opacity: 1, y: 0, scale: 1, duration: 0.45, ease: "expo.out", immediateRender: false }, T.in);
+            const cd = T.cardCountDur + 0.1;
+            drive(T.cardCount, cd, (p) => render(p * cd));
+            // landing: punch + sheen on the exact frame that first shows the total (cardCount + cardCountDur)
+            const land = T.cardCount + T.cardCountDur;
+            drive(land - PRE, 0.45, (p) => {
+              const k = p <= 0 ? 0 : 1 - easeOutCubic(p);
+              amt.style.transform = "scale(" + (1 + 0.045 * k).toFixed(4) + ")";
+            });
+            gsap.set("#sheen", { x: 0 });
+            tl.fromTo("#sheen", { x: 0 }, { x: 864 + 160, duration: 0.55, ease: "power2.out", immediateRender: false }, land - PRE);
+            // landing: the card expands to reveal the crew split (compact while counting, so no empty band)
+            const cells = split.querySelectorAll(".cell, .div");
+            if (cells.length) {
+              const sh = split.offsetHeight + parseFloat(getComputedStyle(split).marginTop);
+              gsap.set("#splitWrap", { height: 0 });
+              tl.fromTo("#splitWrap", { height: 0 }, { height: sh, duration: 0.34, ease: "kit-out", immediateRender: false }, land + 0.1);
+              gsap.set(cells, { opacity: 0, y: 16 });
+              tl.fromTo(cells, { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.4, ease: "power3.out", stagger: 0.07, immediateRender: false }, land + 0.2);
+            }
+            tl.fromTo("#card", { opacity: 1, y: 0 }, { opacity: 0, y: -18, duration: 0.35, ease: "power2.in", immediateRender: false }, T.out);
+          }
+
+          tl.set({}, {}, T.end);
+          window.__timelines = window.__timelines || {};
+          window.__timelines["main"] = tl;
+          tl.seek(0);
+        });
+      })();
+    </script>
+  </body>
+</html>

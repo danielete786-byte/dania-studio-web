@@ -1,0 +1,640 @@
+<!doctype html>
+<!-- GTA 6 component #19 — Name tag (craft v2, round 10). 1080x1920 (9:16), 30 fps, 5 s.
+     Identifies a character on screen.
+     Variant 0 "Leader tag": a lock-on pin tracked to the character's collar, an elbow callout (pin → steep diagonal →
+       horizontal leg that ends at the name's left edge), and the name set big in wide caps under the leg (white first
+       name, Leonida-sunset surname). Held golden-hour slow-mo with a push. Payoff when the last surname glyph seats: a
+       1-frame warm exposure flash from the sun, one warm leak from the sun side, a kick, a light pulse on the pin and a
+       sheen across the sunset.
+     Variant 1 "Lower third": the name is born in the blast and lands on the cut. Jason on the rooftop as the helicopter
+       explodes behind him (s098 at 0.5x, motion-compensated); the surname rises in the fireball and its last glyph seats
+       on the cut (1.033 s) to a sharp held profile of him driving (s008 at 1.0x, pushed in). The hit is on that cut: an
+       exposure pulse (2 frames at peak), shake and punch, a 6 px RGB split for 0.12 s and a light sweep across the
+       surname. A broadcast lower-third structure: small tracked first name over a huge surname, a drawn 2 px sunset
+       hairline that leads into the role, set flush to the surname's measure. The type sits above the grain (pure white).
+     bg "none": transparent overlay (no footage, no grain/vignette/exposure hit/leak/shake/fire light/bottom burn). Safe zone: x 72–936, y 230–1480. -->
+<html lang="en" data-composition-variables='[
+  {"id":"variant","type":"enum","label":"Variant","default":"0","options":[{"value":"0","label":"Leader tag"},{"value":"1","label":"Lower third"}]},
+  {"id":"bg","type":"enum","label":"Background","default":"plate","options":[{"value":"plate","label":"Sample footage"},{"value":"none","label":"Transparent"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link rel="stylesheet" href="assets/fonts/fonts.css" />
+    <link rel="stylesheet" href="assets/kit/look/look.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="assets/kit/look/look.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: transparent; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; font-family: "Inter", sans-serif; color: #fff;
+        -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; }
+      .hide { display: none !important; }
+      /* footage: #shake takes the payoff kick, #push the slow push */
+      #frame { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; overflow: hidden; }
+      #shake, #push { position: absolute; inset: 0; }
+      .shot { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      /* the payoff light: a warm additive exposure hit centred on the scene's light source (sun / fire). It sits over the
+         footage and under the type, so it lights the image instead of greying the frame. */
+      #xhit { position: absolute; inset: -60px; pointer-events: none; mix-blend-mode: screen; opacity: 0; }
+      /* the leak lives over the footage and under the tag, so it lights the scene, never the name */
+      #leakhost { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+
+      /* ---------- v0: leader tag ---------- */
+      #tag { position: absolute; inset: 0; }
+      #lines { position: absolute; left: 0; top: 0; overflow: visible;
+        filter: drop-shadow(0 0 6px rgba(255,190,120,.55)) drop-shadow(0 1px 2px rgba(0,0,0,.55)); }
+      #lines path { fill: none; stroke: #fff; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+      #pin { position: absolute; left: 0; top: 0; width: 0; height: 0; }
+      #pin .core { position: absolute; left: -7px; top: -7px; width: 14px; height: 14px; border-radius: 50%; background: #fff;
+        box-shadow: 0 0 10px rgba(255,200,140,.85), 0 0 26px rgba(255,170,100,.45), 0 1px 3px rgba(0,0,0,.5); }
+      #pin .ring { position: absolute; left: -22px; top: -22px; width: 44px; height: 44px; border-radius: 50%;
+        border: 2.5px solid rgba(255,255,255,.95); box-shadow: 0 0 12px rgba(255,190,120,.5), inset 0 0 8px rgba(255,190,120,.25); }
+      #pin .pulse { position: absolute; left: -22px; top: -22px; width: 44px; height: 44px; border-radius: 50%;
+        border: 2px solid rgba(255,225,190,.9); opacity: 0; }
+      /* the pin's light pulse on the hit: a warm point of light that blooms and decays (screen, so it only adds light) */
+      #pin .flare { position: absolute; left: -90px; top: -90px; width: 180px; height: 180px; border-radius: 50%; opacity: 0;
+        mix-blend-mode: screen; background: radial-gradient(circle, rgba(255,240,214,1) 0%, rgba(255,214,160,.75) 16%, rgba(254,170,90,.32) 38%, rgba(254,142,78,0) 70%); }
+      #block0 { position: absolute; white-space: nowrap; }
+      #block0 .nm { font-size: 124px; letter-spacing: .005em; }
+      #n0a { filter: drop-shadow(0 0 22px rgba(255,190,125,.38)) drop-shadow(0 8px 22px rgba(0,0,0,.45)); }
+      #n0b { margin-top: 2px; filter: drop-shadow(0 0 26px rgba(248,79,164,.28)) drop-shadow(0 8px 24px rgba(0,0,0,.5)); }
+      #r0 { margin-top: 30px; font-size: 28px; letter-spacing: .34em; color: #fff;
+        text-shadow: 0 1px 2px rgba(0,0,0,.6), 0 4px 16px rgba(0,0,0,.5); }
+      #scrim0 { position: absolute; left: -200px; width: 1300px; height: 900px; opacity: .8; }
+
+      /* ---------- v1: full-bleed lower third ---------- */
+      #lower { position: absolute; inset: 0; }
+      /* legibility comes from a bottom scrim plus a soft spot weighted to the lockup (part of the graphic, kept in bg:none) */
+      #scrim1 { position: absolute; left: 0; width: 1080px; opacity: 0; }
+      #spot1 { position: absolute; opacity: 0;
+        background: radial-gradient(ellipse 50% 50% at 50% 50%, rgba(5,5,9,.55) 0%, rgba(5,5,9,.3) 50%, rgba(5,5,9,0) 100%); }
+      #burn1 { position: absolute; left: 0; width: 1080px; opacity: 0; }
+      /* the lockup: every part is placed absolutely from measured metrics (ink edges and baselines), see the v1 script */
+      #block1 { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; }
+      #block1 .ln { position: absolute; left: 0; top: 0; white-space: nowrap; line-height: 1; }
+      /* first name: small, wide 600, tracked .22em, inside its own mask (generous padding so the tracking-in never clips) */
+      #m1a { position: absolute; overflow: hidden; padding: 16px 140px 26px 16px; }
+      #n1a { position: relative; font-size: 64px; font-weight: 600; letter-spacing: .22em; line-height: 1; white-space: nowrap; }
+      /* surname: the hero, wide 800, pure white; its light is set per frame (fire glow + dark lift) */
+      #n1b { font-size: 190px; letter-spacing: 0; }
+      /* light sweep: the wrapper carries the moving band mask (padded so the glow is never cut at the word's ends);
+         the copy carries the glow, so light only appears where the band is */
+      #sw1 { position: absolute; left: 0; top: 0; padding: 60px; opacity: 0; pointer-events: none;
+        -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; }
+      #n1bs { position: relative; white-space: nowrap; line-height: 1; letter-spacing: 0; color: #fff;
+        filter: drop-shadow(0 0 2px rgba(255,255,255,1)) drop-shadow(0 0 7px rgba(255,240,214,.95)) drop-shadow(0 0 16px rgba(255,196,128,.5)); }
+      /* the one accent: a 2 px sunset hairline, drawn from the left; glow on the wrapper so the clip never cuts it */
+      #rule1 { position: absolute; height: 2px; filter: drop-shadow(0 0 2px rgba(255,170,190,.9)) drop-shadow(0 0 7px rgba(248,79,164,.75)) drop-shadow(0 0 18px rgba(254,142,78,.45)); }
+      #rule1i { position: absolute; inset: 0; background: linear-gradient(90deg, #F84FA4 0%, #FE78A6 30%, #FE8E4E 68%, #FEB747 100%); }
+      /* role: label size, pure white, soft dark lift; ends flush with the surname's right ink edge */
+      #r1 { font-size: 26px; letter-spacing: .34em; color: #fff;
+        text-shadow: 0 1px 2px rgba(0,0,0,.6), 0 4px 16px rgba(0,0,0,.55); }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="5" data-width="1080" data-height="1920">
+      <div id="frame">
+        <div id="shake" data-layout-allow-overflow>
+          <div id="push">
+            <!-- v0 footage: s018 (Lucia at the gate, golden hour) from source frame 6, pre-slowed 1.85x with motion-compensated
+                 interpolation (minterpolate mci/aobmc/bidir) into assets/clips/. Mirror any change in CONFIG.variants["0"].shots -->
+            <video id="a1" class="clip shot" src="assets/clips/s018-lucia-gate-slow.mp4" muted playsinline
+              data-start="0" data-duration="5" data-media-start="0.01" data-track-index="0"></video>
+            <!-- v1 footage, two shots cut on the payoff (frame 31, 1.033 s, when the last surname glyph seats):
+                 c1 = s098 (rooftop explosion) source frames 2–22 at 0.5x with motion-compensated interpolation (the blast);
+                 c2 = s008 (Jason driving, sharp daylight profile) at 1.0x from its first frame, held with a push.
+                 Mirror any change in CONFIG.variants["1"].shots -->
+            <video id="c1" class="clip shot" src="assets/clips/s098-jason-fireworks-050.mp4" muted playsinline
+              data-start="0" data-duration="1.0333" data-media-start="0.01" data-track-index="2"></video>
+            <video id="c2" class="clip shot" src="assets/shots/s008-jason-driving-v.mp4" muted playsinline
+              data-start="1.0333" data-duration="3.9667" data-media-start="0.01" data-track-index="3"></video>
+          </div>
+          <div id="xhit"></div>
+          <div id="leakhost"></div>
+          <!-- v0 tag rides inside #shake so the payoff kick moves footage and tag together -->
+          <div id="tag" class="hide">
+            <div id="scrim0" class="lk-scrim-spot hide"></div>
+            <svg id="lines" width="1080" height="1920" viewBox="0 0 1080 1920">
+              <defs>
+                <!-- directional motion blur on the drawing head; user-space region so a horizontal (zero-height) path still renders -->
+                <filter id="leadblur" filterUnits="userSpaceOnUse" x="0" y="0" width="1080" height="1920">
+                  <feGaussianBlur id="leadblurG" in="SourceGraphic" stdDeviation="0 0" />
+                </filter>
+              </defs>
+              <path id="leader" d="M0 0" />
+            </svg>
+            <div id="pin">
+              <div class="flare" id="flare"></div>
+              <div class="pulse" id="pulse1"></div>
+              <div class="pulse" id="pulse2"></div>
+              <div class="ring" id="ring"></div>
+              <div class="core" id="core"></div>
+            </div>
+            <div id="block0" data-layout-allow-occlusion data-layout-allow-overflow>
+              <div class="nm t-wide" id="n0a" data-layout-allow-occlusion data-layout-allow-overflow></div>
+              <div class="nm t-wide" id="n0b" data-layout-allow-occlusion data-layout-allow-overflow></div>
+              <div class="t-label-wide" id="r0"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- v1 lower third sits outside #shake: the footage takes the hit, the lockup stays planted -->
+      <div id="lower" class="hide">
+        <div id="scrim1" class="lk-scrim-bottom"></div>
+        <div id="spot1"></div>
+        <!-- the hold's bottom burn: from the cut on, the lower frame falls to near-black under the lockup (a graded
+             fade, not a box), so white type reads on s008's sunlit tank top -->
+        <div id="burn1"></div>
+        <div id="block1" data-layout-allow-occlusion data-layout-allow-overflow>
+          <div id="m1a" data-layout-allow-overflow><div class="t-wide" id="n1a" data-layout-allow-occlusion data-layout-allow-overflow></div></div>
+          <div class="ln t-wide" id="n1b" data-layout-allow-occlusion data-layout-allow-overflow></div>
+          <!-- the payoff light sweep: an identical copy of the surname whose glow is masked to a travelling band -->
+          <div id="sw1" data-layout-allow-occlusion data-layout-allow-overflow><div class="t-wide" id="n1bs" data-layout-allow-occlusion data-layout-allow-overflow></div></div>
+          <div id="rule1"><div id="rule1i"></div></div>
+          <div class="ln t-label-wide" id="r1"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const CONFIG = {
+        duration: 5,
+        variants: {
+          // 0 — Leader tag: pin tracked to the subject, an elbow callout (diagonal, then a horizontal leg that ends at the
+          // name's left edge), name hung under the leg.
+          "0": {
+            style: "leader",
+            first: "Lucia",                       // white, warm bloom
+            last: "Caminos",                      // Leonida sunset fill + sheen at the payoff
+            role: "Protagonist",
+            shots: [ { id: "a1", src: "assets/clips/s018-lucia-gate-slow.mp4", start: 0, dur: 5, mediaStart: 0.01 } ],
+            push: { from: 1.0, to: 1.06, origin: [540, 614] },   // origin in frame px ("50% 32%"), on her face
+            // Tracked neckline point on the unpushed clip: [t, x, y] every 0.2 s (template-tracked on the chin/neck/collar,
+            // 7-tap smoothed). The pin sits pinDy px below it, on the collar band. For your own clip, replace with your
+            // subject's path, or one key for a still subject.
+            track: [[0.0,359,869],[0.2,371,833],[0.4,388,811],[0.6,410,828],[0.8,444,861],[1.0,485,847],[1.2,514,833],[1.4,512,851],
+                    [1.6,507,854],[1.8,512,852],[2.0,514,871],[2.2,503,907],[2.4,471,906],[2.6,437,877],[2.8,413,874],[3.0,404,867],
+                    [3.2,416,866],[3.4,436,881],[3.6,453,886],[3.8,458,875],[4.0,453,875],[4.2,446,885],[4.4,440,891],[4.6,436,890],
+                    [4.8,436,890],[5.0,433,889]],
+            pinDy: 12,
+            // The lockup is anchored by the role's BASELINE (roleBaseline) and builds upward; the callout's horizontal leg
+            // sits gap px above the name. left = the name's left edge = where the leg ends.
+            // size 124: CAMINOS spans ~770 px (89% of the safe width), ending near x 850 with air on the right
+            block: { left: 80, roleBaseline: 1458, gap: 30, size: 124, maxWidth: 780 },
+            // the callout: from the ring's edge, a steep diagonal (angle from horizontal) down-left to the elbow, then a
+            // horizontal leg left to the name's left edge. minLeg keeps a leg even if the pin drifts far left.
+            leader: { angle: 58, ringGap: 27, minLeg: 90, draw: 0.28, blur: 6 },
+            sunset: "linear-gradient(100deg, #F84FA4 0%, #FE78A6 22%, #FE8E4E 60%, #FEB747 100%)",
+            // reveal: stagger/dur of the masked char rise. hit = when the LAST surname glyph seats (computed from these:
+            // last + (chars-1)*stagger + seat*dur), so a longer or shorter surname keeps the payoff on its landing.
+            reveal: { stagger: 0.035, dur: 0.6, seat: 0.45 },
+            // out: the exit starts; the leader retracts at out+0.25 (0.3 s) and the pin collapses right behind it (done by
+            // out+0.7), so the last 0.35 s is clean footage
+            timing: { pin: 0.12, leader: 0.22, first: 0.38, last: 0.5, roleAfterHit: 0.12, pulse: 2.7, out: 3.95 },
+            // payoff: one light beat when the surname seats (~0.98 s). A warm additive exposure FLASH from the sun (light:
+            // centre in frame fractions; full peak for exactly 1 frame, then decay), one warm gold→pink leak from the sun side
+            // (top-left, under the tag), a 1.05 kick, a 0.4 s light pulse on the pin, a sheen across the sunset and a warm
+            // bloom swell on the surname.
+            payoff: { light: { at: [0.15, 0.18], color: "255,231,194", peak: 0.9, decay: 0.28, radius: 1050 },
+                      // the leak stays on the sun side: it peaks over the sky and fence at upper left and fades as it reaches her hair
+                      leak: { lead: 0.03, dur: 0.6, colors: ["#FEB747", "#F84FA4"], opacity: 0.6, y: 0.14, from: -0.55, to: 0.25, size: 1300 },
+                      zoom: 1.05, amp: 4, snap: 1.6, pinPulse: 0.4, sheen: 0.7, bloom: 0.8 }
+          },
+          // 1 — Lower third: the name is born in the blast and lit by the fire for the whole hold. Broadcast structure:
+          // small tracked first name over a huge surname, then a sunset hairline that leads into the role, set flush
+          // to the surname's measure.
+          "1": {
+            style: "lower",
+            first: "Jason",                       // small: 64 px wide 600, tracked .22em
+            last: "Duval",                        // the hero
+            role: "Protagonist",                  // label at the end of the hairline, flush with the surname's right ink edge
+            left: 80,                             // the lockup's INK left edge (first name, surname and hairline share it)
+            baseline: 1392,                       // the surname's baseline; the first name sits above it, hairline + role below
+            size: 190,                            // surname size; shrinks until the surname spans at most maxWidth
+            maxWidth: 760,                        // 88% of the safe width (864)
+            first1: { size: 64, gap: 24, spread: 10 },     // gap: first-name baseline to surname cap top; spread: tracking-in px/char
+            rule: { below: 32, gap: 24, draw: 0.45, min: 160 }, // hairline y = baseline + below; it stops gap px before the role
+            // legibility: a bottom scrim + a soft spot on the lockup (part of the graphic, kept in bg:none)
+            scrim: { top: 760, opacity: 0.9, spot: 0.85 },
+            // the hold's bottom burn (from the cut): top = where it starts; stops = [alpha, % from the bottom]
+            burn: { top: 800, stops: [[0.95, 0], [0.88, 43], [0.8, 60], [0.6, 69], [0.3, 82], [0.1, 91], [0, 100]] },
+            // two shots, cut on the payoff. push: [from, to] scale over the shot, origin on his face.
+            //   c1: the blast. s098 source frames 2–22 at 0.5x (motion-compensated), so the fireball blooms at 0.27–0.55 s.
+            //   c2: the hold. s008 at 1.0x (a sharp daylight profile; he smiles from about 3.3 s of the shot).
+            shots: [
+              { id: "c1", src: "assets/clips/s098-jason-fireworks-050.mp4", start: 0.0, dur: 1.0333, mediaStart: 0.01, push: [1.0, 1.03], origin: "40% 22%", grade: "brightness(1.06) contrast(1.04)" },
+              { id: "c2", src: "assets/shots/s008-jason-driving-v.mp4", start: 1.0333, dur: 3.9667, mediaStart: 0.01, push: [1.0, 1.05], origin: "56% 30%",
+                lift: [0, 0.15, 0.28, 0.4, 0.51, 0.61, 0.7, 0.79, 0.87, 0.94, 1], grade: "url(#lift-c2) saturate(1.1)" }
+            ],
+            // seat: the fraction of the last glyph's rise that has run on the cut frame (expo.out at .45: 96% of the way, so
+            // it lands into the hit over the next two frames)
+            reveal: { stagger: 0.03, dur: 0.55, seat: 0.45 },
+            // cut = the payoff frame: the cut to the held shot. The surname's rise is timed backwards from it so its LAST
+            // glyph seats on the cut (rise = cut - (chars-1)*stagger - seat*dur, about 0.67 s, in the fireball). The first
+            // name tracks in just ahead (first); the hairline draws out of the hit (rule) and the role lands after (role).
+            timing: { scrim: 0.2, first: -0.12, cut: 1.0333, rule: 0.04, role: 0.3, out: 4.1 },
+            // the hit on the cut: an exposure pulse on the incoming shot (2-frame hold at peak, then decay), a shake and
+            // punch, a 6 px RGB split on the lockup for 0.12 s, and a light sweep across the surname.
+            payoff: { expose: { peak: 1.7, hold: 2 / 30, dur: 0.38, saturate: 1.12 }, amp: 8, zoom: 1.04, chroma: 6, chromaDur: 0.12,
+                      sheen: { dur: 0.6, lead: 0.0 } },
+            // fire light on the name: measured mean luma of the fire region (x 600–1080, y 100–800) of the blast clip, one
+            // value per frame from t = 0, normalised 0–1 (same scale as r09). After the cut (end) the fire light hands over
+            // to a quiet daylight glow (after) over fade s.
+            fire: { end: 1.0333, after: 0.12, fade: 0.35, glow: 0.55, luma: [0,.01,.01,.02,.03,.08,.14,.28,.42,.51,.60,.63,.66,.70,.73,.78,.82,.90,.98,.99,1,1,1,.98,.96,.93,.91,.88,.85,.83,.82,.80,.79,.78,.77,.77,.76,.76,.75] },
+            // exit: whole masked lines (first name, then surname 0.06 s later) rising out with a 6 px blur
+            exit: { dur: 0.42, lineStagger: 0.06, blur: 6 }
+          }
+        }
+      };
+
+      (function () {
+        const VARS = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+        const vKey = CONFIG.variants[String(VARS.variant)] ? String(VARS.variant) : "0";
+        const plate = VARS.bg !== "none";
+        const V = CONFIG.variants[vKey], T = V.timing, D = CONFIG.duration;
+        const $ = (s) => document.querySelector(s);
+        const ids = V.shots.map((s) => s.id);
+        document.querySelectorAll("video.shot").forEach((v) => { if (!plate || ids.indexOf(v.id) < 0) v.style.display = "none"; });
+
+        Promise.all([
+          document.fonts.load('800 expanded 100px "Archivo"', V.first + V.last),
+          document.fonts.load('600 expanded 28px "Archivo"', V.role + V.first)
+        ]).catch(() => {}).then(() => document.fonts.ready).then(() => {
+          const tl = gsap.timeline({ paused: true });
+          const clamp = (x) => Math.max(0, Math.min(1, x));
+          const eo = gsap.parseEase("expo.out"), p3o = gsap.parseEase("power3.out"), p3i = gsap.parseEase("power3.in");
+          const runW = (n) => { const r = document.createRange(); r.selectNodeContents(n); return r.getBoundingClientRect().width; };
+          const baselineOf = (line, ref) => {   // y of a line's baseline relative to ref, via a zero-size inline-block marker
+            const mk = document.createElement("span"); mk.style.cssText = "display:inline-block;width:0;height:0;vertical-align:baseline";
+            line.appendChild(mk); const y = mk.getBoundingClientRect().top - ref.getBoundingClientRect().top; mk.remove(); return y;
+          };
+          // ink metrics of a caps string in Archivo wide (canvas): bear = left side bearing (ink starts this far right of
+          // the box), right = ink right edge from the box's left, cap = ink height above the baseline
+          const ink = (txt, weight, size, track) => {
+            const s = txt.toUpperCase();
+            try {
+              const c = document.createElement("canvas").getContext("2d");
+              c.font = `${weight} expanded ${size}px "Archivo"`; if ("fontStretch" in c) c.fontStretch = "expanded";
+              if ("letterSpacing" in c) c.letterSpacing = (track || 0) + "px";
+              const m = c.measureText(s), bear = -m.actualBoundingBoxLeft;
+              return { bear: bear >= 0 && bear < size * 0.2 ? bear : 0, right: m.actualBoundingBoxRight, cap: m.actualBoundingBoxAscent };
+            } catch (e) { return { bear: 0, right: 0, cap: size * 0.72 }; }
+          };
+
+          // the payoff light: warm additive exposure hit, centred on the scene light. Peak for one frame, then decays.
+          const exposureHit = (at, L) => {
+            if (!plate) return;
+            const el = $("#xhit"), c = L.color;
+            // #xhit overhangs the frame by 60 px on every side (so the kick never shows an edge): centre in frame px + 60
+            el.style.background = `radial-gradient(circle ${L.radius}px at ${Math.round(L.at[0] * 1080 + 60)}px ${Math.round(L.at[1] * 1920 + 60)}px, ` +
+              `rgba(${c},1) 0%, rgba(${c},.62) 14%, rgba(${c},.26) 34%, rgba(${c},.08) 55%, rgba(${c},0) 78%)`;
+            // the hit frame shows the full peak; the decay starts half a frame later, so the next frame is already falling
+            const f1 = at + 0.5 / Look.FPS;
+            Look.drive(tl, 0, D, (p) => {
+              const t = p * D;
+              el.style.opacity = t < at - 1e-4 ? "0" : t < f1 ? String(L.peak) : (L.peak * (1 - p3o(clamp((t - f1) / L.decay)))).toFixed(4);
+            });
+          };
+
+          if (V.style === "leader") {
+            // ---------------- v0: leader tag ----------------
+            $("#tag").classList.remove("hide");
+            $("#n0a").textContent = V.first; $("#n0b").textContent = V.last; $("#r0").textContent = V.role;
+            const B = V.block, blk = $("#block0"), R = V.reveal, LD = V.leader;
+            // fit: the longer line never exceeds maxWidth (x 80 → 936)
+            let fs = B.size;
+            const nms = document.querySelectorAll("#block0 .nm");
+            nms.forEach((n) => (n.style.fontSize = fs + "px"));
+            while (Math.max(...[...nms].map(runW)) > B.maxWidth && fs > 72) { fs -= 2; nms.forEach((n) => (n.style.fontSize = fs + "px")); }
+            // anchor the lockup by the role's baseline; it builds upward, and the callout leg sits gap px above the name
+            blk.style.left = B.left + "px"; blk.style.top = "0px";
+            const top = Math.round(B.roleBaseline - baselineOf($("#r0"), blk));
+            blk.style.top = top + "px";
+            // the leg ends on the lockup's INK edge, not its box: wide caps carry a side bearing (about 8 px on the L at 134 px),
+            // so a leg ending at the box overhangs the first glyph. Measured per name with canvas metrics.
+            const bearing = (txt) => {
+              try {
+                const c = document.createElement("canvas").getContext("2d");
+                c.font = `800 expanded ${fs}px "Archivo"`; if ("fontStretch" in c) c.fontStretch = "expanded";
+                const b = -c.measureText(txt.toUpperCase().charAt(0)).actualBoundingBoxLeft;
+                return b >= 0 && b < fs * 0.2 ? b : 0;
+              } catch (e) { return 0; }
+            };
+            const ink = Math.min(bearing(V.first), bearing(V.last));
+            const RL = B.left + Math.round(ink), RY = top - B.gap;
+            // bg:none only: a soft spot behind the tag (part of the graphic). It fades in with the pin and out with the exit,
+            // so a transparent overlay ends clean.
+            if (!plate) {
+              const sc = $("#scrim0"); sc.classList.remove("hide"); sc.style.top = (RY - 240) + "px";
+              tl.fromTo(sc, { opacity: 0 }, { opacity: 0.8, duration: 0.5, ease: "power2.out", immediateRender: true }, T.pin);
+              tl.fromTo(sc, { opacity: 0.8 }, { opacity: 0, duration: 0.45, ease: "power2.inOut", immediateRender: false }, T.out + 0.3);
+            }
+
+            // masked reveals (split first), then the sunset fill on the surname
+            Look.reveal(tl, "#n0a", T.first, { by: "chars", stagger: R.stagger, dur: R.dur });
+            Look.reveal(tl, "#n0b", T.last, { by: "chars", stagger: R.stagger, dur: R.dur });
+            Look.fill("#n0b", V.sunset, { sheen: true });
+            // per-glyph gradient leaves overlap their neighbours' boxes by a hair (kerning): intentional, tell the layout audit
+            document.querySelectorAll("#block0 .lk-c").forEach((c) => c.setAttribute("data-layout-allow-occlusion", ""));
+            // the payoff lands when the last surname glyph seats
+            const HIT = T.last + (V.last.length - 1) * R.stagger + R.seat * R.dur;
+            Look.enter(tl, "#r0", HIT + T.roleAfterHit, { from: "blur", dur: 0.6, blur: 10, scale: 1.04 });
+
+            // pin lock-on, then on the hit: a ring snap and a 0.4 s light pulse; one quiet pulse in the hold
+            const P = V.payoff, tOut = T.out;
+            gsap.set("#core", { scale: 0 }); gsap.set("#ring", { scale: 2.4, opacity: 0 }); gsap.set("#flare", { opacity: 0, scale: 0.5 });
+            tl.fromTo("#ring", { scale: 2.4, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: "expo.out", immediateRender: false }, T.pin);
+            tl.fromTo("#core", { scale: 0 }, { scale: 1, duration: 0.32, ease: "back.out(2.2)", immediateRender: false }, T.pin + 0.06);
+            tl.fromTo("#ring", { scale: P.snap }, { scale: 1, duration: 0.22, ease: "expo.out", immediateRender: false }, HIT);
+            tl.fromTo("#core", { scale: 1.35 }, { scale: 1, duration: 0.3, ease: "expo.out", immediateRender: false }, HIT);
+            tl.fromTo("#flare", { opacity: 1, scale: 0.55 }, { opacity: 0, scale: 1.35, duration: P.pinPulse, ease: "power3.out", immediateRender: false }, HIT);
+            tl.fromTo("#pulse1", { scale: 1, opacity: 0.9 }, { scale: 3.0, opacity: 0, duration: P.pinPulse, ease: "power2.out", immediateRender: false }, HIT);
+            tl.fromTo("#pulse2", { scale: 1, opacity: 0.45 }, { scale: 2.4, opacity: 0, duration: 0.9, ease: "power2.out", immediateRender: false }, T.pulse);
+
+            // geometry: one seek-safe driver computes the tracked pin and the elbow callout from absolute time
+            const K = V.track, PO = V.push.origin;
+            const trackAt = (t) => {
+              if (t <= K[0][0]) return [K[0][1], K[0][2]];
+              const L = K[K.length - 1]; if (t >= L[0]) return [L[1], L[2]];
+              let i = 0; while (K[i + 1][0] < t) i++;
+              const a = K[Math.max(0, i - 1)], b = K[i], c = K[i + 1], d = K[Math.min(K.length - 1, i + 2)];
+              const u = (t - b[0]) / (c[0] - b[0]);
+              const cr = (p0, p1, p2, p3) => 0.5 * (2 * p1 + (-p0 + p2) * u + (2 * p0 - 5 * p1 + 4 * p2 - p3) * u * u + (-p0 + 3 * p1 - 3 * p2 + p3) * u * u * u);
+              return [cr(a[1], b[1], c[1], d[1]), cr(a[2], b[2], c[2], d[2])];
+            };
+            const pushAt = (t) => plate ? V.push.from + (V.push.to - V.push.from) * clamp(t / D) : 1;
+            const pin = $("#pin"), leader = $("#leader"), blurG = $("#leadblurG");
+            const cot = 1 / Math.tan(LD.angle * Math.PI / 180);
+            // exit: the callout retracts into the pin (0.3 s) and the pin collapses right behind it (0.2 s), done by out+0.7
+            const tLeadOut = tOut + 0.25, leadOutDur = 0.3, tPinOut = tLeadOut + 0.25;
+            const f2 = (v) => v.toFixed(2);
+            Look.drive(tl, 0, D, (p) => {
+              const t = p * D, k = trackAt(t), s = pushAt(t);
+              const px = PO[0] + (k[0] - PO[0]) * s, py = PO[1] + (k[1] + V.pinDy - PO[1]) * s;
+              pin.style.transform = `translate(${f2(px)}px, ${f2(py)}px)`;
+              // elbow callout: ring edge → steep diagonal down-left → elbow on the leg's y → horizontal leg left to the
+              // name's left edge. Draws out from the pin; on exit it retracts back into the pin.
+              const ex = Math.max(RL + LD.minLeg, px - (RY - py) * cot), ey = RY;
+              const dx = ex - px, dy = ey - py, l0 = Math.hypot(dx, dy) || 1, ux = dx / l0, uy = dy / l0;
+              const sx = px + ux * LD.ringGap, sy = py + uy * LD.ringGap;
+              const len1 = Math.max(0, l0 - LD.ringGap), len2 = ex - RL, total = len1 + len2;
+              const lead = eo(clamp((t - T.leader) / LD.draw)), z = p3i(clamp((t - tLeadOut) / leadOutDur));
+              const vis = total * lead * (1 - z);
+              let d = "M0 0", bx = 0, by = 0;
+              if (vis > 0.5) {
+                if (vis <= len1) d = `M${f2(sx)} ${f2(sy)} L${f2(sx + ux * vis)} ${f2(sy + uy * vis)}`;
+                else d = `M${f2(sx)} ${f2(sy)} L${f2(ex)} ${f2(ey)} L${f2(ex - (vis - len1))} ${f2(ey)}`;
+                // directional blur on the moving head: along the diagonal, then along x on the leg; fades as it settles
+                const m = lead < 1 && z <= 0 ? LD.blur * (1 - lead) : z > 0 && z < 1 ? LD.blur * z : 0;
+                if (m > 0.05) { if (vis <= len1) { bx = Math.abs(ux) * m; by = Math.abs(uy) * m; } else { bx = m; by = 0; } }
+              }
+              leader.setAttribute("d", d);
+              blurG.setAttribute("stdDeviation", `${f2(bx)} ${f2(by)}`);
+              if (bx > 0 || by > 0) leader.setAttribute("filter", "url(#leadblur)"); else leader.removeAttribute("filter");
+            });
+
+            // payoff: the surname seats and catches the sun. A 1-frame warm exposure flash from the sun, one warm leak from
+            // the sun side (under the tag), kick, ring light pulse, sheen across the sunset fill, and a warm bloom swell on
+            // CAMINOS that settles a touch brighter.
+            exposureHit(HIT, P.light);
+            if (plate) Look.leak(tl, HIT - P.leak.lead, P.leak.dur, { host: "#leakhost", colors: P.leak.colors, opacity: P.leak.opacity,
+              y: P.leak.y, from: P.leak.from, to: P.leak.to, size: P.leak.size, z: 1 });
+            Look.chroma(tl, "#block0", HIT, 0.2, { px: 4 });
+            Look.sheen(tl, "#n0b", HIT + 0.02, { dur: P.sheen });
+            const nb = $("#n0b");
+            const bloomB = (env, rest) => `drop-shadow(0 0 ${(26 + 6 * rest).toFixed(1)}px rgba(248,79,164,${(0.28 + 0.1 * rest).toFixed(3)}))` +
+              (env > 0.002 ? ` drop-shadow(0 0 ${(8 + 12 * env).toFixed(1)}px rgba(254,183,71,${(0.7 * P.bloom * env).toFixed(3)}))` +
+                ` drop-shadow(0 0 ${(24 + 44 * env).toFixed(1)}px rgba(254,142,78,${(P.bloom * env).toFixed(3)}))` : "") +
+              ` drop-shadow(0 8px 24px rgba(0,0,0,.5))`;
+            Look.drive(tl, HIT, 1.3, (p) => {
+              const a = p <= 0 ? 0 : Math.min(1, p / 0.1);
+              const env = p <= 0 || p >= 1 ? 0 : a * Math.pow(1 - p, 2);
+              nb.style.filter = bloomB(env, a);
+            });
+            if (plate) Look.impact(tl, HIT, { shake: "#shake", amp: P.amp, zoom: P.zoom, flash: 0, dur: 0.42 });
+
+            // exit: role blurs out, the names rise out through their masks, the callout retracts into the pin, the pin lets go
+            Look.exit(tl, "#r0", tOut, { to: "blur", dur: 0.3, blur: 10 });
+            const ca = document.querySelectorAll("#n0a .lk-c"), cb = document.querySelectorAll("#n0b .lk-c");
+            tl.fromTo(cb, { yPercent: 0 }, { yPercent: -118, duration: 0.42, ease: "power3.in", stagger: 0.022, immediateRender: false }, tOut + 0.02);
+            tl.fromTo(ca, { yPercent: 0 }, { yPercent: -118, duration: 0.42, ease: "power3.in", stagger: 0.022, immediateRender: false }, tOut + 0.08);
+            // each glyph fades over the second half of its rise, so the staggered mask exit never leaves a lone glyph foot
+            tl.fromTo(cb, { opacity: 1 }, { opacity: 0, duration: 0.22, ease: "power2.in", stagger: 0.022, immediateRender: false }, tOut + 0.02 + 0.16);
+            tl.fromTo(ca, { opacity: 1 }, { opacity: 0, duration: 0.22, ease: "power2.in", stagger: 0.022, immediateRender: false }, tOut + 0.08 + 0.16);
+            tl.fromTo("#ring", { scale: 1, opacity: 1 }, { scale: 2.0, opacity: 0, duration: 0.2, ease: "power2.in", immediateRender: false }, tPinOut);
+            tl.fromTo("#core", { scale: 1 }, { scale: 0, duration: 0.17, ease: "power2.in", immediateRender: false }, tPinOut + 0.03);
+
+            if (plate) Look.push(tl, "#push", 0, D, { from: V.push.from, to: V.push.to, origin: "50% 32%" });
+          } else {
+            // ---------------- v1: full-bleed lower third ----------------
+            // Structure: small tracked first name over a huge surname, a 2 px sunset hairline under the surname that leads
+            // into the role; the role ends flush with the surname's right ink edge, so the block reads as one justified unit.
+            $("#lower").classList.remove("hide");
+            // the type composites ABOVE the finishing layer (grain + vignette), so the name stays pure #FFFFFF; the scrim,
+            // spot and burn stay under it, so the grain reads evenly across the whole picture
+            $("#block1").style.zIndex = "95";
+            const nA = $("#n1a"), nB = $("#n1b"), mA = $("#m1a"), role = $("#r1"), rule = $("#rule1"), ruleI = $("#rule1i");
+            nA.textContent = V.first; nB.textContent = V.last; role.textContent = V.role;
+            const R = V.reveal, P = V.payoff, F1 = V.first1, RU = V.rule, X = V.exit, L0 = V.left, B0 = V.baseline;
+            // fit: the surname spans at most maxWidth (88% of the safe width)
+            let fs = V.size; nB.style.fontSize = fs + "px";
+            while (runW(nB) > V.maxWidth && fs > 96) { fs -= 2; nB.style.fontSize = fs + "px"; }
+            nA.style.fontSize = F1.size + "px";
+            const roleFs = parseFloat(getComputedStyle(role).fontSize), roleTr = 0.34 * roleFs;
+            const kB = ink(V.last, 800, fs, 0), kA = ink(V.first, 600, F1.size, 0.22 * F1.size), kR = ink(V.role, 600, roleFs, 0);
+            // right side bearing of one glyph (canvas): its advance minus its ink right edge
+            const rbOf = (ch, weight, size) => {
+              try { const c = document.createElement("canvas").getContext("2d"); c.font = `${weight} expanded ${size}px "Archivo"`;
+                if ("fontStretch" in c) c.fontStretch = "expanded"; const m = c.measureText(ch.toUpperCase());
+                return Math.max(0, Math.min(size * 0.2, m.width - m.actualBoundingBoxRight)); } catch (e) { return 0; }
+            };
+            // surname: ink left edge at L0, baseline at B0
+            const xB = L0 - kB.bear; nB.style.left = xB.toFixed(1) + "px";
+            nB.style.top = (B0 - baselineOf(nB, nB)).toFixed(1) + "px";
+            // first name: its baseline sits gap px above the surname's cap top, ink-aligned left; it lives in its own mask
+            const baseA = B0 - kB.cap - F1.gap, padL = 16, padT = 16;
+            mA.style.left = (L0 - kA.bear - padL).toFixed(1) + "px";
+            mA.style.top = (baseA - baselineOf(nA, nA) - padT).toFixed(1) + "px";
+            const ruleY = B0 + RU.below;
+            role.style.left = "0px"; role.style.top = (ruleY + kR.cap / 2 - baselineOf(role, role)).toFixed(1) + "px";
+            // split now (masked rise, tracking-in). Split glyphs are inline-blocks, so kerning is gone (VA alone is ~7 px at
+            // this size): measure the right edges on the split DOM, not with canvas. Each glyph box = its advance + tracking.
+            // the payoff is the cut: the surname's last glyph seats on it, so its rise is timed backwards from the cut
+            const CUT = T.cut, tRise = CUT - (V.last.length - 1) * R.stagger - R.seat * R.dur;
+            // the light-sweep copy: same text, size and split structure as the surname, so its glyphs sit exactly on it
+            const sw = $("#sw1"), nS = $("#n1bs"), SWP = 60;
+            nS.textContent = V.last; nS.style.fontSize = fs + "px";
+            sw.style.left = (xB - SWP).toFixed(1) + "px"; sw.style.top = (parseFloat(nB.style.top) - SWP).toFixed(1) + "px";
+            Look.split("#n1bs", { by: "chars", mask: true });
+            const ac = Look.split("#n1a", { by: "chars" }).chars;
+            Look.reveal(tl, "#n1b", tRise, { by: "chars", stagger: R.stagger, dur: R.dur });
+            const rc = Look.split("#r1", { by: "chars" }).chars;
+            const bx = $("#block1").getBoundingClientRect().left, lastOf = (sel) => { const a = document.querySelectorAll(sel); return a[a.length - 1]; };
+            const inkR = lastOf("#n1b .lk-c").getBoundingClientRect().right - bx - rbOf(V.last.slice(-1), 800, fs);   // the block's measure
+            const roleInkW = lastOf("#r1 .lk-c").getBoundingClientRect().right - role.getBoundingClientRect().left - roleTr - rbOf(V.role.slice(-1), 600, roleFs);
+            // role: right ink edge flush with the surname's; vertically centred on the hairline
+            const xR = inkR - roleInkW;
+            role.style.left = xR.toFixed(1) + "px";
+            // hairline: from the ink left edge to gap px before the role's first glyph
+            const RW = Math.max(RU.min, Math.round(xR + kR.bear - RU.gap - L0));
+            rule.style.left = L0 + "px"; rule.style.top = (ruleY - 1) + "px"; rule.style.width = RW + "px";
+            ruleI.style.backgroundSize = RW + "px 2px";
+            // scrim: bottom gradient from scrim.top down, plus a soft spot weighted to the lockup
+            const sc = $("#scrim1"), sp = $("#spot1"), top = baseA - kA.cap, bot = ruleY + 12;
+            sc.style.top = V.scrim.top + "px"; sc.style.height = (1920 - V.scrim.top) + "px";
+            sp.style.left = (L0 - 260) + "px"; sp.style.width = (inkR - L0 + 520) + "px";
+            sp.style.top = (top - 190) + "px"; sp.style.height = (bot - top + 380) + "px";
+            tl.fromTo(sc, { opacity: 0 }, { opacity: V.scrim.opacity, duration: 0.6, ease: "power2.out", immediateRender: false }, T.scrim);
+            tl.fromTo(sp, { opacity: 0 }, { opacity: V.scrim.spot, duration: 0.6, ease: "power2.out", immediateRender: false }, T.scrim);
+            // the bottom burn switches on at the cut (the cut hides the step) and lifts with the scrim on the exit
+            const bu = $("#burn1"), BU = V.burn;
+            bu.style.top = BU.top + "px"; bu.style.height = (1920 - BU.top) + "px";
+            bu.style.background = "linear-gradient(0deg, " + BU.stops.map((s) => `rgba(4,4,8,${s[0]}) ${s[1]}%`).join(", ") + ")";
+            // HIT0: half a frame before the cut, so every hit element is already on the cut frame itself and none on the
+            // frame before it
+            const HIT0 = CUT - 0.5 / Look.FPS, tOutBurn = T.out + 0.3;
+            if (plate) {   // tied to the sample shot: a transparent overlay keeps only the scrim and spot
+              Look.drive(tl, 0, D, (p) => {
+                const t = p * D;
+                bu.style.opacity = t < HIT0 ? "0" : (1 - gsap.parseEase("power2.inOut")(clamp((t - tOutBurn) / 0.5))).toFixed(4);
+              });
+            }
+
+            // first name: tracks in just ahead of the surname (glyphs converge onto their set while blurring in; x transforms)
+            const tA = tRise + T.first;
+            const spreadA = (i) => i * F1.spread;
+            gsap.set(ac, { x: spreadA });
+            tl.fromTo(ac, { x: spreadA }, { x: 0, duration: 0.8, ease: "expo.out", immediateRender: false }, tA);
+            Look.enter(tl, "#n1a", tA, { from: "blur", dur: 0.5, blur: 12, scale: 1 });
+            // the surname is born in the blast: its masked chars rise in the fireball (Look.reveal, set up above) and the
+            // last one seats on the cut. The hit lands there, on the incoming held shot: an exposure pulse (light, not a
+            // white veil; 2 frames at peak), a shake and punch, a short 6 px RGB split on the lockup and the light sweep.
+            document.querySelectorAll("#block1 .lk-c").forEach((c) => c.setAttribute("data-layout-allow-occlusion", ""));
+            if (plate) {
+              // the exposure's 1-frame attack ends ON the cut frame, then holds 2 frames at peak and decays
+              Look.expose(tl, CUT - 1 / Look.FPS, { target: "#shake", peak: P.expose.peak, hold: P.expose.hold, dur: P.expose.dur, saturate: P.expose.saturate });
+              Look.impact(tl, HIT0, { shake: "#shake", amp: P.amp, zoom: P.zoom, flash: 0, dur: 0.4 });
+            }
+            Look.chroma(tl, "#block1", HIT0, P.chromaDur, { px: P.chroma });
+            // light sweep: a band (105°, like the kit's sheen) crosses the surname left to right; the copy's glow shows only
+            // inside it, so each glyph flares as the light passes. Seek-safe: computed from absolute time on every frame.
+            const SW = sw.offsetWidth, tSw = HIT0 + P.sheen.lead, swE = gsap.parseEase("power2.inOut");
+            sw.style.webkitMaskImage = sw.style.maskImage = "linear-gradient(105deg, rgba(0,0,0,0) 41%, rgba(0,0,0,.55) 46%, #000 50%, rgba(0,0,0,.55) 54%, rgba(0,0,0,0) 59%)";
+            sw.style.webkitMaskSize = sw.style.maskSize = (SW * 3) + "px 100%";
+            Look.drive(tl, 0, D, (p) => {
+              const t = p * D, u = (t - tSw) / P.sheen.dur;
+              if (u <= 0 || u >= 1) { sw.style.opacity = "0"; return; }
+              // the band centre (1.5 * mask width into the mask) travels from 0.3 W left of the word to 0.3 W past its end
+              const c = -0.3 * SW + 1.6 * SW * swE(u), mx = c - 1.5 * SW;
+              sw.style.webkitMaskPosition = sw.style.maskPosition = mx.toFixed(1) + "px 0px";
+              sw.style.opacity = "1";
+            });
+            // role: lands as the hairline reaches it (blur in, glyphs converging leftward onto their set)
+            const tRole = CUT + T.role;
+            const spreadR = (i) => i * 8;
+            gsap.set(rc, { x: spreadR });
+            tl.fromTo(rc, { x: spreadR }, { x: 0, duration: 0.7, ease: "expo.out", immediateRender: false }, tRole);
+            Look.enter(tl, "#r1", tRole, { from: "blur", dur: 0.45, blur: 10, scale: 1 });
+
+            // hairline: drawn left→right (expo.out), retracted right→left on exit. Clip on the inner bar, glow on the wrapper.
+            const tRule = CUT + T.rule, tRuleOut = T.out + 0.08;
+            Look.drive(tl, 0, D, (p) => {
+              const t = p * D, a = eo(clamp((t - tRule) / RU.draw)), z = p3i(clamp((t - tRuleOut) / 0.32));
+              const w = RW * a * (1 - z);
+              ruleI.style.clipPath = w < 0.5 ? "inset(0 100% 0 0)" : `inset(0 ${(RW - w).toFixed(1)}px 0 0)`;
+            });
+
+            // light on the name: the hit swell (a warm-white core + warm flare), the fire's own light through the blast (a
+            // warm glow following the measured fire luma) handing over to a quiet daylight glow after the cut, and the exit
+            // blur. One driver owns both lines' filters.
+            const F = V.fire;
+            const lumaAt = (t) => {
+              const x = Math.max(0, t) * Look.FPS, i = Math.floor(x), a = F.luma[Math.min(i, F.luma.length - 1)], b = F.luma[Math.min(i + 1, F.luma.length - 1)];
+              return a + (b - a) * (x - i);
+            };
+            const fireAt = (t) => {
+              if (!plate) return 0;
+              if (t < F.end) return lumaAt(t);
+              const L0 = lumaAt(F.end);
+              return L0 + (F.after - L0) * p3o(clamp((t - F.end) / F.fade));
+            };
+            const glow = (env, L, k, xb) => {
+              const w = clamp((F.glow * L + 0.4 * env) * k);
+              return (xb > 0.05 ? `blur(${xb.toFixed(2)}px) ` : "") +
+                (env > 0.004 ? `drop-shadow(0 0 ${(6 + 8 * env).toFixed(1)}px rgba(255,232,200,${(0.55 * env).toFixed(3)})) ` : "") +
+                (w > 0.004 ? `drop-shadow(0 0 ${(14 + 16 * L + 16 * env).toFixed(1)}px rgba(255,166,86,${w.toFixed(3)})) ` : "") +
+                `drop-shadow(0 8px 22px rgba(0,0,0,.5))`;
+            };
+            const tOutA = T.out + 0.06, tOutB = tOutA + X.lineStagger;
+            Look.drive(tl, 0, D, (p) => {
+              const t = p * D, q = (t - HIT0) / 0.9, L = fireAt(t);
+              const env = q <= 0 || q >= 1 ? 0 : Math.min(1, q / 0.08) * Math.pow(1 - q, 2);
+              mA.style.filter = glow(env, L, 0.8, X.blur * p3i(clamp((t - tOutA) / X.dur)));
+              nB.style.filter = glow(env, L, 1, X.blur * p3i(clamp((t - tOutB) / X.dur)));
+            });
+
+            // exit: role blurs out, the hairline retracts, then the names leave as WHOLE masked lines (first name, then the
+            // surname 0.06 s later) with a 6 px blur and a late fade, so no lone glyph sliver is left in the mask
+            Look.exit(tl, "#r1", T.out, { to: "blur", dur: 0.3, blur: 10 });
+            const inB = document.querySelectorAll("#n1b .lk-in");
+            tl.fromTo(nA, { yPercent: 0 }, { yPercent: -135, duration: X.dur, ease: "power3.in", immediateRender: false }, tOutA);
+            tl.fromTo(inB, { yPercent: 0 }, { yPercent: -120, duration: X.dur, ease: "power3.in", immediateRender: false }, tOutB);
+            // the fade finishes before the masked rise does, so the glyph feet never sit alone in the mask as a row of
+            // dashes (r10: frame 4.6 showed them once the burn lifted off the bright tank top)
+            tl.fromTo(mA, { opacity: 1 }, { opacity: 0, duration: X.dur * 0.4, ease: "power2.in", immediateRender: false }, tOutA + X.dur * 0.45);
+            tl.fromTo(nB, { opacity: 1 }, { opacity: 0, duration: X.dur * 0.4, ease: "power2.in", immediateRender: false }, tOutB + X.dur * 0.45);
+            tl.fromTo(sc, { opacity: V.scrim.opacity }, { opacity: 0, duration: 0.45, ease: "power2.inOut", immediateRender: false }, T.out + 0.3);
+            tl.fromTo(sp, { opacity: V.scrim.spot }, { opacity: 0, duration: 0.45, ease: "power2.inOut", immediateRender: false }, T.out + 0.25);
+
+            // per-shot push: each shot pushes in on its own face (the cut resets it, like an editor's per-clip keyframes).
+            if (plate) {
+              // a shot's lift: a tone curve (SVG table) that opens the shadows and low mids but keeps black at 0, referenced
+              // from its grade as url(#lift-<id>). s008's face is a backlit profile (mean luma 19 in the source).
+              V.shots.forEach((s) => {
+                if (!s.lift) return;
+                const NS = "http://www.w3.org/2000/svg", svg = document.createElementNS(NS, "svg");
+                svg.setAttribute("width", "0"); svg.setAttribute("height", "0"); svg.style.cssText = "position:absolute;width:0;height:0";
+                const f = document.createElementNS(NS, "filter"); f.setAttribute("id", "lift-" + s.id); f.setAttribute("color-interpolation-filters", "sRGB");
+                const ct = document.createElementNS(NS, "feComponentTransfer");
+                ["feFuncR", "feFuncG", "feFuncB"].forEach((k) => { const fn = document.createElementNS(NS, k); fn.setAttribute("type", "table"); fn.setAttribute("tableValues", s.lift.join(" ")); ct.appendChild(fn); });
+                f.appendChild(ct); svg.appendChild(f); document.body.appendChild(svg);
+              });
+              V.shots.forEach((s) => { if (s.grade) document.getElementById(s.id).style.filter = s.grade; });
+              const pe = $("#push"), S = V.shots;
+              Look.drive(tl, 0, D, (p) => {
+                const t = p * D; let i = 0; while (i < S.length - 1 && t >= S[i + 1].start) i++;
+                const sh = S[i], u = clamp((t - sh.start) / sh.dur);
+                pe.style.transformOrigin = sh.origin;
+                pe.style.transform = `scale(${(sh.push[0] + (sh.push[1] - sh.push[0]) * u).toFixed(5)})`;
+              });
+            }
+          }
+
+          // v1 runs a lighter vignette: its bottom scrim already darkens the frame edge where the lockup sits
+          const fin = Look.install(tl, { duration: D, grain: 0.16, vignette: V.style === "lower" ? 0.38 : 0.5, enabled: plate });
+          // Grain on every frame. The kit's grain driver picks its frame with floor(p*D*FPS + 1e-6), but GSAP rounds tweened
+          // values to 1e-6, so some n/(D*FPS) round down onto the previous frame and the grain (and so the whole frame, on
+          // still footage) repeats. Same hash, rounded to the nearest frame.
+          // v1 only: the kit gives its overlay wrapper a z-index, which isolates the grain's overlay blend from the picture,
+          // so the grain composites as plain grey and lifts the blacks (measured: the car roof's black, 0.6, rendered at
+          // 18.6). Dropping the wrapper's z-index (it is the last child of #root, so it still paints over the footage)
+          // lets the grain really overlay-blend: blacks stay black. The type sits above it (z 95).
+          if (fin && V.style === "lower") fin.el.style.zIndex = "auto";
+          if (fin && fin.grain) {
+            const g = fin.grain, GS = 384;
+            Look.drive(tl, 0, D, (p) => {
+              const f = Math.round(p * D * Look.FPS);
+              g.style.backgroundPosition = Math.floor(Look.hash(f * 2 + 1) * GS) + "px " + Math.floor(Look.hash(f * 2 + 7919) * GS) + "px";
+            });
+          }
+          tl.set({}, {}, D);
+          window.__timelines = window.__timelines || {};
+          window.__timelines["main"] = tl;
+          tl.seek(0);
+        });
+      })();
+    </script>
+  </body>
+</html>

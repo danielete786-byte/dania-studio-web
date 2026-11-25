@@ -1,0 +1,355 @@
+<!doctype html>
+<!-- GTA 6 component #10 "Mission passed" (craft v2, round 9): the result sting and its fail twin.
+     1080x1920 (9:16), 30 fps, 5.4 s. Full-bleed vertical footage, every shot at 1.0x, cut on the beat.
+     The lockup is set flush-left on one optical column (ink edge x = 96) in the image's sky / canopy (y ~234-490).
+     Variables: variant "0" Passed + payout / "1" Mission failed; bg "plate" (sample footage) / "none" (transparent overlay).
+     v0: the biker beside the seaplane (s065) -> cut 1.1 to golden hour on the pier (s026) -> 2.6 the leap over Vice City (s135)
+         -> 4.2 ends on the jetski jumping at camera (s064). MISSION PASSED (one wide line) over the stunt; on the cut the payout
+         ($25,000, 216 px Inter 800, sunset gradient) rises in, counts and LANDS at 1.55 s: exposure pulse held 2 frames
+         + a warm anamorphic streak (6 px core, 240 px glow, held 0.2 s) + kick + sheen. Blur exit at 4.5 s.
+     v1: police slide in colour (s096) -> FAILED slams ON the cut at 1.0 to the drive-by past the police (s014) and the
+         world drains to cold mono; only bright red (the police lights, tail lights) and the word keep colour.
+         2.6 cut to the shootout (s119: the police SUV charges and flips), still drained; ends on the daylight street. -->
+<html lang="en" data-composition-variables='[
+  {"id":"variant","type":"enum","label":"Variant","default":"0","options":[{"value":"0","label":"Passed + payout"},{"value":"1","label":"Mission failed"}]},
+  {"id":"bg","type":"enum","label":"Background","default":"plate","options":[{"value":"plate","label":"Sample footage"},{"value":"none","label":"Transparent"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link rel="stylesheet" href="assets/fonts/fonts.css" />
+    <link rel="stylesheet" href="assets/kit/look/look.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="assets/kit/look/look.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: transparent; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; font-family: "Inter", sans-serif; color: #fff;
+        -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; }
+      #shake, #push { position: absolute; inset: 0; }
+      .shot { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      #ov { position: absolute; inset: 0; z-index: 10; }
+
+      /* legibility from shade, not boxes: the sky behind the lockup is darkened, falling off to nothing above the faces */
+      #scrim { position: absolute; inset: 0; opacity: 0; }
+      #root.passed #scrim { background:
+        radial-gradient(ellipse 70% 15% at 36% 19%, rgba(16,6,24,.40) 0%, rgba(16,6,24,.2) 55%, rgba(16,6,24,0) 100%),
+        linear-gradient(180deg, rgba(16,6,24,.62) 0%, rgba(16,6,24,.54) 12%, rgba(16,6,24,.36) 24%, rgba(16,6,24,.14) 34%, rgba(16,6,24,0) 44%); }
+      #root.failed #scrim { background:
+        radial-gradient(ellipse 72% 16% at 36% 19%, rgba(4,5,9,.38) 0%, rgba(4,5,9,.18) 55%, rgba(4,5,9,0) 100%),
+        linear-gradient(180deg, rgba(4,5,9,.64) 0%, rgba(4,5,9,.54) 12%, rgba(4,5,9,.36) 24%, rgba(4,5,9,.14) 34%, rgba(4,5,9,0) 44%); }
+      #root.none.passed #scrim, #root.none.failed #scrim { background: radial-gradient(ellipse 62% 14% at 40% 19%, rgba(5,5,9,.42) 0%, rgba(5,5,9,.18) 55%, rgba(5,5,9,0) 100%); }
+
+      /* the payoff light (passed, plate only): a warm anamorphic streak through the payout's digit line, screen-blended */
+      #flare { position: absolute; left: -200px; width: 1480px; height: 240px; margin-top: -120px; top: 0; opacity: 0; pointer-events: none;
+        mix-blend-mode: screen; transform-origin: 46% 50%; }
+      #flare .glow { position: absolute; inset: 0;
+        background: radial-gradient(ellipse 36% 50% at 46% 50%, rgba(255,198,140,.72) 0%, rgba(255,150,105,.3) 40%, rgba(255,150,105,0) 76%); }
+      #flare .halo { position: absolute; left: 0; right: 0; top: 104px; height: 32px; filter: blur(9px);
+        background: linear-gradient(90deg, rgba(255,170,110,0) 4%, rgba(255,170,110,.5) 24%, rgba(255,214,160,.85) 46%, rgba(255,170,110,.5) 70%, rgba(255,170,110,0) 90%); }
+      #flare .core { position: absolute; left: 0; right: 0; top: 117px; height: 6px; filter: blur(1.2px);
+        background: linear-gradient(90deg, rgba(255,226,190,0) 8%, rgba(255,232,200,.8) 24%, rgba(255,252,246,1) 46%, rgba(255,232,200,.8) 68%, rgba(255,226,190,0) 86%); }
+
+      .lock { position: absolute; left: 96px; top: 0; width: 864px; height: 640px; transform-origin: 0 40%; }
+      .ln { position: absolute; left: 0; white-space: nowrap; }
+
+      /* ---- passed: one wide line over one hero numeral, same measure (a poster block, no rule) ---- */
+      #lineP { font-family: "Archivo", "Inter", sans-serif; font-stretch: 125%; font-weight: 900; font-size: 66px; line-height: 1;
+        text-transform: uppercase; letter-spacing: .01em; color: #fff; }
+      #cashP { line-height: 1; }
+      #cash { display: flex; align-items: flex-start; font-family: "Inter", sans-serif; font-weight: 800; line-height: 1;
+        letter-spacing: -0.04em; font-variant-numeric: tabular-nums lining-nums; font-feature-settings: "tnum" 1, "lnum" 1;
+        transform-origin: 0 55%; padding: 2px 0 10px; white-space: nowrap; }
+      #cur { display: block; letter-spacing: 0; }
+      #num { display: block; }
+
+      /* ---- failed: label, one hero word, the reason in sentence case (the GTA fail-screen voice) ---- */
+      #kickF { font-family: "Archivo", "Inter", sans-serif; font-stretch: 125%; font-weight: 700; font-size: 30px; line-height: 1;
+        text-transform: uppercase; letter-spacing: .5em; color: rgba(255,255,255,.9);
+        text-shadow: 0 1px 1px rgba(0,0,0,.35), 0 4px 18px rgba(0,0,0,.5); }
+      #heroSlam { display: block; transform-origin: 30% 55%; }
+      #heroF { font-family: "Archivo", "Inter", sans-serif; font-stretch: 125%; font-weight: 900; font-size: 164px; line-height: .9;
+        text-transform: uppercase; letter-spacing: -0.005em; color: #fff; padding: 0 0 6px; }
+      #reasonF { font-family: "Inter", sans-serif; font-weight: 600; font-size: 40px; line-height: 1.2; letter-spacing: -0.01em; color: #fff;
+        text-shadow: 0 1px 1px rgba(0,0,0,.4), 0 4px 18px rgba(0,0,0,.55); }
+    </style>
+  </head>
+  <body>
+    <!-- fail grade: cold mono everywhere except BRIGHT saturated red (police lights, tail lights). #isoMono is driven per frame.
+         The red mask is alpha = 6R - 6G - 1B - 2.4: lights pass, shaded mural reds, skin, amber and sparks do not. -->
+    <svg width="0" height="0" style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true">
+      <filter id="iso" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+        <feColorMatrix id="isoMono" in="SourceGraphic" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1 0" result="mono" />
+        <feColorMatrix id="isoMask" in="SourceGraphic" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  6 -6 -1 0 -2.4" result="redMask" />
+        <feColorMatrix in="SourceGraphic" type="saturate" values="1.3" result="redSat" />
+        <feComposite in="redSat" in2="redMask" operator="in" result="red" />
+        <feMerge><feMergeNode in="mono" /><feMergeNode in="red" /></feMerge>
+      </filter>
+    </svg>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="5.4" data-width="1080" data-height="1920">
+      <div id="shake"><div id="push">
+        <!-- v0 "Passed + payout": every shot at 1.0x -->
+        <video id="a0" class="clip shot" src="assets/shots/s065-biker-plane-v.mp4" muted playsinline data-start="0" data-duration="1.1" data-media-start="0" data-track-index="0"></video>
+        <video id="b0" class="clip shot" src="assets/shots/s026-sunset-pier-v.mp4" muted playsinline data-start="1.1" data-duration="1.5" data-media-start="0" data-track-index="0"></video>
+        <video id="c0" class="clip shot" src="assets/shots/s135-skydive-city-v.mp4" muted playsinline data-start="2.6" data-duration="1.6" data-media-start="0" data-track-index="0"></video>
+        <video id="d0" class="clip shot" src="assets/shots/s064-jetski-v.mp4" muted playsinline data-start="4.2" data-duration="1.2" data-media-start="0" data-track-index="0"></video>
+        <!-- v1 "Mission failed": every shot at 1.0x -->
+        <video id="a1" class="clip shot" src="assets/shots/s096-police-street-v.mp4" muted playsinline data-start="0" data-duration="1.0" data-media-start="0.55" data-track-index="1"></video>
+        <video id="b1" class="clip shot" src="assets/shots/s014-driveby-police-v.mp4" muted playsinline data-start="1.0" data-duration="1.6" data-media-start="0.6" data-track-index="1"></video>
+        <video id="c1" class="clip shot" src="assets/shots/s119-gameplay-shootout-v.mp4" muted playsinline data-start="2.6" data-duration="2.8" data-media-start="1.25" data-track-index="1"></video>
+      </div></div>
+
+      <div id="ov" class="clip" data-start="0" data-duration="5.4" data-track-index="2">
+        <div id="scrim"></div>
+        <div id="flare" data-layout-allow-overflow><div class="glow"></div><div class="halo"></div><div class="core"></div></div>
+        <div id="lockP" class="lock">
+          <div id="lineGlow" class="ln"><div id="lineP" data-layout-allow-overflow></div></div>
+          <div id="cashP" class="ln"><div id="cashWrap"><div id="cashGlow"><div id="cash" data-layout-allow-overflow><span id="cur"></span><span id="num"></span></div></div></div></div>
+        </div>
+        <div id="lockF" class="lock">
+          <div id="kickF" class="ln"></div>
+          <div id="heroWrap" class="ln"><div id="heroGlow"><div id="heroSlam"><div id="heroF" data-layout-allow-overflow></div></div></div></div>
+          <div id="reasonF" class="ln" data-layout-allow-overflow></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const CONFIG = {
+        duration: 5.4,
+        variants: {
+          // Passed + payout: the result as one wide line, then the payout is THE hero. It rises in on the cut, counts and lands.
+          "0": {
+            state: "passed",
+            // footage ids in the HTML (swap their src for your own clips). push: slow camera push per shot; origin keeps faces clear
+            shots: [
+              { id: "a0", at: 0.0, dur: 1.1, from: 1.0, to: 1.04, origin: "50% 0%" },  // the stunt: biker beside the seaplane (line only)
+              { id: "b0", at: 1.1, dur: 1.5, from: 1.0, to: 1.05 },                    // golden hour on the pier: the payout lands here
+              { id: "c0", at: 2.6, dur: 1.6, from: 1.0, to: 1.05 },                    // the leap over Vice City
+              { id: "d0", at: 4.2, dur: 1.2, from: 1.0, to: 1.04, origin: "50% 0%" }   // ends on the brightest shot: the jetski jumps at camera
+            ],
+            line: "Mission passed",
+            reward: { amount: 25000, prefix: "$" },  // prefix is set small and raised ("$" or "+$"); amount counts up from 0
+            hit: 1.1,      // the cut: the payout rises in and starts counting
+            land: 1.55,    // the payoff: the count lands (punch + exposure pulse + streak + kick), sheen right after
+            out: 4.5       // the lockup blurs out (payout first) before the riders rise into it; gone by ~5.0 s
+          },
+          // Mission failed: the word slams on the cut, the world drains to cold mono with only bright red left
+          "1": {
+            state: "failed",
+            shots: [
+              { id: "a1", at: 0.0,  dur: 1.0,  from: 1.0, to: 1.035 },
+              { id: "b1", at: 1.0,  dur: 1.6,  from: 1.0, to: 1.05 },   // the drive-by past the police at the mural (dusk): FAILED slams on this cut
+              { id: "c1", at: 2.6,  dur: 2.8,  from: 1.0, to: 1.04 }    // the police SUV charges, flips, and the street clears (daylight)
+            ],
+            kicker: "Mission",
+            word: "Failed",
+            reason: "The cops got there first.",   // creator line: what went wrong (keep it to ~30 characters, sentence case)
+            hit: 1.0,      // the payoff: cut + slam + exposure pulse + shake + drain
+            out: 4.85
+          }
+        },
+        colors: {
+          sunset: "linear-gradient(100deg, #F84FA4 0%, #FE78A6 22%, #FE8E4E 60%, #FEB747 100%)", // payout fill (passed): the one accent
+          warmBloom: "255,184,120",
+          fail: "linear-gradient(180deg, #FF7A6E 0%, #FF3B3B 46%, #D3202A 100%)",              // hero fill (failed), lit from above
+          failBloom: "255,59,59"
+        },
+        grade: {
+          pass: "contrast(1.04) saturate(1.08)",
+          // failed mono per shot: brightness lift, black offset (contrast) and a cold R/G/B cast. s014 is a dusk shot, so it gets more lift
+          fail: [ { at: 1.0, lift: 1.7, offset: -0.05 }, { at: 2.6, lift: 1.2, offset: -0.08 } ],
+          failCold: [0.9, 0.98, 1.12]
+        },
+        layout: {
+          x: 96,                          // the optical column: every line's INK edge sits here
+          lineTop: 226, lineSize: 66,     // passed line (auto-sized to the payout's measure, 56-72 px)
+          cashTop: 284, cashSize: 216, cashMaxW: 770, cashMin: 200, curScale: 0.42,
+          kickTop: 246, heroTop: 290, heroSize: 164, heroMaxW: 780, reasonTop: 448,
+          ink: { line: -5, cash: -3, kick: -3, hero: -12, reason: -1 }   // side-bearing offsets (px), measured in the hero PNG
+        },
+        timing: { line: 0.18, kicker: 0.62, reason: 0.3, end: 5.4 }
+      };
+
+      (function () {
+        const VARS = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+        const vKey = CONFIG.variants[String(VARS.variant)] ? String(VARS.variant) : "0";
+        const plate = VARS.bg !== "none";
+        const V = CONFIG.variants[vKey], T = CONFIG.timing, C = CONFIG.colors, L = CONFIG.layout, D = CONFIG.duration, OUT = V.out;
+        const failed = V.state === "failed";
+        const $ = (s) => document.querySelector(s);
+        const ids = V.shots.map((s) => s.id);
+
+        document.querySelectorAll("video.shot").forEach((v) => { if (!plate || ids.indexOf(v.id) < 0) v.style.display = "none"; });
+        if (!plate) { $("#root").classList.add("none"); $("#flare").style.display = "none"; }
+        $("#root").classList.add(failed ? "failed" : "passed");
+        $(failed ? "#lockP" : "#lockF").style.display = "none";
+
+        const fmt = (n) => Math.round(n).toLocaleString("en-US");
+        if (!failed) {
+          $("#lineP").textContent = V.line;
+          $("#cur").textContent = V.reward.prefix;
+          $("#num").textContent = fmt(V.reward.amount);
+        } else {
+          $("#kickF").textContent = V.kicker;
+          $("#heroF").textContent = V.word;
+          $("#reasonF").textContent = V.reason;
+        }
+
+        const fontsReady = Promise.all([
+          document.fonts.load('expanded 900 66px "Archivo"'),
+          document.fonts.load('expanded 700 30px "Archivo"'),
+          document.fonts.load('800 216px "Inter"'),
+          document.fonts.load('600 40px "Inter"')
+        ]).then(() => document.fonts.ready);
+
+        fontsReady.then(() => {
+          const tl = gsap.timeline({ paused: true });
+          const H = V.hit, F = 1 / 30;
+          const place = (el, top, dx) => { el.style.top = top + "px"; el.style.left = dx + "px"; };
+
+          // ---- footage: one push per shot (the cut hides the reset), scrim up at the start ----
+          if (plate) {
+            V.shots.forEach((s) => {
+              const o = s.origin || "50% 45%";
+              tl.fromTo("#push", { scale: s.from, transformOrigin: o }, { scale: s.to, transformOrigin: o, duration: s.dur, ease: "none", immediateRender: false }, s.at);
+            });
+            gsap.set("#push", { scale: V.shots[0].from, transformOrigin: V.shots[0].origin || "50% 45%" });
+          }
+          gsap.set("#scrim", { opacity: 0 });
+          tl.fromTo("#scrim", { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "power2.out", immediateRender: false }, failed ? 0.45 : 0.05);
+
+          if (!failed) {
+            // ================= PASSED =================
+            const cash = $("#cash"), cur = $("#cur"), num = $("#num"), line = $("#lineP");
+            // the payout: 216 px digits, the currency set small and raised to the digit tops; fitted to <= 770 px (floor 200 px)
+            let cs = L.cashSize;
+            const setCash = () => {
+              num.style.fontSize = cs + "px";
+              const s = Math.round(cs * L.curScale); cur.style.fontSize = s + "px";
+              cur.style.marginTop = Math.round(0.1365 * (cs - s)) + "px";   // Inter cap top sits 0.1365em under the line box top
+              cur.style.marginRight = Math.round(cs * 0.035) + "px";
+            };
+            setCash();
+            while (cash.getBoundingClientRect().width > L.cashMaxW && cs > L.cashMin) { cs -= 2; setCash(); }
+            const cashW = Math.ceil(cash.getBoundingClientRect().width);
+            cash.style.width = (cashW + 4) + "px";
+            // the line takes the payout's measure: one block, two lines, flush left
+            let ls = L.lineSize; line.style.fontSize = ls + "px";
+            ls = Math.max(56, Math.min(72, ls * cashW / line.getBoundingClientRect().width)); line.style.fontSize = ls.toFixed(2) + "px";
+            place($("#lineGlow"), L.lineTop, L.ink.line);
+            place($("#cashP"), L.cashTop, L.ink.cash);
+
+            // bloom + lift on wrappers, so masks and the count never clip them
+            $("#lineGlow").style.filter = `drop-shadow(0 0 14px rgba(${C.warmBloom},.32)) drop-shadow(0 0 44px rgba(${C.warmBloom},.18)) drop-shadow(0 6px 22px rgba(0,0,0,.45))`;
+            $("#cashGlow").style.filter = `drop-shadow(0 0 1px rgba(16,6,24,.35)) drop-shadow(0 6px 26px rgba(16,6,24,.55)) drop-shadow(0 0 30px rgba(254,142,78,.26))`;
+
+            // ---- beat 1 (over the stunt): the line, masked char rise ----
+            Look.reveal(tl, line, T.line, { by: "chars", stagger: 0.022, dur: 0.72 });
+            tl.set("#lineP .lk-mask", { overflow: "visible" }, T.line + 1.1);
+
+            // ---- beat 2 (on the cut): the payout rises in with motion blur and counts; it lands at V.land ----
+            const amt = V.reward.amount, Lt = V.land;
+            Look.fill(cash, C.sunset, { sheen: true });
+            const rr0 = $("#root").getBoundingClientRect(), nr0 = num.getBoundingClientRect();
+            const digitMid = Math.round(nr0.top - rr0.top + cs * (0.1365 + 0.727 / 2));   // measured before the entrance offsets it
+            Look.enter(tl, "#cashWrap", H, { from: "up", dist: 70, dur: 0.42, blur: 14 });
+            const E = gsap.parseEase("power2.out");
+            Look.drive(tl, H, Lt - H, (p) => { num.textContent = fmt(p >= 1 ? amt : Math.floor(amt * E(p))); });
+            // the landing punch: 1.07 on the landing frame, settles to 1 (driven, so seeking back always returns 1)
+            const pe = gsap.parseEase("expo.out");
+            Look.drive(tl, Lt - F, 0.45 + F, (p) => {
+              const t = p * (0.45 + F);
+              const s = (p <= 0 || p >= 1) ? 1 : t < F ? 1 + 0.07 * (t / F) : 1 + 0.07 * (1 - pe((t - F) / 0.45));
+              gsap.set(cash, { scale: +s.toFixed(4) });
+            });
+            Look.sheen(tl, cash, Lt + 0.14, { dur: 0.8 });
+            // the hold breathes: the whole block drifts up 1.6% from its left edge
+            tl.fromTo("#lockP", { scale: 1 }, { scale: 1.016, duration: OUT - Lt - 0.4, ease: "sine.inOut", immediateRender: false }, Lt + 0.4);
+
+            if (plate) {
+              $("#push").style.filter = CONFIG.grade.pass;
+              // the hit ADDS light: an exposure pulse on the footage (peak held 2 frames), a kick, and the streak through the digits
+              Look.impact(tl, Lt, { shake: "#shake", amp: 6, flash: 0, zoom: 1.025, dur: 0.32 });
+              Look.expose(tl, Lt - F, { target: "#shake", peak: 1.6, hold: 2 / 30, dur: 0.4 });   // 1-frame attack: peaks ON the landing frame
+              $("#flare").style.top = digitMid + "px";
+              gsap.set("#flare", { opacity: 0, scaleX: 0.5 });
+              tl.fromTo("#flare", { opacity: 0, scaleX: 0.5 }, { opacity: 1, scaleX: 1, duration: F, ease: "none", immediateRender: false }, Lt - F);
+              tl.fromTo("#flare", { opacity: 1, scaleY: 1 }, { opacity: 0, scaleY: 0.6, duration: 0.42, ease: "power2.in", immediateRender: false }, Lt + 0.2);
+            }
+            // ---- exit: payout first, then the line ----
+            Look.exit(tl, ["#cashP", "#lineGlow"], OUT, { to: "blur", dur: 0.42, blur: 14, stagger: 0.06, scale: 1.04 });
+          } else {
+            // ================= FAILED =================
+            const hero = $("#heroF");
+            let hs = L.heroSize; hero.style.fontSize = hs + "px";
+            while (hero.getBoundingClientRect().width > L.heroMaxW && hs > 120) { hs -= 2; hero.style.fontSize = hs + "px"; }
+            place($("#kickF"), L.kickTop, L.ink.kick);
+            place($("#heroWrap"), L.heroTop, L.ink.hero);
+            place($("#reasonF"), L.reasonTop, L.ink.reason);
+            Look.fill(hero, C.fail);
+            const bl = C.failBloom;
+            $("#heroGlow").style.filter = `drop-shadow(0 0 16px rgba(${bl},.4)) drop-shadow(0 0 54px rgba(${bl},.24)) drop-shadow(0 10px 30px rgba(0,0,0,.5))`;
+
+            // ---- the kicker: anticipation, 0.38 s before the hit (blur-in + tracking in) ----
+            const kicker = $("#kickF");
+            const setTrack = (em) => { kicker.style.letterSpacing = em.toFixed(4) + "em"; };
+            Look.enter(tl, kicker, T.kicker, { from: "blur", dur: 0.5, blur: 12, scale: 1.03 });
+            Look.drive(tl, T.kicker, 0.7, (p) => setTrack(0.86 - 0.36 * gsap.parseEase("expo.out")(p)));
+
+            // ---- FAILED slams in ON the cut: full opacity on the hit frame, 1.2 -> 1 out of a 12 px blur in 0.26 s ----
+            const slam = $("#heroSlam"), se = gsap.parseEase("expo.out");
+            Look.drive(tl, H - F, 0.26 + F, (p) => {
+              const t = p * (0.26 + F);
+              if (p <= 0 || t < F * 0.5) { gsap.set(slam, { opacity: 0, scale: 1.2 }); slam.style.filter = "blur(12px)"; return; }
+              const k = se(Math.max(0, Math.min(1, (t - F) / 0.26)));
+              gsap.set(slam, { opacity: 1, scale: +(1.2 - 0.2 * k).toFixed(4) });
+              slam.style.filter = k >= 1 ? "none" : `blur(${(12 * (1 - k)).toFixed(2)}px)`;
+            });
+            // the reason rises word by word under the word
+            Look.reveal(tl, "#reasonF", H + T.reason, { by: "words", stagger: 0.06, dur: 0.6 });
+            tl.set("#reasonF .lk-mask", { overflow: "visible" }, H + T.reason + 1.2);
+            // the hold breathes
+            tl.fromTo("#lockF", { scale: 1 }, { scale: 1.016, duration: OUT - H - 0.5, ease: "sine.inOut", immediateRender: false }, H + 0.5);
+
+            if (plate) {
+              // the world drains to cold mono on the hit frame; only bright red keeps its colour. Per-shot lift (dusk vs daylight)
+              const push = $("#push"), mono = $("#isoMono"), G = CONFIG.grade, Lw = [0.2126, 0.7152, 0.0722];
+              const matrix = (g, lift, off) => {
+                const rows = [];
+                for (let i = 0; i < 3; i++) {
+                  const row = [];
+                  for (let j = 0; j < 3; j++) row.push(((1 - g) * (i === j ? 1 : 0) + g * Lw[j] * lift * G.failCold[i]).toFixed(4));
+                  rows.push(row.join(" ") + " 0 " + (g * off).toFixed(4));
+                }
+                return rows.join("  ") + "  0 0 0 1 0";
+              };
+              let last = "";
+              const span = D - H + F;
+              Look.drive(tl, H - F, span, (p) => {
+                const t = (H - F) + p * span;
+                if (p <= 0 || t < H - F * 0.5) { push.style.filter = "none"; if (last !== "id") { mono.setAttribute("values", matrix(0, 1, 0)); last = "id"; } return; }
+                let seg = G.fail[0]; G.fail.forEach((s) => { if (t >= s.at - 1e-4) seg = s; });
+                const g = Math.min(1, 0.86 + 0.14 * Math.max(0, Math.min(1, (t - H) / (2 * F))));   // 86% mono on the hit frame, full 2 frames later
+                const v = matrix(g, seg.lift, seg.offset);
+                if (v !== last) { mono.setAttribute("values", v); last = v; }
+                push.style.filter = "url(#iso)";
+              });
+              // the hit ADDS light: exposure pulse (peak held 3 frames, blacks stay black), shake + punch-zoom, no white flash
+              Look.impact(tl, H, { shake: "#shake", amp: 10, flash: 0, zoom: 1.04, dur: 0.36 });
+              Look.expose(tl, H - F, { target: "#shake", peak: 1.85, hold: 3 / 30, dur: 0.36, saturate: 1.2 });   // 1-frame attack: peaks ON the hit frame
+            }
+            Look.exit(tl, ["#reasonF", "#heroWrap", "#kickF"], OUT, { to: "blur", dur: 0.42, blur: 14, stagger: 0.05, scale: 1.04 });
+          }
+          tl.to("#scrim", { opacity: 0, duration: 0.5, ease: "power2.inOut" }, OUT + 0.05);
+
+          Look.install(tl, { duration: D, grain: 0.14, vignette: 0.5, enabled: plate });
+          tl.set({}, {}, T.end);
+          window.__timelines = window.__timelines || {};
+          window.__timelines["main"] = tl;
+          tl.seek(0);
+        });
+      })();
+    </script>
+  </body>
+</html>

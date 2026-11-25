@@ -1,0 +1,269 @@
+<!doctype html>
+<!-- 31 · Clip grid (craft v2) — 1080x1920, 30 fps, 5 s. Several clips at once, numbered ("4 scenes in 4 seconds").
+     variant "0" = 2×2 grid: each scene opens full frame, then docks into its quarter (scale .5 from its corner) and reveals the
+       next scene behind it; the 4th pulls back into the last cell, the grid completes = payoff (impact + Look.expose + the
+       sunset seam drawing out from the cross). Then the last cell takes the frame back (scale .5 -> 1) and ends full-bleed.
+     variant "1" = 3 stacked: three full-width 16:9 bands wipe in from alternating sides on the beat; the payoff lights both
+       seams in the sunset; at the end the outer bands wipe away and the middle band holds as a letterbox framed by the seams.
+     Numerals hug the seams (soft shadow pools, no cards). bg "none": no backdrop, grain, vignette or light hits; the clips still
+     show (full-frame component). All content in CONFIG; keep each <video>'s static attributes in step with it. -->
+<html lang="en" data-composition-variables='[
+  {"id":"variant","type":"enum","label":"Variant","default":"0","options":[{"value":"0","label":"2×2 grid"},{"value":"1","label":"3 stacked"}]},
+  {"id":"bg","type":"enum","label":"Background","default":"plate","options":[{"value":"plate","label":"Black stage + finishing"},{"value":"none","label":"Transparent around the clips"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link rel="stylesheet" href="assets/fonts/fonts.css" />
+    <link rel="stylesheet" href="assets/kit/look/look.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="assets/kit/look/look.js"></script>
+    <style>
+      /* declared inline as well as in fonts.css so the renderer's static font guard resolves Archivo */
+      @font-face { font-family: "Archivo"; font-style: normal; font-weight: 100 900; font-stretch: 62% 125%; font-display: block; src: url("assets/fonts/Archivo.ttf") format("truetype"); }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: transparent; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; color: #fff; font-family: "Inter", sans-serif;
+        -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; }
+      #stage { position: absolute; inset: 0; background: #050507; display: none; }
+      .bgon #stage { display: block; }
+      #shake, #push { position: absolute; inset: 0; }
+      .lay { position: absolute; inset: 0; display: none; }
+      .v0 #L0, .v1 #L1 { display: block; }
+      .pz, .pp { position: absolute; inset: 0; }
+      .pz video, .pp video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      /* ---- 2×2: every panel is a full 1080×1920 frame; docking = scale .5 about its own corner ---- */
+      .pan { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; overflow: hidden; background: #050507; }
+      #p0 { transform-origin: 0 0; z-index: 5; } #p1 { transform-origin: 100% 0; z-index: 4; }
+      #p2 { transform-origin: 0 100%; z-index: 3; } #p3 { transform-origin: 100% 100%; z-index: 2; }
+      /* the shadow pool behind each numeral (panel-local, so it docks with the shot): top row pools at the bottom-left,
+         bottom row at the top-left, i.e. always against the horizontal seam */
+      .pool { position: absolute; inset: 0; pointer-events: none; }
+      #p0 .pool, #p1 .pool { background: radial-gradient(ellipse 100% 30% at 0% 100%, rgba(4,4,8,.5) 0%, rgba(4,4,8,.22) 50%, rgba(4,4,8,0) 100%),
+        linear-gradient(0deg, rgba(4,4,8,.62) 0%, rgba(4,4,8,.4) 12%, rgba(4,4,8,.14) 26%, rgba(4,4,8,0) 38%); }
+      #p2 .pool, #p3 .pool { background: radial-gradient(ellipse 100% 30% at 0% 0%, rgba(4,4,8,.52) 0%, rgba(4,4,8,.24) 50%, rgba(4,4,8,0) 100%),
+        linear-gradient(180deg, rgba(4,4,8,.64) 0%, rgba(4,4,8,.42) 12%, rgba(4,4,8,.15) 26%, rgba(4,4,8,0) 38%); }
+      .gut { position: absolute; background: #050507; z-index: 8; }
+      #gvt { left: 537px; top: 0; width: 6px; height: 960px; transform-origin: 50% 100%; }
+      #gvb { left: 537px; top: 960px; width: 6px; height: 960px; transform-origin: 50% 0; }
+      #ghl { left: 0; top: 957px; width: 540px; height: 6px; transform-origin: 100% 50%; }
+      #ghr { left: 540px; top: 957px; width: 540px; height: 6px; transform-origin: 0 50%; }
+      /* the light: a 2 px sunset line inside the seam; it draws out from the cross on the payoff */
+      .seam { position: absolute; left: 0; width: 1080px; height: 3px; z-index: 9;
+        filter: drop-shadow(0 0 5px rgba(254,142,78,.85)) drop-shadow(0 0 16px rgba(248,79,164,.55)); }
+      .seam i { position: absolute; top: 0; height: 3px; background-image: linear-gradient(90deg, #F84FA4 0%, #FE78A6 28%, #FE8E4E 64%, #FEB747 100%);
+        background-size: 1080px 3px; background-repeat: no-repeat; }
+      #sh0 { top: 958.5px; } #sh0 .l { left: 0; width: 540px; transform-origin: 100% 50%; }
+      #sh0 .r { left: 540px; width: 540px; background-position: -540px 0; transform-origin: 0 50%; }
+      #flare { position: absolute; left: 280px; top: 700px; width: 520px; height: 520px; z-index: 9; opacity: 0; mix-blend-mode: screen; pointer-events: none;
+        background: radial-gradient(circle, rgba(255,240,224,.95) 0%, rgba(254,160,110,.5) 14%, rgba(248,79,164,.16) 36%, rgba(248,79,164,0) 62%); }
+      /* ---- 3 stacked: full-width bands of 16:9 footage ---- */
+      .band { position: absolute; left: 0; width: 1080px; height: 640px; overflow: hidden; }
+      #b0 { top: 0; } #b1 { top: 640px; } #b2 { top: 1280px; }
+      #b0 .pool { background: radial-gradient(ellipse 72% 82% at 0% 100%, rgba(4,4,8,.62) 0%, rgba(4,4,8,.3) 50%, rgba(4,4,8,0) 100%),
+        radial-gradient(ellipse 70% 60% at 0% 0%, rgba(4,4,8,.5) 0%, rgba(4,4,8,.22) 50%, rgba(4,4,8,0) 100%); }
+      #b1 .pool { background: radial-gradient(ellipse 80% 74% at 0% 50%, rgba(4,4,8,.64) 0%, rgba(4,4,8,.32) 50%, rgba(4,4,8,0) 100%); }
+      #b2 .pool { background: radial-gradient(ellipse 72% 82% at 0% 0%, rgba(4,4,8,.66) 0%, rgba(4,4,8,.34) 50%, rgba(4,4,8,0) 100%),
+        linear-gradient(180deg, rgba(4,4,8,.42) 0%, rgba(4,4,8,.18) 26%, rgba(4,4,8,0) 46%); }
+      #gs0 { left: 0; top: 637px; width: 1080px; height: 6px; } #gs1 { left: 0; top: 1277px; width: 1080px; height: 6px; }
+      #sh1 { top: 639px; } #sh2 { top: 1279px; } #sh1 i, #sh2 i { left: 0; width: 1080px; transform-origin: 0 50%; }
+      /* ---- type ---- */
+      #ov { position: absolute; inset: 0; z-index: 20; pointer-events: none; }
+      #bsc { position: absolute; left: 0; right: 0; top: 1180px; height: 740px; }
+      .num { position: absolute; white-space: nowrap; line-height: 1; }
+      .lift { text-shadow: 0 2px 3px rgba(0,0,0,.26), 0 10px 36px rgba(0,0,0,.36), 0 0 40px rgba(255,255,255,.14); }
+      .n0 { font-family: "Archivo", "Inter", sans-serif; font-stretch: 125%; font-weight: 800; font-size: 236px; letter-spacing: 0; }
+      .n1 { font-family: "Inter", sans-serif; font-weight: 800; font-size: 214px; letter-spacing: -0.05em; font-feature-settings: "tnum" 1, "lnum" 1; }
+      .lab { position: absolute; white-space: nowrap; color: rgba(255,255,255,.94); }
+      .l0 { font-family: "Archivo", "Inter", sans-serif; font-stretch: 125%; font-weight: 700; font-size: 25px; letter-spacing: .3em; text-transform: uppercase; line-height: 1.2; }
+      .l1 { font-family: "Inter", sans-serif; font-weight: 600; font-size: 27px; letter-spacing: .3em; text-transform: uppercase; line-height: 1.2; }
+      /* soft shadow behind each grid numeral (no edge, no box): legibility over the full-frame shot before it docks */
+      .npool { position: absolute; width: 600px; height: 520px; opacity: 0; background: radial-gradient(closest-side, rgba(4,4,8,.46) 0%, rgba(4,4,8,.24) 55%, rgba(4,4,8,0) 100%); }
+      #kick { position: absolute; left: 72px; white-space: nowrap; color: #fff; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="5" data-width="1080" data-height="1920">
+      <div id="stage"></div>
+      <div id="shake"><div id="push">
+        <div id="L0" class="lay">
+          <div class="pan" id="p0"><div class="pz"><video id="v00" class="clip" src="assets/shots/s008-jason-driving-v.mp4" muted playsinline data-start="0" data-media-start="0" data-duration="4.25" data-track-index="1"></video></div><div class="pool"></div></div>
+          <div class="pan" id="p1"><div class="pz"><video id="v01" class="clip" src="assets/shots/s014-driveby-police-v.mp4" muted playsinline data-start="0.45" data-media-start="0" data-duration="3.8" data-track-index="2"></video></div><div class="pool"></div></div>
+          <div class="pan" id="p2"><div class="pz"><video id="v02" class="clip" src="assets/shots/s119-gameplay-shootout-v.mp4" muted playsinline data-start="0.95" data-media-start="0.07" data-duration="3.3" data-track-index="3"></video></div><div class="pool"></div></div>
+          <div class="pan" id="p3"><div class="pz"><video id="v03" class="clip" src="assets/shots/s011-vice-highway-v.mp4" muted playsinline data-start="1.45" data-media-start="0.03" data-duration="3.55" data-track-index="4"></video></div><div class="pool"></div></div>
+          <div class="gut" id="gvt"></div><div class="gut" id="ghl"></div><div class="gut" id="ghr"></div><div class="gut" id="gvb"></div>
+          <div class="seam" id="sh0"><i class="l"></i><i class="r"></i></div>
+          <div id="flare"></div>
+        </div>
+        <div id="L1" class="lay">
+          <div class="band" id="b0"><div class="pz"><div class="pp"><video id="v10" class="clip" src="assets/shots/s016-store-counter-h.mp4" muted playsinline data-start="0" data-media-start="0" data-duration="3.88" data-track-index="5"></video></div></div><div class="pool"></div></div>
+          <div class="band" id="b1"><div class="pz"><div class="pp"><video id="v11" class="clip" src="assets/shots/s004-palm-shirt-truck-h.mp4" muted playsinline data-start="0.4" data-media-start="0.3" data-duration="4.6" data-track-index="6"></video></div></div><div class="pool"></div></div>
+          <div class="band" id="b2"><div class="pz"><div class="pp"><video id="v12" class="clip" src="assets/shots/s012-muscle-beach-h.mp4" muted playsinline data-start="0.8" data-media-start="0" data-duration="3.04" data-track-index="7"></video></div></div><div class="pool"></div></div>
+          <div class="gut" id="gs0"></div><div class="gut" id="gs1"></div>
+          <div class="seam" id="sh1"><i></i></div><div class="seam" id="sh2"><i></i></div>
+        </div>
+      </div></div>
+      <div id="ov">
+        <div id="bsc" class="lk-scrim-bottom"></div>
+        <div id="kick"></div>
+      </div>
+    </div>
+    <script>
+      const CONFIG = {
+        duration: 5,
+        variants: {
+          // 2×2, reading order (TL, TR, BL, BR). Each clip is ONE vertical (9:16) shot played at 1.0x: `in` = in-point.
+          // A cell is on screen from its reveal until the takeover (the last cell to the end), so a shot must be at least
+          // that long (see README). Top-row shots need a calm lower half, bottom-row shots a calm top: the numerals sit there.
+          "0": {
+            layout: "grid", kicker: "4 scenes in 4 seconds",
+            cells: [
+              { label: "The drive", clip: "assets/shots/s008-jason-driving-v.mp4", in: 0 },
+              { label: "The mural", clip: "assets/shots/s014-driveby-police-v.mp4", in: 0, grade: "contrast(1.06) saturate(1.08) brightness(1.08)" },
+              { label: "Shootout",  clip: "assets/shots/s119-gameplay-shootout-v.mp4", in: 0.07, zoom: 1.2, origin: "50% 0%", grade: "contrast(1.14) saturate(1.14) brightness(1.02)" },
+              { label: "Vice City", clip: "assets/shots/s011-vice-highway-v.mp4", in: 0.03 }
+            ]
+          },
+          // 3 stacked, top to bottom. Each clip is ONE 16:9 shot at 1.0x; `zoom`/`focus` frame it inside the 1080×640 band.
+          "1": {
+            layout: "stack", kicker: "3 scenes in 3 seconds",
+            cells: [
+              { label: "Pawn shop",  clip: "assets/shots/s016-store-counter-h.mp4", in: 0, zoom: 1.12, focus: "60% 45%", grade: "contrast(1.1) saturate(1.06) brightness(1.08)" },
+              { label: "The pickup", clip: "assets/shots/s004-palm-shirt-truck-h.mp4", in: 0.3, zoom: 1.06, focus: "60% 30%" },
+              { label: "Beach gym",  clip: "assets/shots/s012-muscle-beach-h.mp4", in: 0, zoom: 1.08, focus: "60% 40%" }
+            ]
+          }
+        },
+        timing: {
+          // grid: cell k docks at first + k*step (dock seconds long); the payoff lands when the 4th cell has docked;
+          // `take` = the last cell takes the frame back.
+          grid: { first: 0.45, step: 0.5, dock: 0.36, take: 3.75, takeDur: 0.5 },
+          // stack: band k wipes in at k*step (wipe seconds); payoff when the 3rd has landed; outer bands wipe out at `out`.
+          stack: { step: 0.4, wipe: 0.5, payoff: 1.22, out: 3.42 }
+        }
+      };
+
+      (function () {
+        const VARS = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+        const vKey = CONFIG.variants[String(VARS.variant)] ? String(VARS.variant) : "0";
+        const plate = VARS.bg !== "none";
+        const V = CONFIG.variants[vKey], D = CONFIG.duration, grid = V.layout !== "stack";
+        const $ = (s) => document.querySelector(s), root = $("#root"), ov = $("#ov");
+        root.classList.add(grid ? "v0" : "v1"); if (plate) root.classList.add("bgon");
+        // hide the other layout's footage; apply CONFIG in-points and grades
+        document.querySelectorAll("#" + (grid ? "L1" : "L0") + " video").forEach((v) => (v.style.display = "none"));
+        const vids = grid ? ["#v00", "#v01", "#v02", "#v03"] : ["#v10", "#v11", "#v12"];
+        V.cells.forEach((c, i) => {
+          const v = $(vids[i]);
+          if (v.getAttribute("src") !== c.clip) v.setAttribute("src", c.clip);
+          if (v.getAttribute("data-media-start") !== String(c.in || 0)) v.setAttribute("data-media-start", String(c.in || 0));
+          if (c.grade) v.style.filter = c.grade;
+        });
+        $("#kick").textContent = V.kicker;
+        $("#kick").className = grid ? "l0 lift" : "l1 lift";
+
+        // numerals + labels (absolute, in #ov); pos = [left, top] of the numeral box, label offset is per layout
+        const mk = (cls, text, x, y) => { const d = document.createElement("div"); d.className = cls; d.textContent = text; d.style.left = x + "px"; d.style.top = y + "px"; if (text) d.setAttribute("data-layout-allow-overflow", ""); ov.appendChild(d); return d; };
+        // type is parked invisible until its reveal starts (keeps the layout and contrast checks off the masked, parked glyphs)
+        const show = (tl, el, at) => { gsap.set(el, { autoAlpha: 0 }); tl.set(el, { autoAlpha: 1 }, at); };
+
+        document.fonts.ready.then(() => {
+          const tl = gsap.timeline({ paused: true });
+          const nums = [], labs = [];
+          if (grid) {
+            const T = CONFIG.timing.grid, pans = ["#p0", "#p1", "#p2", "#p3"];
+            // lockups mirror across the horizontal seam: labels hug it (ink 906–923 / 997–1014), numbers sit outward (caps 720–880 / 1040–1200)
+            const NX = [72, 615, 72, 615], NY = [681, 681, 1001, 1001];
+            const pools = V.cells.map((c, i) => mk("npool", "", NX[i] - 170, i < 2 ? NY[i] - 121 : NY[i] - 169));
+            V.cells.forEach((c, i) => {
+              nums.push(mk("num n0 lift", String(i + 1), NX[i], NY[i]));
+              labs.push(mk("lab l0 lift", c.label, NX[i] + 8, i < 2 ? NY[i] + 219 : NY[i] - 11));
+            });
+            $("#kick").style.top = "1436px"; $("#kick").style.fontSize = "21px"; $("#kick").style.letterSpacing = ".26em";
+            // every cell pushes in slowly for its whole life
+            V.cells.forEach((c, i) => { const p = $(pans[i] + " .pz"), z = c.zoom || 1; gsap.set(p, { transformOrigin: c.origin || "50% 40%" }); tl.fromTo(p, { scale: z }, { scale: z * 1.08, duration: D, ease: "none", immediateRender: false }, 0); });
+            gsap.set(["#gvt", "#gvb"], { scaleY: 0 }); gsap.set(["#ghl", "#ghr"], { scaleX: 0 }); gsap.set("#sh0 i", { scaleX: 0 });
+            Look.enter(tl, "#kick", 0.12, { from: "blur", dur: 0.6, blur: 10 });
+            const docks = [0, 1, 2, 3].map((k) => T.first + k * T.step);
+            docks.forEach((t, k) => {
+              const p = pans[k];
+              tl.fromTo(p, { scale: 1 }, { scale: 0.5, duration: T.dock, ease: "expo.inOut", immediateRender: false }, t);
+              Look.drive(tl, t, T.dock, (q) => { const b = Math.sin(Math.PI * q) * 5; $(p).style.filter = b > 0.05 ? "blur(" + b.toFixed(2) + "px)" : ""; });
+              // the number lands the moment its scene is revealed, at its final place; the footage then docks under it.
+              // It rises out of the seam (top row) or drops out of it (bottom row).
+              const r = k === 0 ? 0.06 : T.first + (k - 1) * T.step + 0.26;
+              tl.fromTo(pools[k], { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out", immediateRender: false }, r);
+              show(tl, nums[k], r); show(tl, labs[k], r + 0.1);
+              Look.reveal(tl, nums[k], r, { by: "chars", from: k < 2 ? 112 : -112, dur: 0.6 });
+              Look.reveal(tl, labs[k], r + 0.1, { by: "words", from: k < 2 ? 120 : -120, dur: 0.5, stagger: 0.05 });
+            });
+            // the gutters draw outward from the cross as each cell's edge lands
+            const g = (sel, axis, at) => tl.fromTo(sel, { [axis]: 0 }, { [axis]: 1, duration: 0.42, ease: "expo.out", immediateRender: false }, at);
+            g("#gvt", "scaleY", docks[0] + 0.2); g("#ghl", "scaleX", docks[0] + 0.2);
+            g("#ghr", "scaleX", docks[1] + 0.2); g("#gvb", "scaleY", docks[2] + 0.2);
+            // PAYOFF: the 4th cell has pulled back into place, the grid is complete
+            const HIT = docks[3] + T.dock - 0.02;
+            if (plate) { Look.impact(tl, HIT, { shake: "#shake", flash: 0, amp: 7, zoom: 1.028, dur: 0.34 }); Look.expose(tl, HIT, { target: "#shake", peak: 1.55, hold: 3 / 30, dur: 0.42 }); }
+            tl.fromTo("#sh0 i", { scaleX: 0 }, { scaleX: 1, duration: 0.6, ease: "expo.out", immediateRender: false }, HIT);
+            tl.fromTo("#flare", { opacity: 0, scale: 0.6 }, { opacity: 0.85, scale: 1, duration: 1 / 30, ease: "none", immediateRender: false }, HIT);
+            tl.to("#flare", { opacity: 0, scale: 1.25, duration: 0.55, ease: "power2.out" }, HIT + 3 / 30);
+            tl.fromTo("#sh0", { opacity: 1 }, { opacity: 0.88, duration: 0.9, ease: "power2.out", immediateRender: false }, HIT + 0.5);
+            // TAKEOVER: type and light clear, the last cell scales back up to the full frame and the piece ends full-bleed
+            Look.exit(tl, [...labs, ...nums, "#kick"], T.take - 0.12, { to: "blur", dur: 0.34, stagger: 0.025 });
+            tl.to(pools, { opacity: 0, duration: 0.3, ease: "power2.in" }, T.take - 0.1);
+            tl.to(["#sh0", "#bsc"], { opacity: 0, duration: 0.3, ease: "power2.in" }, T.take - 0.1);
+            tl.set("#p3", { zIndex: 12 }, T.take);
+            tl.fromTo("#p3", { scale: 0.5 }, { scale: 1, duration: T.takeDur, ease: "expo.inOut", immediateRender: false }, T.take);
+            tl.to("#p3 .pool", { opacity: 0, duration: T.takeDur, ease: "power2.inOut" }, T.take);
+            Look.drive(tl, T.take, T.takeDur, (q) => { const b = Math.sin(Math.PI * q) * 5; $("#p3").style.filter = b > 0.05 ? "blur(" + b.toFixed(2) + "px)" : ""; });
+          } else {
+            const T = CONFIG.timing.stack, bands = ["#b0", "#b1", "#b2"];
+            // numeral column at x 72, evenly spaced; 01 sits on seam 1, 02 centres on band 2, 03 hangs from seam 2
+            const NY = [413, 853, 1293];
+            V.cells.forEach((c, i) => {
+              nums.push(mk("num n1 lift", String(i + 1).padStart(2, "0"), 66, NY[i]));
+              labs.push(mk("lab l1 lift", c.label, 0, NY[i] + 23));
+              const pp = $(bands[i] + " .pp"); gsap.set(pp, { transformOrigin: c.focus || "50% 50%" });
+              tl.fromTo(pp, { scale: c.zoom || 1 }, { scale: (c.zoom || 1) * 1.07, duration: D, ease: "none", immediateRender: false }, 0);
+            });
+            labs.forEach((l, i) => (l.style.left = (nums[i].offsetLeft + nums[i].offsetWidth + 22) + "px"));
+            $("#kick").style.top = "248px";
+            gsap.set(["#sh1 i", "#sh2 i"], { scaleX: 0 });
+            Look.enter(tl, "#kick", 0.0, { from: "blur", dur: 0.55, blur: 10 });
+            gsap.set("#bsc", { opacity: 0 });
+            bands.forEach((b, k) => {
+              const t = k * T.step, fromL = k % 2 === 0, hide = fromL ? "inset(0% 100% 0% 0%)" : "inset(0% 0% 0% 100%)";
+              const start = k === 0 ? (fromL ? "inset(0% 64% 0% 0%)" : "inset(0% 0% 0% 64%)") : hide;
+              gsap.set(b, { clipPath: start });
+              tl.fromTo(b, { clipPath: start }, { clipPath: "inset(0% 0% 0% 0%)", duration: T.wipe, ease: "expo.out", immediateRender: false }, t);
+              const pz = $(b + " .pz"), dx = fromL ? -150 : 150;
+              gsap.set(pz, { x: k === 0 ? dx * 0.4 : dx });
+              tl.fromTo(pz, { x: k === 0 ? dx * 0.4 : dx }, { x: 0, duration: T.wipe + 0.1, ease: "expo.out", immediateRender: false }, t);
+              Look.mblur(tl, pz, t, T.wipe * 0.6, { x: 22, ease: "power2.out" });
+              show(tl, nums[k], t + 0.2); show(tl, labs[k], t + 0.3);
+              Look.reveal(tl, nums[k], t + 0.2, { by: "chars", stagger: 0.04, dur: 0.6 });
+              Look.reveal(tl, labs[k], t + 0.3, { by: "words", dur: 0.5, stagger: 0.06 });
+            });
+            const HIT = T.payoff;
+            if (plate) { Look.impact(tl, HIT, { shake: "#shake", flash: 0, amp: 7, zoom: 1.026, dur: 0.34 }); Look.expose(tl, HIT, { target: "#shake", peak: 1.5, hold: 3 / 30, dur: 0.42 }); }
+            tl.fromTo("#sh1 i", { scaleX: 0 }, { scaleX: 1, duration: 0.6, ease: "expo.out", immediateRender: false }, HIT);
+            tl.fromTo("#sh2 i", { scaleX: 0 }, { scaleX: 1, duration: 0.6, ease: "expo.out", immediateRender: false }, HIT + 0.06);
+            // OUT: type clears, band 3 wipes off to the right and band 1 to the left; band 2 holds as a letterbox between the seams
+            Look.exit(tl, [...labs, ...nums], T.out - 0.1, { to: "blur", dur: 0.34, stagger: 0.025 });
+            [[2, "inset(0% 0% 0% 100%)", 150, 0], [0, "inset(0% 100% 0% 0%)", -150, 0.06]].forEach(([k, endClip, dx, d]) => {
+              const b = bands[k], t = T.out + d;
+              tl.fromTo(b, { clipPath: "inset(0% 0% 0% 0%)" }, { clipPath: endClip, duration: 0.38, ease: "power3.in", immediateRender: false }, t);
+              tl.fromTo(b + " .pz", { x: 0 }, { x: dx, duration: 0.38, ease: "power3.in", immediateRender: false }, t);
+            });
+            tl.to(["#gs0", "#gs1"], { opacity: 0, duration: 0.2 }, T.out + 0.3);
+          }
+          Look.install(tl, { duration: D, grain: 0.14, vignette: 0.45, enabled: plate });
+          tl.set({}, {}, D);
+          window.__timelines = window.__timelines || {};
+          window.__timelines["main"] = tl;
+          tl.seek(0);
+        });
+      })();
+    </script>
+  </body>
+</html>

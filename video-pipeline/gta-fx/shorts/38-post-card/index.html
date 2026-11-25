@@ -1,0 +1,904 @@
+<!doctype html>
+<!-- GTA 6 component #38: X post card (craft v2). 1080x1920 (9:16), 30 fps, 6.5 s.
+     The post becomes the headline: a faithful X post lands over a cut montage, its key phrase is highlighted,
+     and on the payoff cut that phrase lifts off the card and flies up into the headline slot (a FLIP: v0 splits the
+     marked phrase into one chip per headline line, which land on the cut and stretch out on Archivo's width axis; v1 flies
+     the numeral itself out of the post's "90M+"). The card is the receipt.
+     Variables: variant "0" Light card / "1" Dark on blur; bg "plate" (sample GTA 6 shots) / "none" (transparent overlay).
+     Safe zone for Shorts/TikTok/Reels: all text and the card sit inside x 72–936, y 230–1480. -->
+<html lang="en" data-composition-variables='[
+  {"id":"variant","type":"enum","label":"Variant","default":"0","options":[{"value":"0","label":"Light card"},{"value":"1","label":"Dark on blur"}]},
+  {"id":"bg","type":"enum","label":"Background","default":"plate","options":[{"value":"plate","label":"Sample footage"},{"value":"none","label":"Transparent"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link rel="stylesheet" href="assets/fonts/fonts.css" />
+    <link rel="stylesheet" href="assets/kit/look/look.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="assets/kit/look/look.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: transparent; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; font-family: "Inter", sans-serif; color: #fff;
+        -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; }
+      #shake, #push { position: absolute; inset: 0; }
+      /* the focus layer is larger than the frame so a rack-focus blur never shows a soft edge */
+      #focus { position: absolute; inset: -64px; }
+      .shot { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      #ov { position: absolute; inset: 0; z-index: 10; }
+      /* Look.install gives .lk-overlay an inline z-index, which makes it its own stacking context, so the grain's
+         overlay blend only meets the empty overlay layer and turns into a flat 15 % grey veil (white card → #EBEBEB,
+         lifted blacks). Un-isolate the wrapper and stack its layers directly, so the grain blends with the picture. */
+      #root .lk-overlay { z-index: auto !important; }
+      #root .lk-overlay > .lk-vignette, #root .lk-overlay > .lk-grain { z-index: 90; }
+
+      /* light around the card (v1), matched to each shot's light */
+      #glow { position: absolute; inset: 0; display: none; opacity: 0; }
+      /* bg:none only (v1): a smoked wash stands in for the blur, so the dark card still separates from any clip */
+      #smoke { position: absolute; inset: 0; display: none; opacity: 0; }
+      /* soft top darkening where the headline sits (part of the graphic, so it stays in bg:none); the gradient
+         itself is per variant in CONFIG (v0 is a warm plum tint so the pink smoke stays saturated) */
+      #scrim { position: absolute; left: 0; right: 0; top: 0; height: 1000px; display: none; opacity: 0; }
+      /* v1 (plate only): the kit's bottom scrim, so the lower 600 px is deep shadow with light in it, not a flat wash */
+      #scrimB { position: absolute; left: 0; right: 0; bottom: 0; height: 760px; display: none; opacity: 0; }
+      /* plate only: extra darkening behind the headline for one bright shot, cut in and out with that shot (a graduated
+         filter on the sky, part of the grade rather than the graphic) */
+      #scrimShot { position: absolute; left: 0; right: 0; top: 0; height: 1000px; display: none; opacity: 0; }
+
+      /* ---- headline: the post's phrase, at title scale ---- */
+      #title { position: absolute; left: 72px; width: 864px; top: 0; z-index: 2; }   /* above the card: the FLIP flies out of it */
+      #kicker { color: rgba(255,255,255,.88); font-size: 26px; white-space: nowrap; }
+      /* its own composited layer: a worker that seeks straight into the hold re-rasters the drop-shadowed numeral, and
+         without a layer of its own it could tear a tile seam into the "9" (the r08 notch, frames 98+) */
+      #lift { margin-top: 26px; will-change: transform; transform: translateZ(0); }
+      #title.white #lift { filter: drop-shadow(0 2px 2px rgba(0,0,0,.30)) drop-shadow(0 10px 30px rgba(0,0,0,.42)); }
+      /* the sunset numeral blooms in the scene's own warm light (gradient type takes its bloom as drop-shadows on the
+         container, never a text-shadow under the clipped fill) */
+      #title.sunset #lift { filter: drop-shadow(0 0 14px rgba(254,142,78,.34)) drop-shadow(0 0 44px rgba(254,142,78,.26))
+                                    drop-shadow(0 10px 34px rgba(0,0,0,.45)); }
+      #hero { position: relative; }
+      /* the -0.035em pull cancels the wide face's left sidebearing, so the glyphs sit on the x 72 line */
+      .hl { display: block; white-space: nowrap; font-weight: 800; color: #fff; transform-origin: 0% 60%; margin-left: -0.035em; }
+      .hl .cv { display: inline-block; text-align: right; }
+      .hl.count { font-variant-numeric: tabular-nums lining-nums; font-feature-settings: "tnum" 1, "lnum" 1; }
+      #unit { margin-top: 20px; font-size: 30px; color: #fff; white-space: nowrap; }
+
+      /* ---- the card: X post detail ---- */
+      .card { position: absolute; z-index: 1; left: 72px; width: 864px; border-radius: 34px; padding: 44px 48px 30px; opacity: 0;
+        --sub: #536471; --rule: rgba(15,20,25,.09); --ink: #0F1419; }
+      /* light card: lit by the scene, a warm top edge and a sunset under-glow, not a cold slab */
+      /* r09: a warm paper (#FBF7F4), a peach top rim and a plum contact shadow, so the slab takes the golden-hour light */
+      .card.light { color: #0F1419; background: linear-gradient(180deg, #FDF9F6 0%, #FBF7F4 55%, #F6F0EC 100%);
+        box-shadow: inset 0 1px 0 rgba(255,214,180,.7), inset 0 0 0 1px rgba(60,30,20,.07),
+                    0 2px 3px rgba(20,8,18,.24), 0 28px 60px rgba(20,8,18,.38), 0 40px 90px -30px rgba(254,142,78,.24),
+                    0 60px 120px -36px rgba(20,8,18,.45); }
+      /* the payoff light crossing the card: a warm band, multiplied so the ink stays ink */
+      .sheen { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; pointer-events: none; z-index: 4;
+        mix-blend-mode: multiply; display: none; }
+      .sheen i { position: absolute; top: 0; bottom: 0; left: 0; width: 56%;
+        background: linear-gradient(100deg, rgba(255,198,156,0) 0%, rgba(255,178,124,.26) 44%, rgba(255,160,112,.34) 50%, rgba(255,178,124,.26) 56%, rgba(255,198,156,0) 100%); }
+      /* the phrase lifting off the card (v0): a copy of the marker line that flies up into the headline slot */
+      .ghost { position: absolute; z-index: 5; overflow: hidden; border-radius: 10px; background-repeat: no-repeat; pointer-events: none;
+        opacity: 0; transform-origin: 0 0; font-family: "Inter", sans-serif; font-weight: 450; font-size: 50px; line-height: 1.3;
+        letter-spacing: -0.018em; font-feature-settings: "cv11" 1; overflow-wrap: break-word; white-space: pre-line; text-wrap: pretty; }
+      .ghost .ink { position: absolute; color: #0F1419; }
+      .ghost .ink .w { position: relative; }
+      .card.dark { color: #E7E9EA; --sub: #8B9096; --rule: rgba(255,255,255,.12); --ink: #0B0B0E;
+        background: linear-gradient(180deg, rgba(24,25,31,.95) 0%, rgba(12,13,17,.95) 45%, rgba(8,8,11,.96) 100%);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.16), inset 0 0 0 1px rgba(255,255,255,.09),
+                    0 2px 4px rgba(0,0,0,.45), 0 24px 50px -22px rgba(0,0,0,.6), 0 60px 140px -30px rgba(0,0,0,.85); }
+
+      .head { display: flex; align-items: center; gap: 24px; }
+      .avatar { width: 104px; height: 104px; border-radius: 50%; flex: none; position: relative; overflow: hidden;
+        background: #1F202B center/cover no-repeat; }
+      .avatar::after { content: ""; position: absolute; inset: 0; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0,0,0,.10); }
+      .card.dark .avatar::after { box-shadow: inset 0 0 0 1px rgba(255,255,255,.16); }
+      .avatar .ini { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+        font-weight: 700; font-size: 36px; color: #fff; letter-spacing: -0.02em; }
+      .who { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+      .name { font-weight: 700; font-size: 34px; line-height: 1.15; letter-spacing: -0.018em; white-space: nowrap; }
+      .handle { font-weight: 400; font-size: 30px; line-height: 1.2; color: var(--sub); letter-spacing: -0.008em; white-space: nowrap; }
+      .more { width: 42px; height: 42px; flex: none; color: var(--sub); align-self: flex-start; margin-top: 4px; }
+
+      .body { position: relative; isolation: isolate; margin-top: 30px; font-weight: 450; font-size: 50px; line-height: 1.3;
+        letter-spacing: -0.018em; font-feature-settings: "cv11" 1; overflow-wrap: break-word; white-space: pre-line; text-wrap: pretty; }
+      .body .w { position: relative; }
+      /* marker mode: the marker sits ABOVE the text and carries its own ink copy of the paragraph, clipped by the
+         same clip-path, so the ink flips exactly at the sweep edge */
+      .mark { position: absolute; z-index: 1; overflow: hidden; border-radius: 10px; background-repeat: no-repeat;
+        clip-path: inset(0 100% 0 0 round 10px); }
+      .mark .ink { position: absolute; color: var(--ink); pointer-events: none; }
+
+      .meta { margin-top: 30px; font-size: 30px; line-height: 1.2; color: var(--sub); white-space: nowrap; letter-spacing: -0.008em; }
+      .meta b { font-weight: 700; }
+      .card.light .meta b { color: #0F1419; } .card.dark .meta b { color: #E7E9EA; }
+      .meta .dot { padding: 0 10px; }
+
+      .rule { height: 1px; background: var(--rule); margin: 26px 0 22px; }
+      .actions { display: flex; align-items: center; justify-content: space-between; color: var(--sub); }
+      .act { display: flex; align-items: center; gap: 12px; font-size: 30px; line-height: 1; font-weight: 500; min-width: 160px; }
+      .act.share { min-width: 0; }
+      .ico { width: 38px; height: 38px; flex: none; position: relative; }
+      .ico svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+      .ico svg path { fill: none; stroke: currentColor; stroke-width: 1.85; stroke-linecap: round; stroke-linejoin: round; }
+      .num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+      /* the like (the post's second beat): X's filled heart, a pop, a ring and a 6-dot burst */
+      .ico svg path.hf { fill: #F91880; stroke: none; opacity: 0; }
+      .burst { position: absolute; left: 50%; top: 52%; width: 0; height: 0; pointer-events: none; }
+      .burst b { position: absolute; left: -30px; top: -30px; width: 60px; height: 60px; border-radius: 50%;
+        border: 3px solid #F91880; opacity: 0; }
+      .burst i { position: absolute; left: -5px; top: -5px; width: 10px; height: 10px; border-radius: 50%; background: #F91880; opacity: 0; }
+      .burst i:nth-child(odd) { background: #FF7AC0; }
+      /* v1: the post's own "90M+" can lift (transforms need a box) */
+      .body .w.tok { display: inline-block; position: relative; }
+      .body .w.tok .ts { position: absolute; left: 0; top: 0; white-space: nowrap; opacity: 0; }
+      /* digit reels: each digit is a one-line masked window; the current digit rolls up and out while the next rolls in */
+      .roll { display: inline-flex; align-items: flex-start; height: 1.25em; line-height: 1.25em; }
+      .roll > span { display: block; height: 1.25em; }
+      .reel { overflow: clip; -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 9%, #000 91%, transparent 100%);
+              mask-image: linear-gradient(180deg, transparent 0%, #000 9%, #000 91%, transparent 100%); }
+      .reel .strip { display: block; }
+      .reel .strip i { display: block; height: 1.25em; font-style: normal; text-align: center; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6.5" data-width="1080" data-height="1920">
+      <!-- sample shots: framework-owned muted videos, cut on the graphic's beats. The script shows only the
+           variant's own four (listed in CONFIG.variants[n].shots). Every shot ends before its source runs out. -->
+      <div id="shake"><div id="push"><div id="focus">
+        <!-- v0 Light card: daylight Vice City into sunset. The payoff lands on the bright s135 skydive (sky behind the
+             headline); the hold is the s026 pier (the woman's face in the pocket right of "IS LIVE", above the card);
+             the card blurs off to reveal "The Keys" and the exit finishes ON the cut to the jetski -->
+        <video id="a1" class="clip shot" src="assets/shots/s011-vice-highway-v.mp4"  muted playsinline data-start="0"    data-duration="1.75" data-media-start="0"    data-track-index="0"></video>
+        <video id="a2" class="clip shot" src="assets/shots/s135-skydive-city-v.mp4"  muted playsinline data-start="1.75" data-duration="1.4"  data-media-start="0"    data-track-index="0"></video>
+        <video id="a3" class="clip shot" src="assets/shots/s026-sunset-pier-v.mp4"   muted playsinline data-start="3.15" data-duration="1.5"  data-media-start="0.05" data-track-index="0"></video>
+        <video id="a4" class="clip shot" src="assets/shots/s074-keys-sign-v.mp4"     muted playsinline data-start="4.65" data-duration="1.1"  data-media-start="0.25" data-track-index="0"></video>
+        <video id="a5" class="clip shot" src="assets/shots/s064-jetski-v.mp4"        muted playsinline data-start="5.75" data-duration="0.75" data-media-start="0"    data-track-index="0"></video>
+        <!-- v1 Dark on blur: night into day into sunset, racked soft behind the card. s039 has a source cut at media 1.07
+             (wide floor → close-up), so b1 starts after it. b2 is the horizontal s098 master on its right side (the
+             fireworks without Jason; the file cuts to a green shot at media 1.13). b3 is s011 racked into a bright city.
+             The exit finishes ON the cut to b5, s108, which plays sharp to the end -->
+        <video id="b1" class="clip shot" src="assets/shots/s039-blue-club-v.mp4"       muted playsinline data-start="0"    data-duration="1.6"  data-media-start="1.1"  data-track-index="0"></video>
+        <video id="b2" class="clip shot" src="assets/shots/s098-jason-fireworks-h.mp4" muted playsinline data-start="1.6"  data-duration="0.8"  data-media-start="0.3"  data-track-index="0"></video>
+        <video id="b3" class="clip shot" src="assets/shots/s011-vice-highway-v.mp4"    muted playsinline data-start="2.4"  data-duration="2.0"  data-media-start="1.1"  data-track-index="0"></video>
+        <video id="b4" class="clip shot" src="assets/shots/s026-sunset-pier-h.mp4"     muted playsinline data-start="4.4"  data-duration="1.45" data-media-start="0.08" data-track-index="0"></video>
+        <video id="b5" class="clip shot" src="assets/shots/s108-balcony-sunset-v.mp4"  muted playsinline data-start="5.85" data-duration="0.65" data-media-start="0.6"  data-track-index="0"></video>
+      </div></div></div>
+
+      <div id="ov" class="clip" data-start="0" data-duration="6.5" data-track-index="1">
+        <div id="smoke"></div>
+        <div id="glow"></div>
+        <div id="scrim"></div>
+        <div id="scrimB" class="lk-scrim-bottom"></div>
+        <div id="scrimShot"></div>
+
+        <div id="title">
+          <div id="kicker" class="t-label-wide"></div>
+          <div id="lift"><div id="hero"></div></div>
+          <div id="unit" class="t-label-wide"></div>
+        </div>
+
+        <article class="card" id="card">
+          <div class="head">
+            <div class="avatar" id="avatar"><span class="ini" id="ini"></span></div>
+            <div class="who">
+              <div class="name" id="name"></div>
+              <div class="handle" id="handle"></div>
+            </div>
+            <svg class="more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.7" fill="currentColor"/><circle cx="12" cy="12" r="1.7" fill="currentColor"/><circle cx="19" cy="12" r="1.7" fill="currentColor"/></svg>
+          </div>
+
+          <p class="body" id="body"></p>
+
+          <div class="meta"><span id="time"></span><span class="dot">·</span><span id="date"></span><span class="dot">·</span><b class="num" id="views">0</b> Views</div>
+          <div class="rule"></div>
+
+          <div class="actions">
+            <div class="act"><span class="ico"><svg viewBox="0 0 24 24"><path d="M5.2 17.6 4 21l3.9-1.6A8.2 8.2 0 0 0 12 20.4h.4a8.2 8.2 0 0 0 0-16.4h-.8a8.2 8.2 0 0 0-6.4 13.6z"/></svg></span><span class="num" id="n-replies">0</span></div>
+            <div class="act"><span class="ico"><svg viewBox="0 0 24 24"><path d="M3.5 8.2 6.8 5l3.3 3.2"/><path d="M6.8 5.4v9.4a2.6 2.6 0 0 0 2.6 2.6h4.4"/><path d="M20.5 15.8 17.2 19l-3.3-3.2"/><path d="M17.2 18.6V9.2a2.6 2.6 0 0 0-2.6-2.6h-4.4"/></svg></span><span class="num" id="n-reposts">0</span></div>
+            <div class="act"><span class="ico" id="heart"><svg viewBox="0 0 24 24"><path class="hf" d="M12 20.2s-8.2-4.9-8.2-11a4.6 4.6 0 0 1 8.2-2.9 4.6 4.6 0 0 1 8.2 2.9c0 6.1-8.2 11-8.2 11z"/><path class="ho" d="M12 20.2s-8.2-4.9-8.2-11a4.6 4.6 0 0 1 8.2-2.9 4.6 4.6 0 0 1 8.2 2.9c0 6.1-8.2 11-8.2 11z"/></svg><span class="burst" id="burst" data-layout-ignore><b></b><i></i><i></i><i></i><i></i><i></i><i></i></span></span><span class="num" id="n-likes">0</span></div>
+            <div class="act"><span class="ico"><svg viewBox="0 0 24 24"><path d="M6.2 3.8h11.6v16.6L12 16.4l-5.8 4z"/></svg></span><span class="num" id="n-saves">0</span></div>
+            <div class="act share"><span class="ico"><svg viewBox="0 0 24 24"><path d="M12 15V3.8"/><path d="m7.6 8.2 4.4-4.4 4.4 4.4"/><path d="M4.8 14.4v5.8h14.4v-5.8"/></svg></span></div>
+          </div>
+          <div class="sheen" id="sheen" data-layout-ignore><i></i></div>
+        </article>
+      </div>
+    </div>
+
+    <script>
+      // ---------- everything a creator edits lives here ----------
+      const CONFIG = {
+        // the account posting: use your own
+        author: { name: "Everest Chris", handle: "@everestchris6", avatar: "assets/img/avatar-everest.jpg", initials: "EC" },
+        // the card and the headline hang on the x 72 safe line; the card sits `gap` px under the headline
+        layout: { left: 72, width: 864, titleTop: 300, gap: 70, maxBottom: 1460 },
+        variants: {
+          // 0 · Light card: X light mode, a sunset highlighter sweep, white headline over daylight shots
+          "0": {
+            style: "light",
+            highlight: "marker",           // "marker" = sunset highlighter sweep (the ink flips at the edge)
+            // wrap the ONE phrase in [[double brackets]]; "\n" breaks the line the way X keeps it
+            text: "[[Pre-load is live]] right now.\nGTA 6 drops November 19 on PS5 and Xbox Series X|S, so start that download tonight.",
+            time: "9:41 AM", date: "Nov 18, 2026",
+            counts: { views: 486200, replies: 1284, reposts: 3912, likes: 24618, saves: 1730 },
+            // the marked phrase is exactly the headline, so "right now." reads as the post carrying on.
+            // the headline: the phrase at title scale (Archivo wide caps), auto-fit to `fit` of the safe width.
+            // slam: it lands on the cut this much too big; stretch: it lands at the flying chip's own width (Archivo's
+            // width axis, narrow) and stretches out to the wide 125 % face as it settles
+            title: { kicker: "GTA 6 · November 19", lines: ["Pre-load", "is live"], fill: "white", maxSize: 160, fit: 0.98, unit: "",
+                     bloom: { color: "#FFD9E6", strength: 0.35 }, slam: 1.08, stretch: { dur: 0.5 } },
+            // the words of the card that lift off and fly into the headline on the payoff cut (must appear in `text`).
+            // In marker mode the chip splits into one piece per headline line ("Pre-load" | "is live") and each piece
+            // lands on its own line (a true FLIP), leaving a gap in the post until the phrase settles back after the hit
+            flip: "Pre-load is live",
+            bodySize: 44,                      // px; with the 134 px headline the hero-to-body ratio is 3:1 (r10)
+            dimHead: 0.3,                      // the name row dims while the chips fly up across it, back after the hit
+            highlightAt: 0.6,                  // the marker sweep starts here (v0 only; v1 keeps timing.highlight)
+            lift: 1.17,                        // the chips peel off the card here, then fly at payoff − flipLead
+            flipLead: 0.32,                    // the flight: 0.32 s, accelerating (power2.in), so it arrives ON the cut
+            flipBlur: 9,                       // px of vertical motion blur the chips build up to as they arrive
+            chroma: { px: 5, dur: 0.18 },      // RGB split on the landing headline (seasoning only)
+            expose: { peak: 1.3 },            // the payoff light: an exposure pulse on the footage, not a white flash
+            shots: ["a1", "a2", "a3", "a4", "a5"],   // the <video> ids this variant shows (cut points live on the videos)
+            // per-shot reframes so each subject lives in the gaps, not under the card (any GSAP-settable props on the
+            // <video>, optionally pushed to `to` across the shot). a3 is the native vertical s027 dock: the string lights
+            // and the lit cloud behind the headline, the horizon under the card, the couple on the dock below it, with its
+            // own slow push. a4 drops s074 80 px (a quick cut); the exit lands on a cut to a5, the s064 jetski.
+            // a2 gets its own punch (s100 is hazy at source), so the towers and the pink smoke keep their contrast.
+            // a1 drops 170 px (scaled 1.06 from its bottom edge so no black band opens at the top), so the pickup and
+            // its two passengers clear the card's lower edge sooner as the camera cranes out of the windshield
+            // a2 (s135, the payoff) plays as shot: the sky and the skyline behind the headline. a3 (s026 pier) is lifted
+            // 200 px and slid 100 px right (scaled 1.1 from its top-right corner, so no band opens): the tree canopy sits
+            // behind the headline, the woman's face in the pocket right of "IS LIVE" above the card, the man past its
+            // right edge, the dock and the lit water under it
+            reframe: { a1: { from: { y: 170, scale: 1.06, transformOrigin: "50% 100%" } },
+                       a3: { from: { x: 100, y: -200, scale: 1.1, transformOrigin: "100% 0%" } },
+                       a4: { from: { scale: 1, x: 0, y: 80 } } },
+            // a3's bright sunset sky gets its own graduated darkening (shotScrimCss at this strength), cut in and out with
+            // the shot (plate only); the global scrim is light (.30) so s100's smoke and towers keep real blacks
+            shotScrim: { a3: 0.6, a4: 0.35 },
+            shotScrimCss: "linear-gradient(180deg, rgba(20,8,18,.40) 0%, rgba(20,8,18,.42) 24%, rgba(20,8,18,.38) 48%, rgba(20,8,18,.22) 58%, rgba(20,8,18,.07) 68%, rgba(20,8,18,0) 76%)",
+            payoff: 1.75,                      // the headline hit: put it on a cut
+            out: 5.27,                         // exit: the blur-out finishes ON the cut to the jetski (5.75), the brightest, sharpest shot
+            sheen: true,                       // the payoff light crosses the card
+            scrim: 1,                          // strength (0–1) of the soft top darkening behind the headline
+            // held through the headline band (y 300–560), then gone by y 760 so the footage under it keeps its punch
+            scrimCss: "linear-gradient(180deg, rgba(20,8,18,.30) 0%, rgba(20,8,18,.30) 24%, rgba(20,8,18,.28) 48%, rgba(20,8,18,.16) 58%, rgba(20,8,18,.05) 68%, rgba(20,8,18,0) 76%)",
+            flash: 0,                          // no white overlay flash: Look.expose lights the footage instead
+            leak: 0,                           // no light leak: the payoff light is the exposure pulse and the sheen alone
+            rack: 0, glow: null, smoke: ""
+          },
+          // 1 · Dark on blur: X dark mode, the phrase lights up, the footage racks out of focus, a sunset number slams
+          "1": {
+            style: "dark",
+            highlight: "light",            // "light" = the phrase goes pure white while the rest dims to `dim`
+            // the lit line is the one the numeral comes from (its "90M+" lifts out and flies up into the headline);
+            // the rest of the post is the receipt (why it matters, where it is now)
+            text: "[[Trailer 1 pulled 90M+ on day one.]]\nA non‑music YouTube record.\nIt now sits at 305.4M.",
+            time: "8:12 PM", date: "Nov 17, 2026",
+            counts: { views: 312900, replies: 862, reposts: 2405, likes: 18310, saves: 954 },
+            // count: the line's number (`to`, plus `suffix`). roll: false keeps it static: it is the post's own fact, so it
+            // flies out of the post reading 90M+ and lands reading 90M+ (no reel, no false values). With roll: true and
+            // no flip, it rolls `from` → `to` as it lands (keep both the same digit count)
+            // slam: the numeral lands on the cut this much too big and settles to 1 (0.4 s expo.out), with the RGB split
+            // r10: no kicker/hero/label stack. One small line above, then the numeral, which sits ON the post: its
+            // baseline is `overlap` px inside the card's top edge (the card's top padding grows to match), so the number
+            // and its receipt lock up as one object instead of floating as three tiers
+            title: { kicker: "Trailer 1 · first 24 hours", lines: ["90M+"], count: { line: 0, from: 10, to: 90, suffix: "M+", roll: false },
+                     slam: 1.14, fill: "sunset", maxSize: 300, fit: 0.96, unit: "" },
+            overlap: 54,                       // px the numeral's baseline sits below the card's top edge
+            // the numeral itself flies out of this token in the post (a true FLIP), so the card is visibly its source;
+            // once the numeral has landed the token settles back into the post in the same sunset fill (`tokenFill`)
+            flip: "90M+", tokenFill: true,
+            bodySize: 46,                      // px; 46 sets the receipt as three even lines (the default is 50)
+            shots: ["b1", "b2", "b3", "b4", "b5"],
+            // b2 (the payoff) is the horizontal s098 master on its right side: the fireworks burst and the lit skyline,
+            // with Jason left of the window, so no face sits under the numeral. b3 is s011 racked: a bright blue city
+            // (towers, green signs, the pickup behind the card). b4 is the horizontal s026 master on its right side
+            // (trees with fairy lights over the numeral, the posts and the lit water under the card), scaled from its
+            // right edge so the couple never enters the window. b5 (s108) plays sharp after the exit
+            reframe: { b2: { from: { objectPosition: "100% 50%" } },
+                       b4: { from: { objectPosition: "100% 50%", scale: 1.12, transformOrigin: "100% 50%" } } },
+            // bright skies behind the sunset numeral get more of the headline scrim, for exactly that shot (plate only)
+            shotScrim: { b3: 0.45, b4: 0.4 },
+            payoff: 1.6,
+            out: 5.37,                         // exit: the blur-out (and the rack back to sharp) finish ON the cut to b5
+            rackOut: 0.48,
+            flash: 0,                          // no white overlay flash (it lifted the blacks to a grey veil in r09)
+            expose: { peak: 1.4 },             // the payoff light: an exposure pulse on the fireworks
+            chroma: { px: 5, dur: 0.18 },      // RGB split on the landing numeral (seasoning only)
+            dim: 0.60,                         // alpha of the post text that isn't the lit line: the lit line is pure white, the token sunset
+            scrim: 0.7,                        // lighter: the bokeh already gives the numeral room
+            scrimCss: "linear-gradient(180deg, rgba(5,5,9,.64) 0%, rgba(5,5,9,.6) 28%, rgba(5,5,9,.5) 48%, rgba(5,5,9,.3) 64%, rgba(5,5,9,.08) 84%, rgba(5,5,9,0) 100%)",
+            scrimBottom: 0.35,                 // the kit's .lk-scrim-bottom at this strength (plate only)
+            rack: 5,                           // px of focus blur on the footage behind the card (0 = sharp); 5 turns lights into bokeh
+            rackGrade: "contrast(1.2) saturate(1.15) brightness(1.08)",   // the racked look: highlights bloom, shadows stay deep
+            // light behind the card, per shot: [time, colour]; it crossfades on each cut, and the dark card's top rim and
+            // top wash take the same colour, so the card catches the club, the fireworks, the sunset and the tail lights
+            glow: [[0, "rgba(150,80,255,.30)"], [1.6, "rgba(255,130,60,.36)"], [2.4, "rgba(120,170,255,.24)"], [4.4, "rgba(255,150,80,.28)"], [5.85, "rgba(255,170,110,.20)"]],
+            smoke: "rgba(14,14,20,.34)"        // bg:none only: a full-frame wash in place of the blur
+          }
+        },
+        // counts roll up from this fraction of their value as a short tick (452K → 486K), never from 0
+        rollFrom: 0.93,
+        // the like (the post's second beat, `likeAfter` s after the payoff): the heart fills X pink and pops, a ring and
+        // 6 dots burst, and the like count rolls up from this fraction (22K → 24K) in the same 0.35 s
+        likeFrom: 0.9,
+        // after the roll, the views tick up by one unit at these moments (seconds): live, but mostly settled
+        tickAt: [3.95, 4.75, 5.55],
+        // flip: the phrase-to-headline flight (seconds); it leaves the card `flipLead` s before the payoff cut, so the cut,
+        // the flash and the chroma land as it arrives; flipBlur = px of vertical motion blur on the flight
+        // lift (v1): when the post's "90M+" turns sunset and peels off its line, before the flight
+        // drift: px the card rises (and deg it tilts back) across the hold, linear from the payoff to the exit
+        timing: { cardIn: 0.15, highlight: 0.72, highlightDur: 0.5, countsAfter: 0.5, rollDur: 0.55, digitStagger: 0.04,
+                  flip: 0.32, flipLead: 0.12, flipBlur: 12, lift: 1.2, likeAfter: 0.4, likeDur: 0.35,
+                  drift: 14, driftTilt: 1.5, out: 5.85, end: 6.5 }
+      };
+
+      (function () {
+        const VARS = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+        const vKey = CONFIG.variants[String(VARS.variant)] ? String(VARS.variant) : "0";
+        const plate = VARS.bg !== "none";
+        const V = CONFIG.variants[vKey], T = CONFIG.timing, A = CONFIG.author, L = CONFIG.layout, TT = V.title;
+        const P = V.payoff, D = T.end, OUT = V.out || T.out, dark = V.style === "dark";
+        const $ = (s) => document.querySelector(s);
+
+        // only this variant's shots, and none at all for a transparent overlay
+        document.querySelectorAll("video.shot").forEach((v) => {
+          if (!plate || V.shots.indexOf(v.id) < 0) v.style.display = "none";
+        });
+        if (plate) $("#root").style.background = "#000";
+
+        // ---- card content ----
+        const card = $("#card");
+        card.classList.add(dark ? "dark" : "light");
+        card.style.left = L.left + "px"; card.style.width = L.width + "px";
+        $("#name").textContent = A.name;
+        $("#handle").textContent = A.handle;
+        if (A.avatar) $("#avatar").style.backgroundImage = `url("${A.avatar}")`;
+        else $("#ini").textContent = A.initials;
+        $("#time").textContent = V.time;
+        $("#date").textContent = V.date;
+
+        // body: plain text + the [[phrase]] as word spans; nothing in the body ever moves
+        const body = $("#body");
+        if (V.bodySize) body.style.fontSize = V.bodySize + "px";
+        const m = V.text.match(/^([\s\S]*?)\[\[([\s\S]*?)\]\]([\s\S]*)$/);
+        let pre = m ? m[1] : V.text, phrase = m ? m[2] : "", post = m ? m[3] : "";
+        const pm = post.match(/^[,.;:!?…)”'"]+/);           // punctuation right after the brackets joins the phrase
+        if (pm) { phrase += pm[0]; post = post.slice(pm[0].length); }
+        const rest = [];
+        const addRest = (s) => { if (!s) return; const r = document.createElement("span"); r.className = "rest"; r.textContent = s; body.appendChild(r); rest.push(r); };
+        addRest(pre);
+        const words = [], GAP = 8;   // marker mode: room beside a neighbouring word so the 10 px bleed never touches it
+        phrase.split(" ").filter(Boolean).forEach((w, i, arr) => {
+          const s = document.createElement("span"); s.className = "w"; s.textContent = w; s.setAttribute("data-layout-allow-occlusion", "");
+          if (w === V.flip) {                          // the single-word FLIP source (v1's "90M+"), lifted on its own
+            s.classList.add("tok");
+            // with tokenFill, the token carries a sunset copy (.ts) that takes over once the numeral has landed
+            if (V.tokenFill) {
+              s.textContent = "";
+              const tw = document.createElement("span"); tw.className = "tw"; tw.textContent = w;
+              const ts = document.createElement("span"); ts.className = "ts"; ts.textContent = w;
+              ts.setAttribute("data-layout-allow-occlusion", "");
+              s.appendChild(tw); s.appendChild(ts);
+            }
+          }
+          if (V.highlight === "marker") {
+            if (i === 0 && pre && / $/.test(pre)) s.style.marginLeft = GAP + "px";
+            // trailing side: only a hair of room (the bleed runs into the word space), so "live right" keeps one space
+            if (i === arr.length - 1 && post && /^ /.test(post)) s.style.marginRight = "3px";
+          }
+          body.appendChild(s); words.push(s);
+          if (i < arr.length - 1) body.appendChild(document.createTextNode(" "));
+        });
+        addRest(post);
+
+        // ---- headline ----
+        const title = $("#title"), hero = $("#hero");
+        title.classList.add(TT.fill === "sunset" ? "sunset" : "white");
+        title.style.left = L.left + "px"; title.style.width = L.width + "px";
+        $("#kicker").textContent = TT.kicker || "";
+        if (!TT.kicker) $("#kicker").style.display = "none";
+        $("#unit").textContent = TT.unit || "";
+        if (!TT.unit) $("#unit").style.display = "none";
+        const lines = TT.lines.map((txt, i) => {
+          const d = document.createElement("div"); d.className = "hl t-wide";
+          d.setAttribute("data-layout-allow-overflow", "");   // the -0.035em sidebearing pull overhangs #hero by ~4 px on purpose
+          if (TT.count && TT.count.line === i) {
+            d.classList.add("count");
+            const cv = document.createElement("span"); cv.className = "cv"; cv.textContent = String(TT.count.to);
+            const cs = document.createElement("span"); cs.className = "cs"; cs.textContent = TT.count.suffix || "";
+            d.appendChild(cv); d.appendChild(cs); d._cv = cv;
+          } else d.textContent = txt;
+          hero.appendChild(d); return d;
+        });
+
+        // ---- backdrop layers ----
+        if (V.scrim) { $("#scrim").style.display = "block"; $("#scrim").dataset.max = V.scrim; $("#scrim").style.background = V.scrimCss; }
+        if (plate && V.scrimBottom) { $("#scrimB").style.display = "block"; $("#scrimB").dataset.max = V.scrimBottom; }
+        if (V.sheen) $("#sheen").style.display = "block";
+
+        // a DOM Range over the first occurrence of `str` in the post (ignores the marker's ink copies)
+        function textRange(root, str) {
+          const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT,
+            { acceptNode: (n) => (n.parentElement.closest(".mark") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT) });
+          const nodes = []; let acc = "";
+          while (walk.nextNode()) { nodes.push({ n: walk.currentNode, at: acc.length }); acc += walk.currentNode.nodeValue; }
+          const i = acc.indexOf(str); if (!str || i < 0) return null;
+          const locate = (k, isEnd) => {
+            for (const o of nodes) { const len = o.n.nodeValue.length; if (k < o.at + len || (isEnd && k === o.at + len)) return [o.n, k - o.at]; }
+            return null;
+          };
+          const a = locate(i, false), b = locate(i + str.length, true); if (!a || !b) return null;
+          const r = document.createRange(); r.setStart(a[0], a[1]); r.setEnd(b[0], b[1]); return r;
+        }
+        if (V.smoke && !plate) { $("#smoke").style.display = "block"; $("#smoke").style.background = V.smoke; }
+        if (V.glow) $("#glow").style.display = "block";
+
+        // ---- counts: X-style display spec, fixed from the target so the width never changes while rolling ----
+        function spec(v, kind) {
+          v = Math.floor(v);
+          if (v < 1000) return { div: 1, dec: 0, suf: "" };
+          if (kind === "views") return v < 1e6 ? { div: 100, dec: 1, suf: "K" } : { div: 1e5, dec: 1, suf: "M" };
+          if (v < 10000) return Math.floor(v / 100) % 10 ? { div: 100, dec: 1, suf: "K" } : { div: 1000, dec: 0, suf: "K" };
+          if (v < 1e6) return { div: 1000, dec: 0, suf: "K" };
+          return Math.floor(v / 1e5) % 10 ? { div: 1e5, dec: 1, suf: "M" } : { div: 1e6, dec: 0, suf: "M" };
+        }
+        const easeRoll = gsap.parseEase("expo.out"), easeTick = gsap.parseEase("expo.out");
+        const digitsOf = (n, Dg) => String(n).padStart(Dg, "0").split("").map(Number);
+        const rollAt = P + T.countsAfter;
+
+        // builds the reel DOM and returns a seek-safe proxy: GSAP tweens .t (seconds since rollAt); the setter
+        // positions every strip from that time alone
+        function reelCounter(el, target, kind, delay, ticks, opt) {
+          opt = opt || {};
+          const RD = opt.dur || T.rollDur, RF = opt.from || CONFIG.rollFrom;
+          const sp = spec(target, kind);
+          const N = Math.floor(target / sp.div), Dg = String(N).length;
+          const N0 = Math.min(N, Math.max(Math.round(N * RF), Dg > 1 ? Math.pow(10, Dg - 1) + 1 : 1));
+          el.textContent = "";
+          const roll = document.createElement("span"); roll.className = "roll";
+          const strips = [];
+          for (let i = 0; i < Dg; i++) {
+            if (sp.dec && i === Dg - sp.dec) { const dot = document.createElement("span"); dot.textContent = "."; roll.appendChild(dot); }
+            const r = document.createElement("span"); r.className = "reel";
+            const st = document.createElement("span"); st.className = "strip"; st.setAttribute("data-layout-allow-overflow", "");
+            const cur = document.createElement("i"), nxt = document.createElement("i");
+            nxt.setAttribute("data-layout-ignore", "");          // the incoming digit is motion, not copy; hidden at rest
+            st.appendChild(cur); st.appendChild(nxt);
+            r.appendChild(st); roll.appendChild(r); strips.push({ st, cur, nxt, k: -1, f: -1 });
+          }
+          if (sp.suf) { const s = document.createElement("span"); s.textContent = sp.suf; roll.appendChild(s); }
+          el.appendChild(roll);
+
+          const s0 = digitsOf(N0, Dg), s1 = digitsOf(N, Dg);
+          // each digit rolls forward straight to its target (452.2K → 486.2K moves only the 5 and the 2)
+          const travel = s0.map((a, i) => i === 0 ? (s1[i] - a) : ((s1[i] - a) % 10 + 10) % 10);
+          const start = rollAt + delay, rollEnd = RD + (Dg - 1) * T.digitStagger, TICK = 0.16;
+          const tk = (ticks || []).map((x) => x - start).filter((x) => x > rollEnd);
+          const place = (r, pos) => {
+            pos = ((pos % 10) + 10) % 10; if (pos > 9.9995) pos = 0;
+            const k = Math.floor(pos + 1e-6), f = Math.max(0, pos - k);
+            if (k !== r.k) { r.cur.textContent = k; r.nxt.textContent = (k + 1) % 10; r.k = k; }
+            if (f !== r.f) { r.st.style.transform = `translateY(${(-f * 1.25).toFixed(4)}em)`; r.nxt.style.visibility = f > 0.001 ? "visible" : "hidden"; r.f = f; }
+          };
+          const draw = (t) => {
+            if (t < rollEnd) {
+              strips.forEach((r, i) => {
+                const p = easeRoll(Math.min(1, Math.max(0, (t - i * T.digitStagger) / RD)));
+                place(r, s0[i] + travel[i] * p);
+              });
+              return;
+            }
+            // settled; a scheduled tick adds one unit, rolling in over TICK s, carries roll the digits above it
+            let n = N, e = 1;
+            tk.forEach((x) => { if (t >= x) { n += 1; e = Math.min(1, (t - x) / TICK); } });
+            e = easeTick(e);
+            const cur = digitsOf(n, Dg), prev = digitsOf(Math.max(N, n - 1), Dg);
+            strips.forEach((r, i) => {
+              const from = prev[i], to = cur[i];
+              place(r, from === to ? to : from + ((to - from + 10) % 10) * e);
+            });
+          };
+          const o = { _t: 0 };
+          Object.defineProperty(o, "t", { get() { return this._t; }, set(x) { this._t = x; draw(x); } });
+          o.t = 0;
+          return { o, at: start };
+        }
+        const C = V.counts;
+        const counters = [reelCounter($("#views"), C.views, "views", 0, CONFIG.tickAt),
+          reelCounter($("#n-replies"), C.replies, "act", 0.05), reelCounter($("#n-reposts"), C.reposts, "act", 0.09),
+          // the likes roll with the heart (the second beat), bigger and faster than the quiet roll of the rest
+          reelCounter($("#n-likes"), C.likes, "act", T.likeAfter - T.countsAfter, null, { from: CONFIG.likeFrom, dur: T.likeDur }),
+          reelCounter($("#n-saves"), C.saves, "act", 0.17)];
+
+        document.fonts.ready.then(() => {
+          // ---- headline: auto-fit the widest line to `fit` of the safe width, capped at maxSize ----
+          const REF = 100;
+          lines.forEach((d) => { d.style.fontSize = REF + "px"; d.style.width = "max-content"; });
+          const widest = Math.max.apply(null, lines.map((d) => d.getBoundingClientRect().width));
+          const size = Math.floor(Math.min(TT.maxSize, REF * (L.width * TT.fit) / widest));
+          lines.forEach((d) => { d.style.fontSize = size + "px"; d.style.width = ""; });
+          if (TT.count) { const cv = lines[TT.count.line]._cv; cv.style.minWidth = cv.offsetWidth + "px"; }
+          title.style.top = L.titleTop + "px";
+
+          // ---- the card hangs under the headline ----
+          if (V.highlight === "marker" && words[0] && words[0].style.marginLeft && words[0].offsetLeft - GAP <= 1) words[0].style.marginLeft = "0px";
+          const cardTop = Math.round(L.titleTop + title.offsetHeight + L.gap);
+          card.style.top = Math.min(cardTop, L.maxBottom - card.offsetHeight) + "px";
+
+          // ---- marker mode: measure the phrase lines and build one marker (with its ink copy) per line ----
+          const marks = [];
+          let markTotal = 0;
+          if (V.highlight === "marker") {
+            const bodyW = body.clientWidth, inkHTML = body.innerHTML;
+            words.forEach((w) => {
+              const top = w.offsetTop, Lx = w.offsetLeft, R = Lx + w.offsetWidth, hh = w.offsetHeight;
+              const last = marks[marks.length - 1];
+              if (last && Math.abs(last.top - top) < 4) { last.R = R; }
+              else marks.push({ top, L: Lx, R, h: hh });
+            });
+            const BLEED = 10, padY = 2;
+            marks.forEach((ln) => { ln.x0 = Math.max(ln.L - BLEED, -BLEED); ln.x1 = Math.min(ln.R + BLEED, bodyW + BLEED); ln.w = ln.x1 - ln.x0; ln.off = markTotal; markTotal += ln.w; });
+            marks.forEach((ln) => {
+              const d = document.createElement("div"); d.className = "mark"; d.setAttribute("data-layout-allow-occlusion", "");
+              const y0 = ln.top + padY;
+              Object.assign(d.style, { left: ln.x0 + "px", top: y0 + "px", width: ln.w + "px", height: (ln.h - padY * 2) + "px",
+                backgroundImage: "linear-gradient(90deg, #F84FA4 0%, #FE78A6 24%, #FE8E4E 62%, #FEB747 100%)",
+                backgroundSize: markTotal + "px 100%", backgroundPosition: (-ln.off) + "px 0" });
+              const ink = document.createElement("div"); ink.className = "ink"; ink.innerHTML = inkHTML;
+              Object.assign(ink.style, { left: (-ln.x0) + "px", top: (-y0) + "px", width: bodyW + "px" });
+              d.appendChild(ink); body.appendChild(d); ln.el = d;
+            });
+          }
+
+          // ---- FLIP geometry: measured now, with the card at rest (no transforms yet) ----
+          // v0 (marker): a ghost of the highlighted words flies from the card into the headline slot.
+          // v1 (count line): the numeral itself starts on the post's "90M+" token and flies to its slot.
+          let flip = null;
+          const rng = textRange(body, V.flip);
+          if (rng) {
+            const g = rng.getBoundingClientRect(), br = body.getBoundingClientRect();
+            const countLine = TT.count ? lines[TT.count.line] : null;
+            if (countLine) {
+              const dr = countLine.getBoundingClientRect(), cr = countLine._cv.getBoundingClientRect();
+              const sr = countLine.lastChild.getBoundingClientRect();
+              const nX = cr.left, nY = Math.min(cr.top, sr.top), nH = Math.max(cr.bottom, sr.bottom) - nY;
+              // the wide face is far wider than Inter at the same height, so the numeral is fitted INSIDE the token's box
+              // (the tighter of height and width) and centred on it: it never spills into the next word
+              const nW = sr.right - nX, s0 = Math.min(g.height / nH, g.width / nW);
+              // uc / vc: the token's centre in the numeral's own (unscaled) box, so the peel can swell about it
+              const uc = (nX - dr.left) + nW / 2, vc = (nY - dr.top) + nH / 2;
+              flip = { el: countLine, s0, uc, vc,
+                dx: (g.left + g.width / 2) - (dr.left + uc * s0),
+                dy: (g.top + g.height / 2) - (dr.top + vc * s0) };
+            } else if (marks.length) {
+              // v0 (r09): the marker chip splits into one piece per headline line ("Pre-load" | "is live"), cut from the
+              // band itself (same gradient offset, same ink), and each piece is a true FLIP onto its own line: its text
+              // edge lands on the glyph edge (x 72), its baseline on the line's baseline, its cap height on the headline's
+              const BLEED = 10, padY = 2, OVL = 0.5;
+              // where a baseline sits (client y): a zero-size inline-block sits ON the baseline
+              const baseline = (host) => {
+                const pr = document.createElement("i"); pr.style.cssText = "display:inline-block;width:0;height:0;vertical-align:baseline";
+                host.appendChild(pr); const y = pr.getBoundingClientRect().top; pr.remove(); return y;
+              };
+              // cap heights (canvas metrics) give the scale that turns the 50 px Inter chip into the headline's caps
+              const cv = document.createElement("canvas").getContext("2d");
+              const capOf = (font) => { cv.font = font; return cv.measureText("H").actualBoundingBoxAscent; };
+              const bodyPx = parseFloat(getComputedStyle(body).fontSize), headPx = parseFloat(getComputedStyle(lines[0]).fontSize);
+              const sCap = (capOf(`800 ${headPx}px Archivo`) || headPx * 0.7) / (capOf(`450 ${bodyPx}px Inter`) || bodyPx * 0.727);
+              // the width-axis value at which a headline line is as wide as its landed chip (binary search, 62–125 %)
+              const stretchFor = (d, w) => {
+                d.style.width = "max-content";
+                const at = (s) => { d.style.fontStretch = s + "%"; return d.getBoundingClientRect().width; };
+                let lo = 62, hi = 125;
+                if (at(lo) >= w) hi = lo; else for (let k = 0; k < 12; k++) { const mid = (lo + hi) / 2; if (at(mid) < w) lo = mid; else hi = mid; }
+                d.style.fontStretch = ""; d.style.width = "";
+                return Math.round(hi * 10) / 10;
+              };
+              let wi = 0;
+              const ghosts = [];
+              TT.lines.forEach((txt, li) => {
+                const n = txt.trim().split(/\s+/).length, grp = words.slice(wi, wi + n); wi += n;
+                if (!grp.length) return;
+                const fw = grp[0], lw = grp[grp.length - 1], prev = words[words.indexOf(fw) - 1], next = words[words.indexOf(lw) + 1];
+                const ln = marks.find((mk) => Math.abs(mk.top - fw.offsetTop) < 4) || marks[0];
+                const sameLine = (w) => w && Math.abs(w.offsetTop - fw.offsetTop) < 4;
+                // the pieces tile the band exactly: inner edges split the word space, outer edges keep the bleed
+                const xL = sameLine(prev) ? (prev.offsetLeft + prev.offsetWidth + fw.offsetLeft) / 2 - OVL : ln.x0;
+                const xR = sameLine(next) ? (lw.offsetLeft + lw.offsetWidth + next.offsetLeft) / 2 + OVL : ln.x1;
+                const y0 = ln.top + padY, gh = ln.h - padY * 2, gw = xR - xL;
+                const gx = br.left + xL, gy = br.top + y0;
+                const ghost = document.createElement("div"); ghost.className = "ghost"; ghost.setAttribute("data-layout-ignore", "");
+                Object.assign(ghost.style, { left: gx + "px", top: gy + "px", width: gw + "px", height: gh + "px",
+                  borderRadius: `${sameLine(prev) ? 0 : 10}px ${sameLine(next) ? 0 : 10}px ${sameLine(next) ? 0 : 10}px ${sameLine(prev) ? 0 : 10}px`,
+                  backgroundImage: ln.el.style.backgroundImage, backgroundSize: ln.el.style.backgroundSize,
+                  backgroundPosition: (-(ln.off + (xL - ln.x0))) + "px 0" });
+                const ink = ln.el.querySelector(".ink").cloneNode(true);
+                ink.style.left = (-xL) + "px"; ink.style.top = (-y0) + "px";
+                ghost.appendChild(ink); $("#ov").appendChild(ghost);
+                // FLIP: origin 0 0, uniform scale sCap; text edge u → x 72, baseline v → the line's baseline
+                const u = fw.offsetLeft - xL, v = baseline(fw) - gy;
+                const tx = L.left, ty = baseline(lines[li]);
+                const textW = (lw.offsetLeft + lw.offsetWidth - fw.offsetLeft) * sCap;
+                ghosts.push({ el: ghost, line: lines[li], dx: tx - gx - u * sCap, dy: ty - gy - v * sCap,
+                  w0: TT.stretch ? stretchFor(lines[li], textW) : 125 });
+              });
+              if (ghosts.length) flip = { ghosts, s0: sCap, ghost: true };
+            }
+          }
+
+          // ---- timeline ----
+          const tl = gsap.timeline({ paused: true });
+
+          // per-shot reframes (scale / x / y on the video itself; the push and the impact live on wrappers)
+          if (plate && V.reframe) Object.keys(V.reframe).forEach((id) => {
+            const v = document.getElementById(id), R = V.reframe[id]; if (!v) return;
+            gsap.set(v, Object.assign({ transformOrigin: "50% 50%" }, R.from));
+            if (R.to) {
+              const st = parseFloat(v.dataset.start), du = parseFloat(v.dataset.duration);
+              tl.fromTo(v, Object.assign({}, R.from), Object.assign({ duration: du, ease: R.ease || "none", immediateRender: false }, R.to), st);
+            }
+          });
+
+          // footage: a slow push across the whole piece (the impact shakes the outer layer, so they never fight)
+          if (plate) Look.push(tl, "#push", 0, D, { from: 1.0, to: 1.06 });
+
+          // v0: a light grade on the daylight shots (contrast and colour); v1 grades inside its focus pull
+          if (plate && !V.rack) gsap.set("#focus", { filter: "contrast(1.08) saturate(1.12)" });
+          // v1: focus pull. The footage racks soft as the card racks sharp, and racks back on the exit
+          if (plate && V.rack) {
+            // the racked look lifts contrast and brightness so the highlights bloom into bokeh instead of going to mush
+            // (both states list the same filter functions, so GSAP interpolates them)
+            const sharp = "blur(0px) contrast(1) saturate(1.08) brightness(1)";
+            const soft = `blur(${V.rack}px) ${V.rackGrade || "contrast(1) saturate(1.35) brightness(0.9)"}`;
+            gsap.set("#focus", { filter: sharp });
+            tl.fromTo("#focus", { filter: sharp }, { filter: soft, duration: 0.75, ease: "power2.inOut", immediateRender: false }, 0.2);
+            tl.fromTo("#focus", { filter: soft }, { filter: sharp, duration: 0.6, ease: "power2.inOut", immediateRender: false }, OUT);
+          }
+
+          // backdrop layers fade with the graphic
+          const back = ["#scrim", "#scrimB", "#smoke", "#glow"].filter((s) => $(s).style.display === "block");
+          if (back.length) {
+            gsap.set(back, { opacity: 0 });
+            back.forEach((sel) => {
+              const mx = parseFloat($(sel).dataset.max || 1);
+              tl.fromTo(sel, { opacity: 0 }, { opacity: mx, duration: 0.5, ease: "power2.out", immediateRender: false }, 0.1);
+              tl.fromTo(sel, { opacity: mx }, { opacity: 0, duration: 0.5, ease: "power2.in", immediateRender: false }, OUT + 0.05);
+            });
+          }
+          // a per-shot graduated darkening behind the headline, on for exactly that shot's span (it cuts with the footage)
+          if (plate && V.shotScrim) {
+            const ss = $("#scrimShot"); ss.style.display = "block"; ss.style.background = V.shotScrimCss || V.scrimCss;
+            gsap.set(ss, { opacity: 0 });
+            Object.keys(V.shotScrim).forEach((id) => {
+              const v = document.getElementById(id); if (!v) return;
+              const st = parseFloat(v.dataset.start), en = st + parseFloat(v.dataset.duration), k = V.shotScrim[id];
+              tl.fromTo(ss, { opacity: 0 }, { opacity: k, duration: 0.01, ease: "none", immediateRender: false }, st);
+              // a shot that runs past the exit fades with the graphic (no pop in the sky mid-shot); otherwise it cuts out
+              if (en > OUT) tl.fromTo(ss, { opacity: k }, { opacity: 0, duration: 0.5, ease: "power2.in", immediateRender: false }, OUT + 0.05);
+              else tl.fromTo(ss, { opacity: k }, { opacity: 0, duration: 0.01, ease: "none", immediateRender: false }, en - 0.01);
+            });
+          }
+          // the glow takes each shot's light, crossfading over 0.3 s on the cut
+          if (V.glow) {
+            const g = $("#glow"), cy = ((parseFloat(card.style.top) + card.offsetHeight / 2) / 1920 * 100).toFixed(1);
+            const parse = (c) => c.match(/[\d.]+/g).map(Number);
+            const at = (t) => {
+              let k = 0; V.glow.forEach((s, i) => { if (t >= s[0]) k = i; });
+              const a = parse(V.glow[k][1]), prev = parse(V.glow[Math.max(0, k - 1)][1]);
+              const x = k === 0 ? 1 : Math.min(1, (t - V.glow[k][0]) / 0.3);
+              return a.map((v, i) => prev[i] + (v - prev[i]) * x);
+            };
+            // the dark card catches the same light: a scene-tinted top rim and a soft wash across its top
+            const DARK_BG = "linear-gradient(180deg, rgba(24,25,31,.95) 0%, rgba(12,13,17,.95) 45%, rgba(8,8,11,.96) 100%)";
+            const DARK_SH = "inset 0 0 0 1px rgba(255,255,255,.09), 0 2px 4px rgba(0,0,0,.45), 0 24px 50px -22px rgba(0,0,0,.6), 0 60px 140px -30px rgba(0,0,0,.85)";
+            let lastF = -1;
+            Look.drive(tl, 0, D, (p) => {
+              const f = Math.round(p * D * 30); if (f === lastF) return; lastF = f;
+              const c = at(f / 30), rgb = `${c[0].toFixed(0)},${c[1].toFixed(0)},${c[2].toFixed(0)}`;
+              g.style.background = `radial-gradient(72% 30% at 50% ${cy}%, rgba(${rgb},${c[3].toFixed(3)}), transparent 72%)`;
+              if (dark) {
+                card.style.boxShadow = `inset 0 1px 0 rgba(${rgb},.5), inset 0 3px 18px -8px rgba(${rgb},.32), ${DARK_SH}`;
+                card.style.backgroundImage = `radial-gradient(110% 58% at 24% 0%, rgba(${rgb},.15), rgba(${rgb},0) 72%), ${DARK_BG}`;
+              }
+            });
+          }
+
+          // 1. the card lands. v0 tilts up off the bottom with a blur; v1 racks into focus from slightly in front
+          gsap.set(card, { transformPerspective: 2200, transformOrigin: "50% 100%" });
+          if (!dark) {
+            gsap.set(card, { opacity: 0, y: 220, rotationX: 26, scale: 0.94, filter: "blur(10px)" });
+            tl.fromTo(card, { y: 220, rotationX: 26, scale: 0.94, filter: "blur(10px)" },
+              { y: 0, rotationX: 0, scale: 1, filter: "blur(0px)", duration: 0.9, ease: "expo.out", immediateRender: false }, T.cardIn);
+            tl.fromTo(card, { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power2.out", immediateRender: false }, T.cardIn);
+          } else {
+            gsap.set(card, { opacity: 0, y: 40, scale: 1.1, filter: "blur(18px)" });
+            tl.fromTo(card, { y: 40, scale: 1.1, filter: "blur(18px)" },
+              { y: 0, scale: 1, filter: "blur(0px)", duration: 0.8, ease: "expo.out", immediateRender: false }, T.cardIn);
+            tl.fromTo(card, { opacity: 0 }, { opacity: 1, duration: 0.35, ease: "power2.out", immediateRender: false }, T.cardIn);
+          }
+          tl.set(card, { filter: "none" }, T.cardIn + 0.92);
+
+          // 2. the highlight
+          if (V.highlight === "marker") {
+            let t = V.highlightAt != null ? V.highlightAt : T.highlight;
+            marks.forEach((ln) => {
+              const d = T.highlightDur * (ln.w / markTotal);
+              tl.fromTo(ln.el, { clipPath: "inset(0% 100% 0% 0% round 10px)" }, { clipPath: "inset(0% 0% 0% 0% round 10px)", duration: d, ease: "none" }, t);
+              t += d;
+            });
+          } else {
+            // the rest of the post settles to `dim` white while the lit line goes pure white (no bloom: at 100 % it read as
+            // soft focus); after the numeral lands, the line's "90M+" holds the sunset fill, so the highlight reads at rest
+            const da = V.dim == null ? 0.86 : V.dim;
+            const base = dark ? "rgba(231,233,234,1)" : "rgba(15,20,25,1)", dim = dark ? `rgba(255,255,255,${da})` : `rgba(15,20,25,${da})`;
+            gsap.set(rest, { color: base });
+            tl.fromTo(rest, { color: base }, { color: dim, duration: 0.55, ease: "power2.inOut", immediateRender: false }, T.highlight);
+            gsap.set(words, { color: base });
+            tl.fromTo(words, { color: base },
+              { color: "#FFFFFF", duration: 0.35, ease: "power2.out", stagger: 0.05, immediateRender: false }, T.highlight);
+          }
+
+          // 3. the payoff, on the cut: the phrase becomes the headline, in one visible move (FLIP)
+          const FD = T.flip, F0 = flip ? P - (V.flipLead != null ? V.flipLead : T.flipLead) : P;   // the flight leaves the card just before the cut
+          lines.forEach((d, i) => {
+            if (TT.count && TT.count.line === i) {
+              // the numeral starts as the post's own "90M+" and flies up into its slot while it rolls up
+              const cnt = TT.count, digits = String(cnt.to).length;
+              if (flip && flip.el === d) {
+                // (a) the post's own "90M+" turns sunset: the numeral fades in exactly over the token as the token fades out
+                // (b) it peels off its line (rises 14 px and swells 10 %), (c) it flies up into its slot on the cut,
+                // (d) after the hit the token settles back into the post in white, so the receipt stays whole
+                const tok = words.find((w) => w.classList.contains("tok")), TL = T.lift, PEEL = 14, s1 = flip.s0 * 1.08;
+                // the peeled state: risen PEEL px and swollen 8 % about the token's own centre (never into "on")
+                const px = flip.dx + flip.uc * (flip.s0 - s1), py = flip.dy + flip.vc * (flip.s0 - s1) - PEEL;
+                gsap.set(d, { opacity: 0, transformOrigin: "0% 0%", x: flip.dx, y: flip.dy, scale: flip.s0 });
+                tl.fromTo(d, { opacity: 0 }, { opacity: 1, duration: 0.14, ease: "power1.out", immediateRender: false }, TL);
+                if (tok) {
+                  tl.fromTo(tok, { opacity: 1 }, { opacity: 0, duration: 0.14, ease: "power1.in", immediateRender: false }, TL);
+                  // it settles back in the sunset fill (tokenFill): the white copy hands over to the sunset one, unseen
+                  const tw = tok.querySelector(".tw"), ts = tok.querySelector(".ts");
+                  if (tw && ts) {
+                    Look.fill(ts, "linear-gradient(100deg, #F84FA4 0%, #FE78A6 24%, #FE8E4E 62%, #FEB747 100%)");
+                    gsap.set(ts, { opacity: 0 });
+                    tl.fromTo(ts, { opacity: 0 }, { opacity: 1, duration: 0.01, ease: "none", immediateRender: false }, P + 0.3);
+                    tl.fromTo(tw, { opacity: 1 }, { opacity: 0, duration: 0.01, ease: "none", immediateRender: false }, P + 0.3);
+                  }
+                  tl.fromTo(tok, { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.4, ease: "expo.out", immediateRender: false }, P + 0.3);
+                }
+                tl.fromTo(d, { x: flip.dx, y: flip.dy, scale: flip.s0 },
+                  { x: px, y: py, scale: s1, duration: F0 - TL - 0.04, ease: "power2.out", immediateRender: false }, TL + 0.04);
+                tl.fromTo(d, { x: px, y: py, scale: s1 },
+                  { x: 0, y: 0, scale: 1, duration: FD, ease: "expo.out", immediateRender: false }, F0);
+                Look.mblur(tl, d, F0, FD * 0.8, { y: T.flipBlur, ease: "power2.out" });
+              } else {
+                gsap.set(d, { opacity: 0, scale: 1.35 });
+                tl.fromTo(d, { opacity: 0, scale: 1.35 }, { opacity: 1, scale: 1, duration: 0.45, ease: "expo.out", immediateRender: false }, P);
+              }
+              // roll: false (v1): the numeral is the post's own fact and reads 90M+ on every frame, from the token to
+              // the slot; the hit's energy is the slam, the flash and the RGB split, never a reel through false values
+              const M = Math.pow(10, digits);
+              if (cnt.roll !== false && !(flip && flip.el === d)) {
+                Look.count(tl, d._cv, F0, P + 0.7 - F0, cnt.from, cnt.to,
+                  { ease: "expo.out", format: (v) => String(((Math.round(v) % M) + M) % M).padStart(digits, "0") });
+              }
+            } else if (flip && flip.ghosts) {
+              // v0 (r09): the line is complete ON the cut, at its chip's width (Archivo's width axis), and stretches out
+              // to the wide face as the slam settles; hidden (never occluded) until its chip arrives
+              const G = flip.ghosts.find((x) => x.line === d), w0 = G ? G.w0 : 125, SD = (TT.stretch && TT.stretch.dur) || 0.5;
+              const eoS = gsap.parseEase("expo.out");
+              gsap.set(d, { opacity: 0 });
+              tl.fromTo(d, { opacity: 0 }, { opacity: 1, duration: 0.001, ease: "none", immediateRender: false }, P);
+              Look.drive(tl, P, SD, (p) => { d.style.fontStretch = p >= 1 ? "" : (w0 + (125 - w0) * eoS(Math.max(0, p))).toFixed(2) + "%"; });
+            } else {
+              // the masked character rise starts as the ghost arrives, so the type grows out of it
+              Look.reveal(tl, d, P + 0.02 + i * 0.08, { by: "chars", stagger: 0.022, dur: 0.55 });
+            }
+          });
+          // v0 (r09): the phrase leaves the card as two chips, one per headline line. (a) At `lift` the chips take over
+          // from the marker in place and the post is left with a gap; (b) they peel up off the paper with a soft shadow;
+          // (c) they fly, accelerating (power3.in) with growing vertical motion blur, onto their lines, arriving on the
+          // cut, where the Archivo headline replaces them; (d) after the hit the marked phrase settles back into the post
+          if (flip && flip.ghosts) {
+            const LIFT = V.lift || T.lift, PEEL = [16, 6], PS = 1;
+            const phraseEls = words.concat(marks.map((mk) => mk.el)), markEls = marks.map((mk) => mk.el);
+            tl.fromTo(phraseEls, { opacity: 1 }, { opacity: 0, duration: 0.001, ease: "none", immediateRender: false }, LIFT);
+            gsap.set(markEls, { y: 0 });
+            tl.fromTo(markEls, { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.4, ease: "expo.out", immediateRender: false }, P + 0.3);
+            flip.ghosts.forEach((G, k) => {
+              // the first line's chip leads and rides on top; the next one leaves later and passes under it
+              const gh = G.el, f0 = F0 + k * 0.07;
+              gh.style.zIndex = String(6 - k);
+              gsap.set(gh, { opacity: 0, x: 0, y: 0, scale: 1, transformOrigin: "0 0", boxShadow: "0 0px 0px rgba(20,8,18,0)" });
+              tl.fromTo(gh, { opacity: 0 }, { opacity: 1, duration: 0.001, ease: "none", immediateRender: false }, LIFT);
+              const pe = PEEL[Math.min(k, PEEL.length - 1)];
+              tl.fromTo(gh, { y: 0, scale: 1, boxShadow: "0 0px 0px rgba(20,8,18,0)" },
+                { y: -pe, scale: PS, boxShadow: "0 16px 30px rgba(20,8,18,0.30)", duration: f0 - LIFT - 0.01, ease: "power2.out", immediateRender: false }, LIFT + 0.01);
+              // power2.in: it accelerates all the way, so the last frame before the cut has it ~90 % home
+              tl.fromTo(gh, { x: 0, y: -pe, scale: PS }, { x: G.dx, y: G.dy, scale: flip.s0, duration: P - f0, ease: "power2.in", immediateRender: false }, f0);
+              Look.mblur(tl, gh, f0, P - f0, { y: 0, to: [0, V.flipBlur || T.flipBlur], ease: "power2.in" });
+              tl.fromTo(gh, { opacity: 1 }, { opacity: 0, duration: 0.001, ease: "none", immediateRender: false }, P);
+            });
+          }
+          // before the hit, the characters wait below their reveal masks: hidden on purpose, not occluded
+          hero.querySelectorAll("*").forEach((n) => n.setAttribute("data-layout-allow-occlusion", ""));
+          if (TT.fill === "sunset") Look.fill(hero, "linear-gradient(100deg, #F84FA4 0%, #FE78A6 24%, #FE8E4E 62%, #FEB747 100%)");
+          else if (TT.bloom) Look.bloom(hero, TT.bloom);
+          Look.chroma(tl, hero, P, V.chroma ? V.chroma.dur : 0.36, { px: V.chroma ? V.chroma.px : 14 });
+          // the slam: the headline lands on the cut `slam` x too big and settles in 0.4 s (expo.out). Driven, so it is
+          // seek-safe: scale 1 on every frame before the cut, the full slam ON the cut frame (the drive starts half a
+          // frame early so its p > 0 there)
+          if (TT.slam) {
+            const eo4 = gsap.parseEase("expo.out"), H0 = 1 / 60, SD = 0.4;
+            gsap.set(hero, { transformOrigin: "0% 60%", scale: 1 });
+            Look.drive(tl, P - H0, SD + H0, (p) => {
+              const t = p * (SD + H0) - H0;
+              gsap.set(hero, { scale: (p <= 0 || p >= 1 || t < 0) ? 1 : TT.slam - (TT.slam - 1) * eo4(Math.min(1, t / SD)) });
+            });
+          }
+          if (plate) Look.impact(tl, P, { shake: "#shake", amp: 10, flash: V.flash == null ? 0.5 : V.flash, zoom: 1.04 });
+          // v0: the payoff light is an exposure pulse on the footage (blacks stay black), not a white overlay
+          if (plate && V.expose) Look.expose(tl, P, Object.assign({ target: "#shake" }, V.expose));
+          if (plate && !dark) Look.leak(tl, P + 0.02, 1.5, { colors: ["#FE8E4E", "#F84FA4"], y: 0.2, opacity: 0.42 });
+          // the card takes the weight of the hit
+          tl.fromTo(card, { y: 0 }, { y: 16, duration: 0.07, ease: "power2.out", immediateRender: false }, P);
+          tl.fromTo(card, { y: 16 }, { y: 0, duration: 0.55, ease: "expo.out", immediateRender: false }, P + 0.07);
+          // ...and stays alive through the hold: a slow rise and a slight tilt back, linear like the footage push
+          // (yPercent and rotationX, so it never fights the y of the landing and the recoil)
+          tl.fromTo(card, { yPercent: 0, rotationX: 0 },
+            { yPercent: -T.drift / card.offsetHeight * 100, rotationX: T.driftTilt, duration: OUT - P, ease: "none", immediateRender: false }, P);
+          // ...and the payoff light crosses it (a warm band, left to right)
+          if (V.sheen) {
+            const band = $("#sheen i"), bw = card.offsetWidth * 0.56;
+            gsap.set(band, { x: -bw });
+            tl.fromTo(band, { x: -bw }, { x: card.offsetWidth, duration: 0.6, ease: "power2.out", immediateRender: false }, P + 0.05);
+          }
+          Look.enter(tl, "#kicker", P + 0.16, { from: "blur", dur: 0.55, blur: 10 });
+          if (TT.unit) Look.enter(tl, "#unit", P + 0.26, { from: "up", dist: 26, dur: 0.55, blur: 8 });
+
+          // 4. counts: after the hit, the reels tick up from ~93 %, then settle with a few live ticks
+          counters.forEach(({ o, at }) => {
+            tl.fromTo(o, { t: 0 }, { t: D - at, duration: D - at, ease: "none", immediateRender: false }, at);
+          });
+
+          // 5. the second beat: the post gets liked. X's own like: the heart fills pink and pops (1 → 1.3 → 1), a ring
+          // and 6 dots burst, and the count turns pink and rolls up (22K → 24K) in the same 0.35 s
+          const H = P + T.likeAfter, heart = $("#heart"), likeNum = $("#n-likes");
+          const hf = heart.querySelector(".hf"), ho = heart.querySelector(".ho");
+          const ring = heart.querySelector(".burst b"), dots = Array.from(heart.querySelectorAll(".burst i"));
+          const subCol = getComputedStyle(likeNum).color;
+          gsap.set(heart, { transformOrigin: "50% 55%", scale: 1 });
+          tl.fromTo(hf, { opacity: 0 }, { opacity: 1, duration: 0.05, ease: "none", immediateRender: false }, H);
+          tl.fromTo(ho, { opacity: 1 }, { opacity: 0, duration: 0.05, ease: "none", immediateRender: false }, H);
+          tl.fromTo(heart, { scale: 1 }, { scale: 1.3, duration: 0.1, ease: "power2.out", immediateRender: false }, H);
+          tl.fromTo(heart, { scale: 1.3 }, { scale: 1, duration: T.likeDur - 0.1, ease: "back.out(3)", immediateRender: false }, H + 0.1);
+          gsap.set(likeNum, { color: subCol });
+          tl.fromTo(likeNum, { color: subCol }, { color: "#F91880", duration: 0.12, ease: "power1.out", immediateRender: false }, H);
+          const eo = gsap.parseEase("expo.out"), po = gsap.parseEase("power2.out");
+          Look.drive(tl, H, 0.5, (p) => {
+            const live = p > 0 && p < 1, rp = Math.min(1, p / 0.6), dp = Math.max(0, (p - 0.08) / 0.92);
+            ring.style.opacity = live && rp < 1 ? (0.9 * (1 - rp)).toFixed(3) : "0";
+            ring.style.transform = `scale(${(0.35 + 0.85 * po(rp)).toFixed(4)})`;
+            dots.forEach((d, k) => {
+              const a = (-90 + k * 60) * Math.PI / 180, r = 18 + 30 * eo(dp);
+              d.style.opacity = live && dp > 0 ? Math.pow(1 - dp, 1.2).toFixed(3) : "0";
+              d.style.transform = `translate(${(Math.cos(a) * r).toFixed(2)}px, ${(Math.sin(a) * r).toFixed(2)}px) scale(${(1 - 0.7 * dp).toFixed(3)})`;
+            });
+          });
+
+          // 6. exit: the headline and the card blur out (and v1's footage racks back to sharp)
+          Look.exit(tl, [title, card], OUT, { to: "blur", dur: 0.42, stagger: 0.06, blur: 14 });
+
+          Look.install(tl, { duration: D, grain: 0.15, vignette: 0.5, enabled: plate });
+          tl.set({}, {}, D);
+          window.__timelines = window.__timelines || {};
+          window.__timelines["main"] = tl;
+          tl.seek(0);
+        });
+      })();
+    </script>
+  </body>
+</html>

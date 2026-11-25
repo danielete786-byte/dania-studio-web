@@ -1,0 +1,512 @@
+<!doctype html>
+<!-- GTA 6 component #11, News chyron (craft v2). 1080x1920 (9:16), 30 fps, 7 s.
+     An in-world broadcast break-in from our own fictional station "VCN · Vice City News" (not Weazel).
+     v0 "Breaking bar": a full-height red "special report" wipe over police-blue duotone footage, then a full-bleed chyron (VCN logo box, red band, paper headline slab, ink deck) that locks with a slam.
+     v1 "Live + ticker": LIVE bug with a ticking clock, a blue slab whose "1.5M" spins on reels and slams on the first cut, and a crawl.
+     Variables: variant "0"/"1"; bg "plate" (graded 4K trailer shots + Look finishing) / "none" (transparent overlay).
+     Safe zones: every glyph sits inside x 72–936, y 236–1440. The bands bleed off the left frame edge and stop hard at x 936. -->
+<html lang="en" data-composition-variables='[
+  {"id":"variant","type":"enum","label":"Variant","default":"0","options":[{"value":"0","label":"Breaking bar"},{"value":"1","label":"Live + ticker"}]},
+  {"id":"bg","type":"enum","label":"Background","default":"plate","options":[{"value":"plate","label":"Sample footage"},{"value":"none","label":"Transparent"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link rel="stylesheet" href="assets/fonts/fonts.css" />
+    <link rel="stylesheet" href="assets/kit/look/look.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="assets/kit/look/look.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: transparent; }
+      :root {
+        --red: #EE1F2C; --paper: #F7F6F2; --ink: #0B0C11; --band: #0D0F16; --blue: #1A41D4;
+        --wide: "Archivo", "Inter", sans-serif;
+      }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; font-family: "Inter", sans-serif; color: #fff;
+        -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; }
+      #shake, #push { position: absolute; inset: 0; }
+      .shot { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      #ov { position: absolute; inset: 0; z-index: 10; }
+
+      /* ---------- v0 stinger: a full-height broadcast wipe over s014 in a police-blue duotone
+           (the blend layers sit inside #shake, above #push; the tint hides the dusk murk) ---------- */
+      #tint { position: absolute; inset: -40px; display: none; }
+      #tint i { position: absolute; inset: 0; display: block; }
+      #tint .sat { background: #808080; mix-blend-mode: saturation; }
+      #tint .mul { background: #5A86FF; mix-blend-mode: multiply; }
+      #tint .lift { background: #08132E; mix-blend-mode: screen; }
+      #tint .shade { background: radial-gradient(ellipse 90% 70% at 60% 46%, rgba(0,0,0,0) 30%, rgba(2,6,20,.6) 100%); }
+      #wipe0 { position: absolute; inset: 0; overflow: hidden; display: none; }
+      #slab0 { position: absolute; left: 0; top: -40px; width: 1500px; height: 2000px;
+        background: linear-gradient(180deg, #F2303C 0%, #DA1E2B 55%, #C9131F 100%); }
+      #slab0 .lead { position: absolute; right: 0; top: 0; bottom: 0; width: 8px; background: linear-gradient(180deg, #FFFFFF, #E8E6E0); }
+      #slab0 .tail { position: absolute; left: 0; top: 0; bottom: 0; width: 40px; background: #0B0C11; box-shadow: inset -2px 0 0 rgba(255,255,255,.28); }
+      #slab0 { overflow: hidden; }
+      #slab0 .cont { position: absolute; top: 600px; }
+      /* tone-on-tone station mark: the open's texture, the way network opens carry a giant tonal logo */
+      #slab0 .wm { position: absolute; top: 1880px; font-family: var(--wide); font-stretch: 125%; font-weight: 900; font-size: 270px; line-height: .74;
+        letter-spacing: .02em; color: #B00F1C; opacity: .55; white-space: nowrap; }
+      #slab0 .wm::before { content: attr(data-mark); }   /* decorative texture: drawn as generated content, not as text */
+      #slab0 .h { margin-top: 44px; font-family: var(--wide); font-stretch: 125%; font-weight: 900; text-transform: uppercase;
+        font-size: 108px; line-height: .9; letter-spacing: .005em; color: #fff; white-space: nowrap; }
+      #slab0 .h > div { display: block; }
+
+      /* ---------- v0 network bug: VCN logo box with a clock cell (Weazel's logo-box structure, our own mark) ---------- */
+      .vbox { position: relative; display: flex; flex-direction: column; background: linear-gradient(180deg, #1A1C25 0%, #0B0C11 100%);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.16); }
+      .vbox .top { height: 96px; display: flex; flex-direction: column; justify-content: center; }
+      .vbox .mk { display: block; font-family: var(--wide); font-stretch: 125%; font-weight: 900; font-size: 64px; line-height: .74;
+        letter-spacing: .01em; color: #fff; white-space: nowrap; padding-top: 4px; }
+      .vbox .ul { display: block; height: 6px; margin-top: 12px; background: linear-gradient(180deg, #F2303C, #C9131F); }
+      .vbox .cell { height: 40px; display: flex; align-items: center; background: #1D2029; box-shadow: inset 0 1px 0 rgba(255,255,255,.14); }
+      .vbox .cell .clk { color: #fff; }
+      .vbox .mkw { align-self: flex-start; display: flex; flex-direction: column; }
+      .vbox .mkw .mask { display: block; }
+      .vbox .cell .mask { display: block; }
+      #sbug0 .top, #sbug0 .cell { padding: 0 28px; }
+      #sbug0 { display: inline-flex; }
+
+      /* ---------- shared chyron bones: flat, hard-edged bands that bleed off the left edge ---------- */
+      .lt { position: absolute; left: 0; width: 936px; }
+      .lt .sh { filter: drop-shadow(0 1px 1px rgba(0,0,0,.28)) drop-shadow(0 14px 30px rgba(0,0,0,.34)); }
+      .band { position: relative; width: 936px; overflow: hidden; }
+      .lab30 { font-family: var(--wide); font-stretch: 125%; font-weight: 800; font-size: 30px; line-height: 1; letter-spacing: .14em;
+        text-transform: uppercase; white-space: nowrap; }
+      .clk { font: 700 30px/1 "Inter", sans-serif; letter-spacing: .01em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+      .mask { overflow: hidden; display: inline-block; vertical-align: middle; padding: 4px 0; margin: -4px 0; }
+      .mask > span { display: inline-block; }
+      .vcn { font-family: var(--wide); font-stretch: 125%; font-weight: 900; font-size: 30px; line-height: 1; letter-spacing: .02em; color: #fff; }
+
+      /* ---------- v0 Breaking bar ---------- */
+      /* bands with material: vertical gradients, a 1 px lit top edge, a 2 px ink hairline between the bands */
+      #lt0 { top: 916px; }
+      #bug0 { width: 300px; height: 136px; overflow: hidden; }
+      #bug0 .top, #bug0 .cell { padding-left: 72px; }
+      #red0 { height: 64px; background: linear-gradient(180deg, #F2303C 0%, #C9131F 100%); display: flex; align-items: center; justify-content: space-between;
+        padding: 0 32px 0 72px; box-shadow: inset 0 1px 0 rgba(255,255,255,.28); }
+      #red0 .l { display: flex; align-items: center; gap: 18px; }
+      #red0 .sq { width: 14px; height: 14px; background: #fff; flex: none; }
+      #red0 .sheen { position: absolute; top: -10px; bottom: -10px; left: 0; width: 240px;
+        background: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,.34) 50%, rgba(255,255,255,0)); }
+      #paper0 { height: 266px; background: linear-gradient(180deg, #FFFFFF 0%, #E8E6E0 100%); display: flex; flex-direction: column; justify-content: center;
+        padding: 2px 32px 4px 72px; box-shadow: inset 0 2px 0 #0B0C11, inset 0 3px 0 rgba(255,255,255,.28); }
+      #paper0 .ln { font-family: var(--wide); font-stretch: 100%; font-weight: 800; font-size: 120px; line-height: .93; letter-spacing: -.018em;
+        text-transform: uppercase; color: var(--ink); white-space: nowrap; }
+      #paper0 .ln2 { transform-origin: 0% 100%; }
+      #ink0 { height: 64px; background: linear-gradient(180deg, #181B24 0%, #0B0C11 100%); display: flex; align-items: center; padding: 0 32px 0 72px;
+        box-shadow: inset 0 2px 0 #0B0C11, inset 0 3px 0 rgba(255,255,255,.12); }
+      #deck0 { position: relative; flex: 1; height: 100%; overflow: hidden; }
+      #deck0 .d { position: absolute; left: 0; top: 0; height: 100%; display: flex; align-items: center; white-space: nowrap;
+        font: 600 30px/1 "Inter", sans-serif; letter-spacing: -.005em; color: rgba(255,255,255,.94); }
+
+      /* ---------- v1 Live + ticker ---------- */
+      #bug1 { position: absolute; left: 72px; top: 236px; }
+      #bug1 .bin { height: 62px; display: flex; filter: drop-shadow(0 8px 22px rgba(0,0,0,.3)); }
+      #bug1 .live { display: flex; align-items: center; gap: 14px; padding: 0 24px 0 22px; background: var(--red); }
+      #bug1 .dot { width: 14px; height: 14px; border-radius: 50%; background: #fff; }
+      #bug1 .loc { display: flex; align-items: center; padding: 0 26px; background: var(--band); }
+      #bug1 .loc .vr { width: 2px; height: 28px; background: rgba(255,255,255,.3); margin: 0 20px; }
+      #lt1 { top: 1040px; }
+      #rule1 { height: 8px; background: var(--red); }
+      #blue1 { background: var(--blue); padding: 38px 32px 34px 72px; box-shadow: inset 0 1px 0 rgba(255,255,255,.16); }
+      #blue1 .lock { display: flex; align-items: flex-start; }
+      #num1 { display: flex; font-family: "Inter", sans-serif; font-weight: 800; font-size: 220px; line-height: .86; letter-spacing: -.05em;
+        font-feature-settings: "ss01" 1, "cv11" 1; color: #fff; white-space: nowrap; transform-origin: 45% 80%; }
+      #num1 .nc { display: inline-block; position: relative; }
+      #num1 .reel { clip-path: inset(0 -45% 0 -45%); }
+      #num1 .ph { visibility: hidden; }
+      #num1 .strip { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; letter-spacing: 0; }
+      #num1 .strip span { display: block; }
+      #words1 { margin-left: 34px; font-family: var(--wide); font-stretch: 80%; font-weight: 800; font-size: 56px; line-height: 1.07;
+        letter-spacing: .004em; text-transform: uppercase; color: #fff; white-space: nowrap; }
+      #words1 > div { display: block; }
+      #sub1 { margin-top: 22px; font: 500 30px/1.2 "Inter", sans-serif; letter-spacing: -.005em; color: rgba(255,255,255,.84); white-space: nowrap; }
+      #tick1 { height: 66px; display: flex; background: var(--paper); }
+      #tick1 .tk-lab { position: relative; z-index: 2; display: flex; align-items: center; padding: 0 30px 0 72px; background: var(--band); }
+      #tick1 .tk-view { position: relative; flex: 1; overflow: hidden;
+        -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 34px, #000 calc(100% - 40px), transparent 100%);
+                mask-image: linear-gradient(90deg, transparent 0, #000 34px, #000 calc(100% - 40px), transparent 100%); }
+      #run1 { position: absolute; left: 0; top: 0; height: 100%; display: flex; align-items: center; white-space: nowrap; }
+      #run1 .it { font: 700 30px/1 "Inter", sans-serif; letter-spacing: .005em; text-transform: uppercase; color: var(--ink); }
+      #run1 .sep { width: 2px; height: 26px; background: rgba(11,12,17,.32); margin: 0 30px; flex: none; }
+
+      #scrimB { position: absolute; left: 0; right: 0; top: 820px; bottom: 0; display: none; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="7" data-width="1080" data-height="1920">
+      <div id="shake">
+        <div id="push">
+          <!-- v0 Breaking bar: drive-by past police (under the duotone wipe) / police street, daylight (the payoff) / Jason + fireworks / police SUV shootout / jetski (the bright close) -->
+          <video id="a1" class="clip shot" src="assets/shots/s014-driveby-police-v.mp4"    muted playsinline data-start="0"    data-duration="1.15" data-media-start="0.7"  data-track-index="0"></video>
+          <video id="a2" class="clip shot" src="assets/shots/s096-police-street-v.mp4"     muted playsinline data-start="1.15" data-duration="1.0"  data-media-start="0.5"  data-track-index="0"></video>
+          <video id="a3" class="clip shot" src="assets/shots/s098-jason-fireworks-v.mp4"   muted playsinline data-start="2.15" data-duration="1.05" data-media-start="0"    data-track-index="0"></video>
+          <video id="a4" class="clip shot" src="assets/shots/s119-gameplay-shootout-v.mp4" muted playsinline data-start="3.2"  data-duration="2.15" data-media-start="0.35" data-track-index="0"></video>
+          <video id="a5" class="clip shot" src="assets/shots/s064-jetski-v.mp4"            muted playsinline data-start="5.35" data-duration="1.65" data-media-start="0"    data-track-index="0"></video>
+          <!-- v1 Live + ticker: skydive over Vice City / Vice City highway / marina aerial / biplane over the beach -->
+          <video id="b1" class="clip shot" src="assets/shots/s135-skydive-city-v.mp4"      muted playsinline data-start="0"    data-duration="1.5"  data-media-start="0.05" data-track-index="0"></video>
+          <video id="b2" class="clip shot" src="assets/shots/s011-vice-highway-v.mp4"      muted playsinline data-start="1.5"  data-duration="3.1"  data-media-start="0.4"  data-track-index="0"></video>
+          <video id="b3" class="clip shot" src="assets/shots/s075-marina-aerial-v.mp4"     muted playsinline data-start="4.6"  data-duration="1.7"  data-media-start="0.05" data-track-index="0"></video>
+          <video id="b4" class="clip shot" src="assets/shots/s100-biplane-beach-v.mp4"     muted playsinline data-start="6.3"  data-duration="0.7"  data-media-start="0.1"  data-track-index="0"></video>
+        </div>
+        <div id="tint"><i class="sat"></i><i class="mul"></i><i class="lift"></i><i class="shade"></i></div>
+      </div>
+
+      <div id="ov" class="clip" data-start="0" data-duration="7" data-track-index="1">
+        <div id="scrimB" class="lk-scrim-bottom"></div>
+
+        <!-- v0: Breaking bar (the wipe sits above it, so the bands are uncovered by the wipe's trailing edge) -->
+        <div class="lt" id="lt0">
+          <div class="sh">
+            <div class="vbox" data-layout-allow-overflow id="bug0">
+              <div class="top"><div class="mkw"><span class="mask"><span class="mk" id="mk0"></span></span><i class="ul" id="ul0"></i></div></div>
+              <div class="cell"><span class="mask"><span class="clk" id="clk0"></span></span></div>
+            </div>
+            <div class="band" data-layout-allow-overflow id="red0">
+              <div class="sheen" id="sheen0" data-layout-allow-overflow></div>
+              <div class="l"><span class="sq" id="sq0"></span><span class="mask"><span class="lab30" id="tag0"></span></span></div>
+            </div>
+            <div class="band" data-layout-allow-overflow id="paper0"></div>
+            <div class="band" data-layout-allow-overflow id="ink0">
+              <div id="deck0"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- v0: stinger, a full-height broadcast wipe carrying the network open -->
+        <div id="wipe0">
+          <div id="slab0" data-layout-allow-overflow>
+            <div class="wm" id="wm0" aria-hidden="true" data-layout-allow-occlusion></div>
+            <i class="tail"></i><i class="lead"></i>
+            <div class="cont" id="wcont0">
+              <div class="vbox" id="sbug0">
+                <div class="top"><div class="mkw"><span class="mask"><span class="mk" id="smk0"></span></span><i class="ul" id="sul0"></i></div></div>
+                <div class="cell"><span class="mask"><span class="clk" id="sclk0"></span></span></div>
+              </div>
+              <div class="h" id="stH"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- v1: LIVE bug -->
+        <div id="bug1"><div class="bin">
+          <div class="live" id="live1"><span class="dot" id="dot1"></span><span class="lab30" id="live1t"></span></div>
+          <div class="loc" id="loc1"><span class="lab30" id="loc1t" style="font-weight:700"></span><span class="vr"></span><span class="clk" id="clk1"></span></div>
+        </div></div>
+
+        <!-- v1: Live + ticker -->
+        <div class="lt" id="lt1">
+          <div class="sh">
+            <div class="band" data-layout-allow-overflow id="rule1"></div>
+            <div class="band" data-layout-allow-overflow id="blue1">
+              <div class="lock"><div id="num1"></div><div id="words1"></div></div>
+              <div id="sub1"></div>
+            </div>
+            <div class="band" data-layout-allow-overflow id="tick1">
+              <div class="tk-lab"><span class="vcn" id="vcn1"></span></div>
+              <div class="tk-view"><div id="run1"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const CONFIG = {
+        // our own fictional station
+        network: { mark: "VCN", name: "Vice City News" },
+        variants: {
+          "0": {
+            shots: ["a1", "a2", "a3", "a4", "a5"],           // the <video> ids this variant shows; the cut points live on the <video> tags
+            // the network open: a full-height red wipe parks over the duotone footage, then sweeps on; the shots cut under it
+            // at `cut` (while it covers the frame) and its trailing edge clears the frame at `clear`, uncovering the chyron
+            stinger: { lines: ["Special", "Report"], cut: 1.15, clear: 1.35 },
+            hit: 1.66,                                        // the payoff: the paper slab locks, the last headline line slams in
+            tag: "Breaking news",
+            clock: "9:48 PM ET",                              // shown in the VCN logo box's clock cell
+            headline: ["GTA 6 out", "tomorrow"],             // 1–2 lines, 120 px, auto-fits the 832 px measure; the last line slams on `hit`
+            subs: [                                           // the ink deck strip swaps line at each `swaps` time
+              "Pre-load live now on PS5 and Xbox Series X|S",
+              "Thursday, November 19, 2026",
+              "Rated M for Mature 17+"
+            ],
+            swaps: [3.2, 5.35],                               // on the cuts
+            out: 6.5,                                         // exit start (v0 holds the last deck line a beat longer)
+            push: [[0, 1.15, 1.06], [1.15, 2.15, 1.06], [2.15, 3.2, 1.05], [3.2, 5.35, 1.06], [5.35, 7.0, 1.05]]   // [from, to, end scale] per shot
+          },
+          "1": {
+            shots: ["b1", "b2", "b3", "b4"],
+            live: "Live",
+            location: "Vice City",
+            clock: { h: 9, m: 48, s: 12, suffix: "PM" },      // ticks once a second
+            figure: "1.5M",                                   // digits spin on reels and stop on `slam`
+            words: ["Expected", "to call", "out sick"],       // the block locked up beside the figure (3 short lines)
+            sub: "Survey ahead of Thursday’s GTA 6 launch",
+            slam: 1.5,                                        // the first cut: reels stop, flash, RGB split
+            ticker: [
+              "Pre-load is live now",
+              "Out Thursday · Nov 19, 2026",
+              "Trailer 1 · 305.4M views",
+              "Rated M for Mature 17+"
+            ],
+            tickerOpenAt: 0.5,                                // the strip lands with the LAST item whole at the left edge...
+            tickerReadAt: 3.0,                                // ...and the crawl reaches the FIRST item at this second (the hero frame)
+            tickerSpeed: [110, 220],                          // px/s: the speed is solved from the two times above, clamped to this range
+            push: [[0, 1.5, 1.06], [1.5, 4.6, 1.06], [4.6, 6.3, 1.05], [6.3, 7.0, 1.03]]
+          }
+        },
+        look: { grain: 0.12, vignette: 0.4 },
+        timing: { out: 6.42, end: 7.0 }
+      };
+
+      (function () {
+        const VARS = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+        const vKey = CONFIG.variants[String(VARS.variant)] ? String(VARS.variant) : "0";
+        const plate = VARS.bg !== "none";
+        const V = CONFIG.variants[vKey], T = CONFIG.timing, N = CONFIG.network;
+        const $ = (s) => document.querySelector(s);
+
+        document.querySelectorAll("video.shot").forEach((v) => { if (!plate || V.shots.indexOf(v.id) < 0) v.style.display = "none"; });
+        $("#lt0").style.display = vKey === "0" ? "" : "none";
+        $("#wipe0").style.display = vKey === "0" ? "block" : "none";
+        ["#bug1", "#lt1"].forEach((s) => ($(s).style.display = vKey === "1" ? "" : "none"));
+        if (plate) $("#scrimB").style.display = "block";
+
+        const fit = (el, maxPx, availPx, minPx) => {
+          el.style.fontSize = maxPx + "px";
+          const w = el.scrollWidth;
+          const px = w > availPx ? Math.max(minPx, Math.floor(maxPx * availPx / w)) : maxPx;
+          el.style.fontSize = px + "px"; return px;
+        };
+        const pad2 = (n) => String(n).padStart(2, "0");
+
+        Promise.all([
+          document.fonts.load('900 112px "Archivo"'), document.fonts.load('800 120px "Archivo"'),
+          document.fonts.load('800 220px "Inter"'), document.fonts.load('600 30px "Inter"'), document.fonts.load('500 30px "Inter"')
+        ]).then(() => document.fonts.ready).then(() => {
+          const tl = gsap.timeline({ paused: true });
+          if (plate) V.push.forEach(([a, b, to]) => Look.push(tl, "#push", a, b - a, { from: 1, to }));
+
+          // bands arrive from off-frame left with directional motion blur, and leave the same way
+          const slideIn = (el, at, dur) => {
+            gsap.set(el, { x: -960 });
+            tl.fromTo(el, { x: -960 }, { x: 0, duration: dur, ease: "expo.out", immediateRender: false }, at);
+            Look.mblur(tl, el, at, dur * 0.55, { x: 34, ease: "power2.out" });
+          };
+          const slideOut = (el, at, dur) => {
+            tl.fromTo(el, { x: 0 }, { x: -980, duration: dur, ease: "power3.in", immediateRender: false }, at);
+            Look.mblur(tl, el, at + dur * 0.25, dur * 0.75, { x: 0, to: [30, 0], ease: "power2.in" });
+          };
+          const rise = (el, at, dur) => {   // masked rise for a single span inside a .mask
+            gsap.set(el, { yPercent: 115 });
+            tl.fromTo(el, { yPercent: 115 }, { yPercent: 0, duration: dur || 0.5, ease: "expo.out", immediateRender: false }, at);
+          };
+
+          if (vKey === "0") {
+            /* ======================= Breaking bar ======================= */
+            const S = V.stinger, CUT = S.cut, CLEAR = S.clear, HIT = V.hit, OUT = V.out || T.out;
+            // --- the VCN logo box: one object, used twice (the network open, then the chyron's bug) ---
+            ["#mk0", "#smk0"].forEach((s) => ($(s).textContent = N.mark));
+            ["#clk0", "#sclk0"].forEach((s) => ($(s).textContent = V.clock));
+            // the chyron's box bleeds off the left edge like the bands; its content column starts at x 72
+            const boxIn = Math.ceil(Math.max($("#mk0").getBoundingClientRect().width, $("#clk0").getBoundingClientRect().width));
+            $("#bug0").style.width = (72 + boxIn + 32) + "px";
+
+            // --- stinger: a full-height red wipe parks over the duotone footage, carrying the network open, then sweeps on ---
+            const stLines = S.lines.map((t) => { const d = document.createElement("div"); d.textContent = t; $("#stH").appendChild(d); return d; });
+            stLines.forEach((d) => fit(d, 108, 700, 84));
+            const SW = 1500;                                                     // slab width (wider than the frame, so it covers it fully mid-sweep)
+            const textR = 72 + Math.max(...stLines.map((d) => d.getBoundingClientRect().width), $("#sbug0").getBoundingClientRect().width);
+            const PARK = Math.max(700, Math.ceil(textR + 64));                   // leading-edge x while parked
+            const X0 = PARK - SW;                                                 // slab x while parked
+            $("#wcont0").style.left = (72 - X0) + "px";                           // content lands on the x 72 column when parked
+            // the tonal mark runs up the slab's leading edge (bottom to top), clear of the type block
+            const wm = $("#wm0"); wm.setAttribute("data-mark", N.mark);
+            wm.style.left = (PARK - 44 - wm.getBoundingClientRect().height - X0) + "px";
+            gsap.set(wm, { rotation: -90, transformOrigin: "0% 0%" });
+            tl.fromTo(wm, { y: 60 }, { y: -30, duration: CLEAR, ease: "none", immediateRender: false }, 0);   // parallax: the tonal mark drifts against the slab
+            if (plate) $("#tint").style.display = "block";
+            Look.bloom(stLines, { color: "#FFFFFF", strength: 0.3 });
+            gsap.set("#slab0", { x: -SW });
+            tl.fromTo("#slab0", { x: -SW + 120 }, { x: X0, duration: 0.42, ease: "expo.out", immediateRender: false }, 0);
+            Look.mblur(tl, "#slab0", 0, 0.24, { x: 40, ease: "power2.out" });
+            tl.fromTo("#slab0", { x: X0 }, { x: X0 + 22, duration: 0.92 - 0.42, ease: "none", immediateRender: false }, 0.42);
+            tl.fromTo("#slab0", { x: X0 + 22 }, { x: 1090, duration: CLEAR - 0.92, ease: "power2.in", immediateRender: false }, 0.92);
+            Look.mblur(tl, "#slab0", 0.98, CLEAR - 0.98, { x: 0, to: [44, 0], ease: "power2.in" });
+            // the open builds on the parked slab: the logo box wipes on, VCN rises, the red rule draws, then SPECIAL / REPORT
+            gsap.set("#sbug0", { clipPath: "inset(0% 100% 0% 0%)" });
+            tl.fromTo("#sbug0", { clipPath: "inset(0% 100% 0% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.42, ease: "expo.out", immediateRender: false }, 0.08);
+            rise("#smk0", 0.11, 0.5);
+            gsap.set("#sul0", { scaleX: 0, transformOrigin: "0 50%" });
+            tl.fromTo("#sul0", { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease: "expo.out", immediateRender: false }, 0.24);
+            rise("#sclk0", 0.26, 0.45);
+            stLines.forEach((d, i) => Look.reveal(tl, d, 0.18 + i * 0.1, { by: "chars", stagger: 0.024, dur: 0.55 }));
+            // the shots cut while the slab covers the whole frame; the trailing edge uncovers the daylight hold
+            if (plate) tl.set("#tint", { autoAlpha: 0 }, CUT);
+            tl.set("#wipe0", { autoAlpha: 0 }, CLEAR + 0.02);
+
+            // --- chyron ---
+            $("#tag0").textContent = V.tag;
+            const hl = V.headline.map((t) => { const d = document.createElement("div"); d.className = "ln"; d.textContent = t; $("#paper0").appendChild(d); return d; });
+            const hlPx = Math.min(...hl.map((d) => fit(d, 120, 832, 88)));
+            hl.forEach((d) => (d.style.fontSize = hlPx + "px"));
+            const slam = hl[hl.length - 1]; slam.classList.add("ln2");
+            const decks = V.subs.map((t) => { const d = document.createElement("div"); d.className = "d"; d.textContent = t; $("#deck0").appendChild(d); return d; });
+            const deckW = $("#deck0").clientWidth;
+            const dPx = Math.min(...decks.map((d) => fit(d, 30, deckW - 4, 24)));
+            decks.forEach((d) => (d.style.fontSize = dPx + "px"));
+
+            gsap.set("#lt0", { autoAlpha: 0 });
+            if (plate) { gsap.set("#scrimB", { autoAlpha: 0 }); tl.set("#scrimB", { autoAlpha: 1 }, CUT); }
+            const IN = CLEAR - 0.08;                                              // the bands chase the wipe's trailing edge in from the left
+            tl.set("#lt0", { autoAlpha: 1 }, IN);
+            slideIn("#bug0", IN, 0.46);
+            slideIn("#red0", IN + 0.03, 0.46);
+            slideIn("#paper0", HIT - 0.3, 0.34);                                  // the paper slab locks on HIT
+            slideIn("#ink0", HIT - 0.22, 0.46);
+            rise("#mk0", IN + 0.1, 0.5);
+            gsap.set("#ul0", { scaleX: 0, transformOrigin: "0 50%" });
+            tl.fromTo("#ul0", { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease: "expo.out", immediateRender: false }, IN + 0.16);
+            rise("#clk0", IN + 0.18, 0.45);
+            gsap.set("#sq0", { scale: 0 });
+            tl.fromTo("#sq0", { scale: 0 }, { scale: 1, duration: 0.35, ease: "back.out(2)", immediateRender: false }, IN + 0.16);
+            rise("#tag0", IN + 0.13, 0.5);
+            hl.slice(0, -1).forEach((d, i) => Look.reveal(tl, d, HIT - 0.24 + i * 0.07, { by: "words", stagger: 0.06, dur: 0.55 }));
+            gsap.set(decks, { yPercent: 110 });
+            gsap.set(decks.slice(1), { autoAlpha: 0 });   // lines waiting off-mask are hidden, not just clipped
+            tl.fromTo(decks[0], { yPercent: 110 }, { yPercent: 0, duration: 0.5, ease: "expo.out", immediateRender: false }, HIT + 0.04);
+            // the payoff, on the graphic: the paper locks, TOMORROW slams in, the footage takes a shake, punch and exposure hit
+            gsap.set(slam, { autoAlpha: 0 });
+            tl.set(slam, { autoAlpha: 1 }, HIT);
+            tl.fromTo(slam, { scale: 1.08, y: 16 }, { scale: 1, y: 0, duration: 0.28, ease: "expo.out", immediateRender: false }, HIT);
+            if (plate) {
+              Look.impact(tl, HIT, { shake: "#shake", amp: 8, flash: 0, zoom: 1.03 });
+              Look.expose(tl, HIT, { target: "#shake", peak: 1.45, saturate: 1.1 });
+            }
+            Look.chroma(tl, "#lt0", HIT, 0.2, { px: 6 });
+            // one light moment on the red band after the hit, then a hard broadcast blink on the square
+            gsap.set("#sheen0", { x: -300, skewX: -18 });
+            tl.fromTo("#sheen0", { x: -300 }, { x: 1100, duration: 0.9, ease: "power2.inOut", immediateRender: false }, HIT + 0.3);
+            Look.drive(tl, HIT + 0.5, OUT - HIT - 0.5, (p) => {
+              const t = p * (OUT - HIT - 0.5);
+              gsap.set("#sq0", { opacity: (Math.floor(t / 0.5) % 2) ? 0.22 : 1 });
+            });
+            // the deck swaps line on the cuts
+            V.swaps.forEach((at, i) => {
+              if (!decks[i + 1]) return;
+              tl.fromTo(decks[i], { yPercent: 0 }, { yPercent: -110, duration: 0.22, ease: "power2.in", immediateRender: false }, at);
+              tl.set(decks[i], { autoAlpha: 0 }, at + 0.22);
+              tl.set(decks[i + 1], { autoAlpha: 1 }, at + 0.1);
+              tl.fromTo(decks[i + 1], { yPercent: 110 }, { yPercent: 0, duration: 0.45, ease: "expo.out", immediateRender: false }, at + 0.1);
+            });
+            // exit: the bands leave the way they came, bottom first
+            slideOut("#ink0", OUT, 0.36);
+            slideOut("#paper0", OUT + 0.04, 0.36);
+            slideOut("#red0", OUT + 0.08, 0.36);
+            slideOut("#bug0", OUT + 0.1, 0.36);
+          } else {
+            /* ======================= Live + ticker ======================= */
+            const SLAM = V.slam;
+            $("#live1t").textContent = V.live;
+            $("#loc1t").textContent = V.location;
+            $("#vcn1").textContent = N.mark;
+            const C = V.clock;
+            const clockAt = (sec) => {
+              let s = C.s + sec, m = C.m + Math.floor(s / 60), h = C.h + Math.floor(m / 60);
+              s %= 60; m %= 60; h = ((h - 1) % 12) + 1;
+              return h + ":" + pad2(m) + ":" + pad2(s) + (C.suffix ? " " + C.suffix : "");
+            };
+            const clk = $("#clk1"); clk.textContent = clockAt(0);
+            clk.style.minWidth = Math.ceil(clk.getBoundingClientRect().width + 2) + "px";
+
+            // the figure: digits on vertical reels (a hidden placeholder keeps the real advance width), other glyphs static
+            const num = $("#num1"); const reels = [], statics = [];
+            [...V.figure].forEach((ch) => {
+              const c = document.createElement("span"); c.className = "nc";
+              if (/\d/.test(ch)) {
+                c.classList.add("reel");
+                const ph = document.createElement("span"); ph.className = "ph"; ph.textContent = ch; c.appendChild(ph);
+                const strip = document.createElement("span"); strip.className = "strip";
+                const n = (2 + reels.length) * 10 + Number(ch);
+                for (let k = 0; k <= n; k++) { const b = document.createElement("span"); b.textContent = String(k % 10); strip.appendChild(b); }
+                c.appendChild(strip); reels.push({ strip, n });
+              } else { c.textContent = ch; statics.push(c); }
+              num.appendChild(c);
+            });
+            const words = V.words.map((t) => { const d = document.createElement("div"); d.textContent = t; $("#words1").appendChild(d); return d; });
+            // fit the lock-up: the word block takes what the figure leaves
+            const avail = 936 - 72 - 32 - num.getBoundingClientRect().width - 34;
+            const wPx = Math.min(...words.map((d) => fit(d, 56, avail, 40)));
+            words.forEach((d) => (d.style.fontSize = wPx + "px"));
+            $("#words1").style.marginTop = Math.round(6 * wPx / 56) + "px";
+            $("#sub1").textContent = V.sub;
+            fit($("#sub1"), 30, 936 - 72 - 32, 24);
+
+            // ticker: already running when the segment starts; the first item sits whole at the left edge at tickerReadAt
+            const run = $("#run1");
+            const addItem = (t) => {
+              const it = document.createElement("span"); it.className = "it"; it.textContent = t; run.appendChild(it);
+              const sp = document.createElement("span"); sp.className = "sep"; run.appendChild(sp); return it;
+            };
+            const last = addItem(V.ticker[V.ticker.length - 1]);
+            let first = null;
+            for (let r = 0; r < 3; r++) V.ticker.forEach((t, i) => { const it = addItem(t); if (r === 0 && i === 0) first = it; });
+            // solve the speed so the strip opens on a whole item (never mid-word) and reaches the first item on the hero frame
+            const crawlAt = 0.3, READ_X = 36;
+            const speed = Math.min(V.tickerSpeed[1], Math.max(V.tickerSpeed[0], (first.offsetLeft - last.offsetLeft) / (V.tickerReadAt - V.tickerOpenAt)));
+            const x0 = READ_X - first.offsetLeft + speed * (V.tickerReadAt - crawlAt);
+            const xEnd = x0 - speed * (T.end - crawlAt);
+            gsap.set(run, { x: x0 });
+            tl.fromTo(run, { x: x0 }, { x: xEnd, duration: T.end - crawlAt, ease: "none", immediateRender: false }, crawlAt);
+
+            // bug
+            Look.enter(tl, "#live1", 0.08, { from: "scale", scale: 0.82, dur: 0.45 });
+            gsap.set("#loc1", { clipPath: "inset(0% 100% 0% 0%)" });
+            tl.fromTo("#loc1", { clipPath: "inset(0% 100% 0% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.5, ease: "expo.out", immediateRender: false }, 0.16);
+            Look.drive(tl, 0, T.end, (p) => {
+              const t = p * T.end;
+              gsap.set("#dot1", { opacity: 0.55 + 0.45 * Math.cos(t * Math.PI * 2 / 1.1) });
+              clk.textContent = clockAt(Math.floor(t));
+            });
+
+            // lower third
+            slideIn("#rule1", 0.12, 0.5);
+            slideIn("#blue1", 0.16, 0.55);
+            slideIn("#tick1", 0.22, 0.55);
+            words.forEach((d, i) => Look.reveal(tl, d, 0.3 + i * 0.07, { by: "words", stagger: 0.05, dur: 0.6 }));
+            Look.enter(tl, statics, 0.3, { from: "up", dist: 60, dur: 0.5, blur: 8, stagger: 0.05 });
+            Look.enter(tl, "#sub1", 0.5, { from: "up", dist: 26, dur: 0.55, blur: 8 });
+            // reels: fast spin from 0.26, hard stop left to right, the last one exactly on the cut
+            const cellH = (() => { const s = reels[0].strip.children; return (s[s.length - 1].getBoundingClientRect().top - s[0].getBoundingClientRect().top) / (s.length - 1); })();
+            const spinEase = (p) => 0.8 * p + 0.2 * (1 - (1 - p) * (1 - p));
+            reels.forEach((r, i) => {
+              const at = 0.26, stop = SLAM - (reels.length - 1 - i) * 0.16;
+              gsap.set(r.strip, { y: 0 });
+              tl.fromTo(r.strip, { y: 0 }, { y: -r.n * cellH, duration: stop - at, ease: spinEase, immediateRender: false }, at);
+              Look.mblur(tl, r.strip, at, stop - at, { y: 18, ease: (p) => p * 0.2 });
+            });
+            gsap.set(reels.map((r) => r.strip), { opacity: 0 });
+            tl.fromTo(reels.map((r) => r.strip), { opacity: 0 }, { opacity: 1, duration: 0.2, ease: "power2.out", immediateRender: false }, 0.26);
+            // the payoff: the number lands on the cut
+            if (plate) Look.impact(tl, SLAM, { shake: "#shake", amp: 10, flash: 0.45, zoom: 1.04 });
+            tl.fromTo("#num1", { scale: 1.07 }, { scale: 1, duration: 0.45, ease: "expo.out", immediateRender: false }, SLAM);
+            Look.chroma(tl, "#num1", SLAM, 0.34, { px: 14 });
+
+            // exit
+            Look.exit(tl, "#bug1", T.out, { to: "blur", dur: 0.36 });
+            slideOut("#tick1", T.out, 0.36);
+            slideOut("#blue1", T.out + 0.04, 0.36);
+            slideOut("#rule1", T.out + 0.08, 0.36);
+          }
+
+          Look.install(tl, { duration: T.end, grain: CONFIG.look.grain, vignette: CONFIG.look.vignette, enabled: plate });
+          tl.set({}, {}, T.end);
+          window.__timelines = window.__timelines || {};
+          window.__timelines["main"] = tl;
+          tl.seek(0);
+        });
+      })();
+    </script>
+  </body>
+</html>

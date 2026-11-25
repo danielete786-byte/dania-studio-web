@@ -4,7 +4,7 @@
  */
 import React from "react";
 import * as SI from "simple-icons";
-import { AbsoluteFill, interpolate, random, useCurrentFrame, useVideoConfig } from "remotion";
+import { AbsoluteFill, interpolate, OffthreadVideo, random, Sequence, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import { CommentBubble } from "./art";
 import { MaskLine, TopBar } from "./components";
 import { C, clamp, EASE_IN, EASE_MOVE, FONT_BODY, FONT_HEAD, popSpring, ramp, wordF } from "./lib";
@@ -259,3 +259,13 @@ export const BrandLogo: React.FC<{ slug: string; size: number; color?: string; s
     </svg>
   );
 };
+
+// ---------- efectos estilo GTA (gta-fx/, librería echris6/gta-components) ----------
+// Se renderizan aparte con ./gta-fx.sh a remotion/public/fx/<nombre>.webm (VP9 con transparencia) y aquí se ponen encima.
+export const GtaFx: React.FC<{ name: string; from: number; durationInFrames?: number; style?: React.CSSProperties }> = ({ name, from, durationInFrames, style }) => (
+  <Sequence from={from} durationInFrames={durationInFrames} layout="none">
+    <AbsoluteFill style={{ pointerEvents: "none", ...style }}>
+      <OffthreadVideo src={staticFile(`fx/${name}.webm`)} transparent muted style={{ width: "100%", height: "100%" }} />
+    </AbsoluteFill>
+  </Sequence>
+);

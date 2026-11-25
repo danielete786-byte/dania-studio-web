@@ -1,0 +1,300 @@
+<!doctype html>
+<!-- 45 · Mission objective (GTA HUD kit) — 1080x1920 (9:16), 30 fps, 7 s.
+     Variables: variant "0" Objective line (warm frosted HUD box, keyword in the Leonida sunset, "ARRIVED" payoff) /
+                variant "1" Mission title (centred lockup, sunset on the title; at the handoff the objective takes over
+                and its keyword sweeps);
+                bg "plate" (sample GTA VI footage underneath) / "none" (transparent overlay).
+     Safe zone: every text box sits inside x 72–936, y 230–1480. -->
+<html lang="en" data-composition-variables='[
+  {"id":"variant","type":"enum","label":"Variant","default":"0","options":[{"value":"0","label":"Objective line"},{"value":"1","label":"Mission title"}]},
+  {"id":"bg","type":"enum","label":"Background","default":"plate","options":[{"value":"plate","label":"Sample footage"},{"value":"none","label":"Transparent"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link rel="stylesheet" href="assets/fonts/fonts.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="assets/kit/motion/motion.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: transparent; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; font-family: "Inter", sans-serif;
+        -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; font-feature-settings: "tnum" 1, "ss01" 1; }
+      .plate { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      #ov { position: absolute; inset: 0; }
+      :root {
+        --ink: #0B0B0E; --paper: #FFFFFF;
+        --shadow-type: 0 2px 2px rgba(0,0,0,.35), 0 6px 24px rgba(0,0,0,.45);
+      }
+
+      /* ---------- shared: the objective row (hollow diamond + condensed line) ---------- */
+      .obj { display: flex; align-items: flex-start; }
+      .obj svg { flex: none; overflow: visible; }
+      .obj svg polygon { fill: none; stroke: #fff; stroke-width: 3; stroke-linejoin: miter; }
+      .obj-text { font-family: "Barlow Condensed", sans-serif; font-weight: 600; color: #fff; letter-spacing: 0.004em; }
+      /* keyword fill: a 220%-wide gradient. At background-position 100% only the pure-white tail shows (54.5–100%),
+         at 0% only the sunset shows (0–45.5%); the soft white→amber edge lives in between, so neither end state leaks. */
+      .kw { display: inline-block; color: transparent; -webkit-background-clip: text; background-clip: text;
+        background-size: 220% 100%; background-repeat: no-repeat; background-position: 100% 0; }
+
+      /* ---------- variant 0: objective HUD card (top-left, like the in-game objective box) ---------- */
+      /* in-game objective box (ref VrX0): near-square corners, tight padding, warm frost rather than a black slab */
+      #card { position: absolute; left: 72px; top: 296px; max-width: 864px; padding: 24px 36px 28px 32px;
+        border-radius: 8px; color: #fff;
+        background: linear-gradient(100deg, rgba(32,27,29,.60) 0%, rgba(30,26,28,.56) 55%, rgba(30,26,28,.52) 100%);
+        backdrop-filter: blur(24px) saturate(1.2); -webkit-backdrop-filter: blur(24px) saturate(1.2);
+        /* sits on the screen like HUD, not a floating web card: contact shadow + short soft falloff only */
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.16), inset 0 0 0 1px rgba(255,255,255,.08),
+          0 1px 2px rgba(0,0,0,.25), 0 12px 32px -12px rgba(0,0,0,.45); }
+      /* arrival sheen: a brighter copy of the inset hairline that pulses once (.16 -> ~.45 -> .16) */
+      #sheen { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.35), inset 0 0 0 1px rgba(255,255,255,.24); }
+      #card .head { display: flex; align-items: baseline; justify-content: space-between; gap: 40px; margin-bottom: 14px; }
+      /* one mission-label style for the whole kit (v0 #mission = v1 #label): Inter 600 caps, wide-tracked, white .9 */
+      .mlabel { font-family: "Inter", sans-serif; font-weight: 600; font-size: 30px; line-height: 1; text-transform: uppercase;
+        letter-spacing: 0.36em; color: rgba(255,255,255,.9); white-space: nowrap; }
+      #dist { font-family: "Barlow Condensed", sans-serif; font-weight: 600; font-size: 32px; line-height: 1;
+        text-transform: uppercase; letter-spacing: 0.06em; color: rgba(255,255,255,.9); white-space: nowrap;
+        font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+      #card .obj { gap: 22px; }
+      #card .obj svg { width: 32px; height: 32px; margin-top: 22px; }
+      #card .obj-text { font-size: 70px; line-height: 1.08; max-width: 724px; text-shadow: 0 1px 2px rgba(0,0,0,.28); }
+      /* text-shadow would paint over a background-clipped fill and grey the keyword: use a filter shadow instead */
+      #card .kw { text-shadow: none; filter: drop-shadow(0 1px 1px rgba(0,0,0,.22)); }
+
+      /* ---------- variant 1: mission title card (centred, upper third) ---------- */
+      /* soft vignette behind the stack; kept with bg "none" so it exports as an alpha vignette under the type */
+      #scrim { position: absolute; inset: 0; opacity: 0;
+        background: radial-gradient(ellipse 760px 380px at 540px 520px, rgba(6,6,10,.45) 0%, rgba(6,6,10,.26) 46%, rgba(6,6,10,0) 100%); }
+      #stack { position: absolute; left: 0; right: 0; top: 380px; display: flex; flex-direction: column; align-items: center; color: #fff; }
+      /* Rockstar "PRESENTS" wide-tracked caps (official-type/); padding-left balances the trailing tracking so it centres */
+      #label { padding-left: 0.36em; text-shadow: 0 2px 10px rgba(0,0,0,.45); }
+      /* the title carries the card's accent: each glyph is filled with one slice of a title-wide sunset gradient.
+         text-shadow would paint over a background-clipped fill, so the shadow is a filter on the whole title */
+      #title { margin-top: 8px; font-family: "Barlow Condensed", sans-serif; font-weight: 800; font-size: 150px; line-height: 1;
+        padding-bottom: 0.04em; text-transform: uppercase; letter-spacing: 0.025em; white-space: nowrap;
+        filter: drop-shadow(0 2px 2px rgba(0,0,0,.35)) drop-shadow(0 6px 22px rgba(0,0,0,.42));
+        clip-path: inset(-60px -120px 0px -120px); }
+      #title .ch { display: inline-block; white-space: pre; color: transparent; -webkit-background-clip: text; background-clip: text;
+        background-repeat: no-repeat; }
+      /* card phase: the line is centred on its text alone; the diamond hangs off its left edge (undrawn) until the handoff */
+      #stack .obj { position: relative; margin-top: 24px; }
+      #stack .obj svg { position: absolute; right: 100%; top: 18px; margin-right: 18px; width: 28px; height: 28px;
+        filter: drop-shadow(0 2px 3px rgba(0,0,0,.5)); }
+      #stack .obj-text { font-size: 60px; line-height: 1.08; max-width: 744px; text-shadow: var(--shadow-type); }
+      #stack .kw { text-shadow: none; filter: drop-shadow(0 2px 2px rgba(0,0,0,.35)) drop-shadow(0 6px 16px rgba(0,0,0,.42)); }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="7" data-width="1080" data-height="1920">
+      <!-- sample footage: one framework-owned muted video per plate; the script hides all but the one the variant names -->
+      <video id="plateA" class="clip plate" src="assets/plates/p05-truck-yard-v.mp4" muted playsinline data-start="0" data-duration="7" data-track-index="0"></video>
+      <video id="plateB" class="clip plate" src="assets/plates/p03-jason-door-v.mp4" muted playsinline data-start="0" data-duration="7" data-track-index="0"></video>
+
+      <div id="ov" class="clip" data-start="0" data-duration="7" data-track-index="1">
+        <!-- variant 0 -->
+        <div id="card">
+          <div id="sheen"></div>
+          <div class="head"><div id="mission" class="mlabel"></div><div id="dist"></div></div>
+          <div class="obj">
+            <svg id="diaSvg0" viewBox="0 0 32 32"><polygon id="dia0" points="16,1.5 30.5,16 16,30.5 1.5,16" pathLength="100" /></svg>
+            <div class="obj-text" id="obj0"></div>
+          </div>
+        </div>
+        <!-- variant 1 -->
+        <div id="scrim"></div>
+        <div id="stack">
+          <div id="label" class="mlabel"></div>
+          <div id="title"></div>
+          <div class="obj" id="objRow1">
+            <svg viewBox="0 0 28 28"><polygon id="dia1" points="14,1.5 26.5,14 14,26.5 1.5,14" pathLength="100" /></svg>
+            <div class="obj-text" id="obj1"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const CONFIG = {
+        variants: {
+          "0": {
+            name: "Objective line",
+            layout: "card",                                  // smoked HUD card, top-left
+            plate: "assets/plates/p05-truck-yard-v.mp4",
+            mission: "Leonida",                              // wide-tracked label above the objective ("" hides it)
+            objective: "Go to the [Vice City Marina].",      // [brackets] mark the keyword that gets the sunset accent
+            distance: { from: 1.4, to: 0, unit: "mi" },      // ticks down to `to` just before timing.arrive; null hides it
+            arrived: "Arrived"                               // the readout swaps to this at timing.arrive ("" keeps the number)
+          },
+          "1": {
+            name: "Mission title",
+            layout: "title",                                 // centred mission card in the upper third
+            plate: "assets/plates/p03-jason-door-v.mp4",
+            label: "Leonida",                                // wide-tracked label above the title (same style as v0's mission label)
+            title: "Vice City",                              // carries the sunset accent until the handoff; auto-fits to titleMaxWidth
+            objective: "Go to the [Vice City Marina]."       // first objective; at timing.handoff it takes the title's place
+          }
+        },
+        accent: ["#F84FA4", "#FE8E4E", "#FEB747"],           // Leonida sunset core: one thing per frame (v0 keyword; v1 title, then keyword)
+        titleMaxWidth: 792,                                  // px; keeps the centred title inside x 144–936
+        handoffMaxPx: 72,                                    // v1: the objective grows to at most this font size at the handoff
+        // in: entrance · arrive (v0): readout swaps to "Arrived", diamond fills · handoff (v1): title drains to white and clears,
+        // the objective takes its place and its keyword sweeps
+        // (null keeps the full lockup) · out: exit · end: clip length
+        timing: { in: 0.25, arrive: 5.05, handoff: 3.7, out: 6.3, end: 7.0 }
+      };
+
+      (function () {
+        const VARS = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+        const vKey = CONFIG.variants[String(VARS.variant)] ? String(VARS.variant) : "0";
+        const showPlate = VARS.bg !== "none";
+        const V = CONFIG.variants[vKey], T = CONFIG.timing;
+        const $ = (s) => document.querySelector(s);
+        const isCard = V.layout !== "title";
+
+        document.querySelectorAll("video.plate").forEach((v) => {
+          if (!showPlate || v.getAttribute("src") !== V.plate) v.style.display = "none";
+        });
+        $(isCard ? "#stack" : "#card").style.display = "none";
+        if (isCard) $("#scrim").style.display = "none";
+
+        // objective text: plain text with one [keyword] that gets the sunset fill
+        const A = CONFIG.accent;
+        const kwBg = "linear-gradient(90deg, " + A[0] + " 0%, " + A[1] + " 22%, " + A[2] + " 45%, #fff 54.5%, #fff 100%)";
+        function renderObjective(el, str) {
+          el.textContent = "";
+          const re = /\[([^\]]+)\]/g; let last = 0, m;
+          while ((m = re.exec(str))) {
+            if (m.index > last) el.appendChild(document.createTextNode(str.slice(last, m.index)));
+            const k = document.createElement("span"); k.className = "kw"; k.textContent = m[1];
+            k.style.backgroundImage = kwBg; el.appendChild(k);
+            last = re.lastIndex;
+          }
+          if (last < str.length) el.appendChild(document.createTextNode(str.slice(last)));
+        }
+
+        if (isCard) {
+          $("#mission").textContent = V.mission || "";
+          if (!V.mission) $("#mission").style.display = "none";
+          if (!V.distance) $("#dist").style.display = "none";
+          else $("#dist").textContent = V.distance.from.toFixed(1) + " " + V.distance.unit;
+          renderObjective($("#obj0"), V.objective);
+        } else {
+          $("#label").textContent = V.label || "";
+          const tEl = $("#title");
+          for (const c of (V.title || "")) { const s = document.createElement("span"); s.className = "ch"; s.textContent = c; tEl.appendChild(s); }
+          if (V.objective) renderObjective($("#obj1"), V.objective); else $("#objRow1").style.display = "none";
+        }
+
+        Promise.all([
+          document.fonts.load('600 64px "Barlow Condensed"'), document.fonts.load('700 30px "Barlow Condensed"'),
+          document.fonts.load('800 124px "Barlow Condensed"'), document.fonts.load('600 30px "Inter"')
+        ]).catch(() => {}).then(() => document.fonts.ready).then(() => {
+          const K = window.KitMotion;
+          const tl = gsap.timeline({ paused: true });
+
+          if (isCard) {
+            const card = $("#card"), kw = card.querySelectorAll(".kw");
+            const shut = "inset(-90px 100% -130px -90px round 8px)", open = "inset(-90px -90px -130px -90px round 8px)";
+            gsap.set(card, { clipPath: shut, opacity: 0, x: -28 });
+            gsap.set("#mission, #dist", { opacity: 0 });
+            gsap.set("#dia0", { strokeDasharray: 100, strokeDashoffset: 100 });
+            gsap.set("#obj0", { clipPath: "inset(-12px 100% -12px 0px)" });
+
+            // 1) the card wipes open from its left edge (expo-out), 2) label, 3) diamond draws, 4) line wipes, 5) keyword sweeps
+            tl.fromTo(card, { opacity: 0 }, { opacity: 1, duration: 0.18, ease: "power1.out", immediateRender: false }, T.in);
+            tl.fromTo(card, { clipPath: shut, x: -28 }, { clipPath: open, x: 0, duration: 0.45, ease: "expo.out", immediateRender: false }, T.in);
+            tl.fromTo("#mission", { opacity: 0, x: -14 }, { opacity: 1, x: 0, duration: 0.45, ease: "expo.out", immediateRender: false }, T.in + 0.16);
+            tl.fromTo("#dia0", { strokeDashoffset: 100 }, { strokeDashoffset: 0, duration: 0.32, ease: "power2.out", immediateRender: false }, T.in + 0.24);
+            tl.fromTo("#obj0", { clipPath: "inset(-12px 100% -12px 0px)" }, { clipPath: "inset(-12px -12px -12px 0px)", duration: 0.5, ease: "power3.out", immediateRender: false }, T.in + 0.3);
+            tl.fromTo(kw, { backgroundPosition: "100% 0%" }, { backgroundPosition: "0% 0%", duration: 0.5, ease: "power2.inOut", immediateRender: false }, T.in + 0.78);
+            const arrive = Math.min(T.arrive || (T.out - 0.9), T.out - 0.6);
+            if (V.distance) {
+              const d = V.distance, el = $("#dist"), done = V.arrived || "";
+              // the count lands on `to` 0.3 s before arrival, then the readout swaps to "ARRIVED" at full white
+              const countEnd = done ? arrive - 0.3 : arrive;
+              tl.fromTo("#dist", { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power2.out", immediateRender: false }, T.in + 0.9);
+              // counts at a steady pace, rounding toward `from` so `to` first shows exactly at countEnd
+              const snap = d.to < d.from ? Math.ceil : Math.floor, eps = d.to < d.from ? -1e-6 : 1e-6;
+              const fmt = (p) => Math.abs(snap((d.from + (d.to - d.from) * p) * 10 + eps) / 10).toFixed(1) + " " + d.unit;
+              const last = fmt(1);
+              K.drive(tl, T.in + 1.2, countEnd - (T.in + 1.2), (p) => { const v = fmt(p); if (el.textContent !== v) el.textContent = v; });
+              if (done) {
+                tl.fromTo(el, { opacity: 1 }, { opacity: 0, duration: 0.1, ease: "power1.in", immediateRender: false }, arrive - 0.1);
+                K.drive(tl, arrive, 0.001, (p) => { const v = p > 0 ? done : last; if (el.textContent !== v) el.textContent = v; });
+                tl.fromTo(el, { opacity: 0, y: 8, color: "rgba(255,255,255,0.9)" }, { opacity: 1, y: 0, color: "rgba(255,255,255,1)", duration: 0.28, ease: "expo.out", immediateRender: false }, arrive);
+              }
+            }
+            // second beat, arrival: the hollow diamond fills and pops (1 -> 1.3 -> 1 in 0.24 s), and the hairline catches one sheen
+            gsap.set("#diaSvg0", { transformOrigin: "50% 50%" });
+            tl.fromTo("#dia0", { fill: "rgba(255,255,255,0)" }, { fill: "rgba(255,255,255,1)", duration: 0.12, ease: "power2.out", immediateRender: false }, arrive);
+            tl.fromTo("#diaSvg0", { scale: 1 }, { scale: 1.3, duration: 0.08, ease: "power2.out", immediateRender: false }, arrive);
+            tl.fromTo("#diaSvg0", { scale: 1.3 }, { scale: 1, duration: 0.16, ease: "back.out(1.5)", immediateRender: false }, arrive + 0.08);
+            tl.fromTo("#sheen", { opacity: 0 }, { opacity: 1, duration: 0.12, ease: "power2.out", immediateRender: false }, arrive + 0.04);
+            tl.fromTo("#sheen", { opacity: 1 }, { opacity: 0, duration: 0.18, ease: "power2.in", immediateRender: false }, arrive + 0.16);
+            // exit: the whole card fades and slides 24 px left (no clip-path, so no half-cut glyph sliver)
+            tl.fromTo(card, { opacity: 1, x: 0 }, { opacity: 0, x: -24, duration: 0.3, ease: "power2.in", immediateRender: false }, T.out);
+          } else {
+            // fit the title to the safe width
+            const tEl = $("#title");
+            let fs = parseFloat(getComputedStyle(tEl).fontSize);
+            while (tEl.getBoundingClientRect().width > CONFIG.titleMaxWidth && fs > 72) { fs -= 2; tEl.style.fontSize = fs + "px"; }
+            const chars = Array.from(tEl.querySelectorAll(".ch")), kw = document.querySelectorAll("#stack .kw");
+            // title-wide sunset: each glyph shows its own slice of one gradient 2.2x the title width (same stops as the keyword).
+            // L = -1.2W shows only the white tail; L = 0 shows only the sunset. Measured before any transform.
+            const tr = tEl.getBoundingClientRect(), W = tr.width;
+            const offs = chars.map((c) => c.getBoundingClientRect().left - tr.left);
+            chars.forEach((c) => { c.style.backgroundImage = kwBg; c.style.backgroundSize = (2.2 * W).toFixed(2) + "px 100%"; });
+            const paintTitle = (p) => { const L = -1.2 * W * (1 - p); chars.forEach((c, i) => { c.style.backgroundPosition = (L - offs[i]).toFixed(2) + "px 0px"; }); };
+            paintTitle(0);
+            // handoff geometry, measured before any transform. In the card phase the line is centred on its text alone; at the
+            // handoff it rises under the label, grows to at most handoffMaxPx, and shifts right by half the diamond's lead so
+            // diamond + line end up centred together.
+            const row = $("#objRow1"), rr = row.getBoundingClientRect(), lr = $("#label").getBoundingClientRect();
+            const lead = rr.left - row.querySelector("svg").getBoundingClientRect().left;
+            const ofs = parseFloat(getComputedStyle($("#obj1")).fontSize);
+            const hs = Math.min(CONFIG.handoffMaxPx / ofs, CONFIG.titleMaxWidth / (rr.width + lead));
+            const hx = lead * hs / 2;
+            const hy = (lr.bottom + 16 + rr.height * hs / 2) - (rr.top + rr.height / 2);
+            gsap.set("#label", { opacity: 0 });
+            gsap.set(chars, { yPercent: 108 });
+            gsap.set("#dia1", { strokeDasharray: 100, strokeDashoffset: 100 });
+            gsap.set("#obj1", { clipPath: "inset(-30px 100% -30px -30px)" });
+
+            // scrim runs in both bg modes (alpha vignette when bg is "none")
+            tl.fromTo("#scrim", { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "power2.out", immediateRender: false }, T.in - 0.1);
+            tl.fromTo("#label", { opacity: 0, scale: 1.08 }, { opacity: 1, scale: 1, duration: 0.55, ease: "expo.out", immediateRender: false }, T.in);
+            tl.fromTo(chars, { yPercent: 108 }, { yPercent: 0, duration: 0.45, ease: "expo.out", stagger: { each: 0.014, from: "start" }, immediateRender: false }, T.in + 0.14);
+            // the title takes the frame's one accent: the sunset sweeps across it at ~0.8–1.2 s
+            K.drive(tl, T.in + 0.55, 0.4, paintTitle, "power2.inOut");
+            tl.set(tEl, { clipPath: "none" }, T.in + 1.1);
+            if (V.objective) {
+              // the objective wipes in plain white while the title settles (its keyword waits for the handoff)
+              tl.fromTo("#obj1", { clipPath: "inset(-30px 100% -30px -30px)" }, { clipPath: "inset(-30px -30px -30px -30px)", duration: 0.5, ease: "power3.out", immediateRender: false }, T.in + 0.80);
+              // second beat, the game's own order: the title drains to white and clears; the objective glides up under the
+              // label as the title fades (no empty frame), the diamond draws, and the keyword sweep lands as the payoff
+              if (T.handoff) {
+                const h = T.handoff;
+                gsap.set(row, { transformOrigin: "50% 50%" });
+                K.drive(tl, h - 0.3, 0.3, (p) => paintTitle(1 - p), "power2.inOut");
+                tl.fromTo(tEl, { opacity: 1, y: 0 }, { opacity: 0, y: -16, duration: 0.3, ease: "power2.in", immediateRender: false }, h);
+                tl.fromTo(row, { x: 0, y: 0, scale: 1 }, { x: hx, y: hy, scale: hs, duration: 0.6, ease: "power3.inOut", immediateRender: false }, h + 0.05);
+                tl.fromTo("#dia1", { strokeDashoffset: 100 }, { strokeDashoffset: 0, duration: 0.3, ease: "power2.out", immediateRender: false }, h + 0.25);
+                tl.fromTo(kw, { backgroundPosition: "100% 0%" }, { backgroundPosition: "0% 0%", duration: 0.5, ease: "power2.inOut", immediateRender: false }, h + 0.35);
+              }
+            }
+            // a slow 2% push through the hold keeps the card alive
+            tl.fromTo("#stack", { scale: 1 }, { scale: 1.02, duration: T.out - (T.in + 0.6), ease: "none", immediateRender: false }, T.in + 0.6);
+            tl.fromTo("#stack", { opacity: 1, y: 0 }, { opacity: 0, y: -18, duration: 0.36, ease: "power2.in", immediateRender: false }, T.out);
+            tl.fromTo("#scrim", { opacity: 1 }, { opacity: 0, duration: 0.4, ease: "power2.in", immediateRender: false }, T.out + 0.05);
+          }
+
+          tl.set({}, {}, T.end);
+          window.__timelines = window.__timelines || {};
+          window.__timelines["main"] = tl;
+          tl.seek(0);
+        });
+      })();
+    </script>
+  </body>
+</html>
