@@ -1,133 +1,169 @@
 /**
- * HISTORIA: «GTA 6 ha destrozado todos los récords» (vídeo viral 30 s · 25 nov 2026).
- * Fondos: arte oficial de rockstargames.com. Efectos estilo GTA: gta-fx (echris6/gta-components, MIT), en public/fx/v-*.webm.
- * Datos: Take-Two (3.790 M$ el primer día), Sony/PlayStation (39 M jugadores y 683 M horas en PS5, 19-22 nov).
+ * HISTORIA: «Take-Two tumba el GTA 6 para PC hecho por fans (Proyecto Leonida)» (Videojuegos · 25 nov 2026).
+ * Fondos: arte oficial de rockstargames.com. Efectos GTA: public/fx/v2-*.webm (gta-fx).
+ * Fuentes: heise, PC Guide, Beebom (retirada DMCA, 3.007 repos); GamesBeat (PC Q1 2027, sin confirmar).
  */
 import React from "react";
 import { Audio } from "@remotion/media";
 import { AbsoluteFill, Img, Sequence, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
-import { Bg, MaskLine, punch, useShake } from "./components";
-import { C, FONT_BODY, FONT_HEAD, popSpring, ramp, wordF } from "./lib";
-import { BrandLogo, GtaFx, HookBadge, Lema, NewsBar, Poll, SceneDef, SceneProps } from "./news";
+import { Bg, Chip, MaskLine, Stamp, punch, useShake } from "./components";
+import { C, FONT_BODY, FONT_HEAD, popSpring, ramp, softSpring, wordF } from "./lib";
+import { BrandLogo, GtaFx, HookBadge, Lema, NewsBar, Poll, SceneDef, SceneProps, TechBackdrop } from "./news";
 
 const DATE = "25 NOV";
-const Bar: React.FC<{ active: number }> = ({ active }) => <NewsBar active={active} total={5} label="GTA 6" date={DATE} />;
-
-// desplazamientos verticales de los efectos (px) para no tapar los subtítulos (y ≥ 1290)
-const FX_Y = { chyron: -440, cash: 0, wasted: 0, confirmado: -300, horas: 0, mision: 0 };
+const Bar: React.FC<{ active: number }> = ({ active }) => <NewsBar active={active} total={5} label="VIDEOJUEGOS" date={DATE} />;
+const FX_Y = { busted: 0, repos: 0, rumor: 0 };
 
 // =====================================================================
-// 1. GANCHO: rótulo de última hora sobre el arte oficial
+// 1. GANCHO: titular + BUSTED al final de la frase
 // =====================================================================
 const Hook: React.FC<SceneProps> = ({ dur, startMs }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const fRec = wordF("hook", "records", startMs);
-  const z = punch(frame, fps, fRec, 0.05);
+  const w = (q: string) => wordF("hook", q, startMs);
+  const fFans = w("fans");
+  const fBorr = w("borrados");
+  const bustedFrom = Math.max(0, fBorr - 36); // el golpe del efecto (≈1,2 s) cae en «borrados»
+  const z = punch(frame, fps, fFans, 0.05);
   return (
     <AbsoluteFill style={{ scale: String(z) }}>
-      <Bg src="img/keyart.jpg" dur={dur} dim={0.35} from={1.1} to={1.3} y={[0, -60]} />
+      <Bg src="img/keyart.jpg" dur={dur} dim={0.5} from={1.12} to={1.28} y={[0, -50]} />
       <HookBadge label="ÚLTIMA HORA" date="25 NOV 2026" />
-      <GtaFx name="v-chyron" from={-48} style={{ translate: `0 ${FX_Y.chyron}px` }} />
+      <div style={{ position: "absolute", left: 80, top: 230 }}>
+        <MaskLine delay={-9} size={126} shadow={C.red}>
+          Take-Two tumba
+        </MaskLine>
+        <MaskLine delay={-5} size={126} color={C.nvLight} shadow={C.ink}>
+          el GTA 6 para PC
+        </MaskLine>
+        <MaskLine delay={fFans - 6} size={126} color={C.yellow} shadow={C.ink}>
+          hecho por fans
+        </MaskLine>
+      </div>
+      <div style={{ position: "absolute", left: 80, top: 720, display: "flex", alignItems: "center", gap: 22, opacity: ramp(frame, fFans, 8) }}>
+        <BrandLogo slug="github" size={110} />
+        <div style={{ fontFamily: FONT_HEAD, fontSize: 96, color: C.white, textShadow: `5px 5px 0 ${C.ink}` }}>+3.000 REPOS</div>
+      </div>
+      <GtaFx name="v2-busted" from={bustedFrom} style={{ translate: `0 ${FX_Y.busted}px` }} />
     </AbsoluteFill>
   );
 };
 
 // =====================================================================
-// 3. DINERO: 3.790 M$ el primer día
+// 3. QUÉ ERA: Proyecto Leonida
 // =====================================================================
-const Dinero: React.FC<SceneProps> = ({ dur }) => (
-  <AbsoluteFill>
-    <Bg src="img/poster.jpg" dur={dur} dim={0.45} from={1.6} to={1.8} objectPosition="60% center" />
-    <Bar active={1} />
-    <GtaFx name="v-cash" from={0} style={{ translate: `0 ${FX_Y.cash}px` }} />
-  </AbsoluteFill>
-);
-
-// =====================================================================
-// 4. GTA 5: su récord… WASTED
-// =====================================================================
-const Gta5: React.FC<SceneProps> = ({ startMs }) => {
+const Que: React.FC<SceneProps> = ({ startMs }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const fCinco = wordF("gta5", "gta", startMs);
-  const sh = useShake(fCinco + 6, 10, 18);
+  const w = (q: string) => wordF("que", q, startMs);
+  const fLeon = w("leonida");
+  const fWin = w("windows");
+  const fFilt = w("filtrada");
+  const card = popSpring(frame, fps, fLeon - 6);
   return (
-    <AbsoluteFill style={{ backgroundColor: "#0b0b0e", translate: `${sh.x}px ${sh.y}px` }}>
-      <AbsoluteFill style={{ filter: `grayscale(${ramp(frame, fCinco, 10)})`, opacity: 1 - ramp(frame, Math.max(0, fCinco - 30) + 33, 4) }}>
-        <div style={{ position: "absolute", left: 0, right: 0, top: 560, textAlign: "center", scale: String(popSpring(frame, fps, 0)) }}>
-          <div style={{ fontFamily: FONT_BODY, fontWeight: 900, fontSize: 44, color: C.white, opacity: 0.8, letterSpacing: "0.12em" }}>RÉCORD ANTERIOR</div>
-          <div style={{ fontFamily: FONT_HEAD, fontSize: 230, color: C.white, lineHeight: 1 }}>GTA V</div>
-          <div style={{ fontFamily: FONT_HEAD, fontSize: 120, color: C.nvLight }}>800 M$</div>
-          <div style={{ fontFamily: FONT_BODY, fontWeight: 800, fontSize: 40, color: C.white, opacity: 0.8 }}>primer día · 2013</div>
+    <AbsoluteFill>
+      <TechBackdrop hue="#2a0618" />
+      <Bar active={1} />
+      <div
+        style={{
+          position: "absolute",
+          left: 90,
+          right: 90,
+          top: 280,
+          background: "#0d1117",
+          border: "3px solid #30363d",
+          borderRadius: 26,
+          padding: "34px 40px",
+          scale: String(card),
+          opacity: frame >= fLeon - 6 ? 1 : 0,
+          boxShadow: `0 0 60px ${C.nv}44`,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+          <BrandLogo slug="github" size={70} />
+          <div style={{ fontFamily: FONT_BODY, fontWeight: 900, fontSize: 34, color: "#8b949e" }}>repositorio · fan-made</div>
         </div>
-      </AbsoluteFill>
-      <GtaFx name="v-wasted" from={Math.max(0, fCinco - 30)} style={{ translate: `0 ${FX_Y.wasted}px` }} />
+        <div style={{ fontFamily: FONT_HEAD, fontSize: 120, color: C.white, marginTop: 14, lineHeight: 1 }}>PROYECTO</div>
+        <div style={{ fontFamily: FONT_HEAD, fontSize: 150, color: C.nvLight, lineHeight: 1 }}>LEONIDA</div>
+        <div style={{ fontFamily: FONT_BODY, fontWeight: 800, fontSize: 34, color: "#c9d1d9", marginTop: 14 }}>Port no oficial de GTA 6 para PC</div>
+      </div>
+      <Chip text="Para Windows" delay={fWin} color={C.cyan} size={42} style={{ left: 110, top: 930 }} />
+      <Chip text="⚠ Versión filtrada de Xbox" delay={fFilt} color={C.yellow} textColor={C.ink} size={42} style={{ left: 110, top: 1040 }} />
     </AbsoluteFill>
   );
 };
 
 // =====================================================================
-// 5. PS5: +39 M jugadores · CONFIRMADO
+// 4. DMCA: 3.007 repositorios bloqueados
 // =====================================================================
-const Ps5: React.FC<SceneProps> = ({ dur, startMs }) => {
+const Dmca: React.FC<SceneProps> = ({ dur, startMs }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const fJug = wordF("ps5", "jugadores", startMs);
+  const w = (q: string) => wordF("dmca", q, startMs);
+  const fDer = w("derechos");
+  const fNum = w("3.007");
+  const sh = useShake(fNum + 20, 8, 12);
   return (
-    <AbsoluteFill>
-      <Bg src="img/car.jpg" dur={dur} dim={0.5} from={1.15} to={1.3} objectPosition="40% center" />
+    <AbsoluteFill style={{ translate: `${sh.x}px ${sh.y}px` }}>
+      <Bg src="img/skyline.jpg" dur={dur} dim={0.6} from={1.05} to={1.2} />
       <Bar active={2} />
-      <div style={{ position: "absolute", left: 0, right: 0, top: 230, display: "flex", justifyContent: "center", scale: String(popSpring(frame, fps, 0)) }}>
-        <BrandLogo slug="playstation" size={150} color={C.white} />
+      <Stamp text="Aviso DMCA" delay={fDer} color={C.red} size={90} rotate={-6} style={{ left: 300, top: 1080 }} />
+      <GtaFx name="v2-repos" from={Math.max(0, fNum - 8)} style={{ translate: `0 ${FX_Y.repos}px` }} />
+      <div style={{ position: "absolute", right: 90, top: 1120, scale: String(popSpring(frame, fps, fNum + 30)), opacity: frame >= fNum + 30 ? 1 : 0 }}>
+        <BrandLogo slug="github" size={90} />
       </div>
-      <GtaFx name="v-confirmado" from={Math.max(0, fJug - 24)} style={{ translate: `0 ${FX_Y.confirmado}px` }} />
     </AbsoluteFill>
   );
 };
 
 // =====================================================================
-// 6. HORAS: 683.000.000
+// 5. PC OFICIAL: sin fecha
 // =====================================================================
-const Horas: React.FC<SceneProps> = ({ dur }) => (
+const Pc: React.FC<SceneProps> = ({ dur, startMs }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const w = (q: string) => wordF("pc", q, startMs);
+  const fRock = w("rockstar");
+  const fFecha = w("fecha");
+  const mon = softSpring(frame, fps, 0);
+  return (
+    <AbsoluteFill>
+      <Bg src="img/car.jpg" dur={dur} dim={0.6} from={1.15} to={1.3} objectPosition="40% center" />
+      <Bar active={3} />
+      {/* monitor de PC (dibujo propio) */}
+      <div style={{ position: "absolute", left: 540 - 330, top: 330, width: 660, scale: String(mon) }}>
+        <div style={{ height: 400, borderRadius: 24, border: `10px solid ${C.white}`, background: "#0b0b12", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column" }}>
+          <div style={{ fontFamily: FONT_HEAD, fontSize: 150, color: C.white, lineHeight: 1 }}>GTA 6</div>
+          <div style={{ fontFamily: FONT_HEAD, fontSize: 90, color: C.nvLight, lineHeight: 1 }}>EN PC</div>
+        </div>
+        <div style={{ margin: "0 auto", width: 80, height: 60, background: C.white }} />
+        <div style={{ margin: "0 auto", width: 280, height: 18, borderRadius: 9, background: C.white }} />
+      </div>
+      <div style={{ position: "absolute", left: 0, right: 0, top: 870, display: "flex", justifyContent: "center", alignItems: "center", gap: 26, opacity: ramp(frame, fRock - 2, 8) }}>
+        <BrandLogo slug="rockstargames" size={110} />
+        <div style={{ fontFamily: FONT_HEAD, fontSize: 90, color: C.white, textShadow: `5px 5px 0 ${C.ink}` }}>FECHA:</div>
+        <div style={{ fontFamily: FONT_HEAD, fontSize: 130, color: C.yellow, textShadow: `5px 5px 0 ${C.ink}`, scale: String(popSpring(frame, fps, fFecha)), opacity: frame >= fFecha ? 1 : 0 }}>¿?</div>
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+// =====================================================================
+// 6. RUMOR: principios de 2027, sin confirmar
+// =====================================================================
+const Rumor: React.FC<SceneProps> = ({ dur }) => (
   <AbsoluteFill>
-    <Bg src="img/skyline.jpg" dur={dur} dim={0.5} from={1.05} to={1.2} />
-    <Bar active={3} />
-    <GtaFx name="v-horas" from={0} style={{ translate: `0 ${FX_Y.horas}px` }} />
+    <Bg src="img/keyart.jpg" dur={dur} dim={0.55} from={1.3} to={1.42} y={[0, -30]} />
+    <Bar active={4} />
+    <GtaFx name="v2-rumor" from={0} style={{ translate: `0 ${FX_Y.rumor}px` }} />
   </AbsoluteFill>
 );
 
 // =====================================================================
-// 7. MISIÓN SUPERADA: mayor lanzamiento del entretenimiento
-// =====================================================================
-const Mision: React.FC<SceneProps> = ({ dur, startMs }) => {
-  const frame = useCurrentFrame();
-  const fMayor = wordF("mision", "mayor", startMs);
-  return (
-    <AbsoluteFill>
-      <Bg src="img/keyart.jpg" dur={dur} dim={0.45} from={1.25} to={1.4} y={[-40, 20]} />
-      <Bar active={4} />
-      <GtaFx name="v-mision" from={0} style={{ translate: `0 ${FX_Y.mision}px` }} />
-      <div style={{ position: "absolute", left: 80, right: 80, top: 860, textAlign: "center", opacity: frame >= fMayor ? 1 : 0 }}>
-        <MaskLine delay={fMayor} size={82} shadow={C.ink}>
-          Mayor lanzamiento
-        </MaskLine>
-        <MaskLine delay={fMayor + 4} size={82} color={C.nvLight} shadow={C.ink}>
-          del entretenimiento
-        </MaskLine>
-      </div>
-      <div style={{ position: "absolute", left: 0, right: 0, top: 1110, display: "flex", justifyContent: "center", opacity: ramp(frame, fMayor + 10, 8) }}>
-        <BrandLogo slug="rockstargames" size={120} />
-      </div>
-    </AbsoluteFill>
-  );
-};
-
-// =====================================================================
-// 8. CIERRE
+// 7. CIERRE
 // =====================================================================
 const Cierre: React.FC<SceneProps> = (p) => (
-  <Poll {...p} segId="cierre" line1="¿Ya lo" line2="has jugado?" size1={170} size2={170} footer="Fuentes: Take-Two · PlayStation · Forbes · CNN" bar={<Bar active={5} />} />
+  <Poll {...p} segId="cierre" line1="¿Esperarás" line2="la oficial?" size1={150} size2={170} footer="Fuentes: heise · PC Guide · Beebom · GamesBeat" bar={<Bar active={5} />} />
 );
 
 // =====================================================================
@@ -136,25 +172,39 @@ const Cierre: React.FC<SceneProps> = (p) => (
 export const Thumbnail: React.FC = () => (
   <AbsoluteFill style={{ backgroundColor: C.ink }}>
     <Img src={staticFile("img/keyart.jpg")} style={{ position: "absolute", width: "100%", height: "100%", objectFit: "cover", scale: "1.15" }} />
-    <AbsoluteFill style={{ background: "linear-gradient(180deg, rgba(11,6,24,0.85) 0%, rgba(11,6,24,0.45) 40%, rgba(11,6,24,0.8) 66%, rgba(11,6,24,0.95) 100%)" }} />
+    <AbsoluteFill style={{ background: "linear-gradient(180deg, rgba(5,8,20,0.85) 0%, rgba(5,8,20,0.5) 40%, rgba(5,8,20,0.85) 66%, rgba(5,8,20,0.95) 100%)" }} />
     <div style={{ position: "absolute", left: 0, right: 0, top: 250, textAlign: "center" }}>
       <div style={{ display: "inline-block", fontFamily: FONT_BODY, fontWeight: 900, fontSize: 44, color: C.white, background: C.red, padding: "10px 26px", borderRadius: 10, letterSpacing: "0.08em" }}>
         ● ÚLTIMA HORA
       </div>
-      <div style={{ fontFamily: FONT_HEAD, fontSize: 250, lineHeight: 1.02, color: C.white, marginTop: 30, textShadow: `10px 10px 0 ${C.ink}` }}>GTA 6</div>
-      <div style={{ fontFamily: FONT_HEAD, fontSize: 148, lineHeight: 1.05, color: C.nvLight, textShadow: `0 0 60px ${C.nv}, 10px 10px 0 ${C.ink}`, whiteSpace: "nowrap" }}>LO HA ROTO TODO</div>
-    </div>
-    <div style={{ position: "absolute", left: 0, right: 0, top: 960, textAlign: "center" }}>
-      <div style={{ fontFamily: FONT_HEAD, fontSize: 230, lineHeight: 1, color: C.white, textShadow: `8px 8px 0 ${C.ink}` }}>3.790 M$</div>
-      <div style={{ display: "inline-block", marginTop: 16, fontFamily: FONT_BODY, fontWeight: 900, fontSize: 54, color: C.ink, background: C.yellow, padding: "10px 30px", borderRadius: 999, rotate: "-3deg" }}>
-        EN SU PRIMER DÍA
+      <div style={{ fontFamily: FONT_HEAD, fontSize: 150, lineHeight: 1.05, color: C.white, marginTop: 30, textShadow: `8px 8px 0 ${C.ink}` }}>GTA 6 PC «FAN»</div>
+      <div
+        style={{
+          fontFamily: FONT_HEAD,
+          fontSize: 300,
+          lineHeight: 1.05,
+          background: "linear-gradient(180deg, #FFFFFF 30%, #CFE0FF 58%, #A9C4FF 82%)",
+          WebkitBackgroundClip: "text",
+          color: "transparent",
+          filter: "drop-shadow(0 0 40px #3B82FF) drop-shadow(8px 8px 0 #000)",
+          rotate: "-4deg",
+        }}
+      >
+        BUSTED
       </div>
     </div>
-    <div style={{ position: "absolute", left: 0, right: 0, top: 1400, textAlign: "center", fontFamily: FONT_HEAD, fontSize: 110, color: "#FF3B2E", textShadow: "0 0 40px #FF3B2E, 6px 6px 0 #000", rotate: "-4deg" }}>
-      GTA V: WASTED
+    <div style={{ position: "absolute", left: 0, right: 0, top: 1080, display: "flex", justifyContent: "center", alignItems: "center", gap: 30 }}>
+      <BrandLogo slug="github" size={150} />
+      <div style={{ textAlign: "left" }}>
+        <div style={{ fontFamily: FONT_HEAD, fontSize: 170, lineHeight: 1, color: C.white, textShadow: `8px 8px 0 ${C.ink}` }}>3.007</div>
+        <div style={{ fontFamily: FONT_BODY, fontWeight: 900, fontSize: 44, color: C.yellow }}>REPOS BORRADOS</div>
+      </div>
+    </div>
+    <div style={{ position: "absolute", left: 0, right: 0, top: 1460, textAlign: "center" }}>
+      <div style={{ display: "inline-block", fontFamily: FONT_BODY, fontWeight: 900, fontSize: 46, color: C.ink, background: C.nvLight, padding: "10px 28px", borderRadius: 999 }}>TAKE-TWO LO TUMBA</div>
     </div>
     <div style={{ position: "absolute", left: 0, right: 0, top: 1620, textAlign: "center", fontFamily: FONT_BODY, fontWeight: 900, fontSize: 40, color: C.white, opacity: 0.9 }}>
-      TE LO CUENTO EN 1 MINUTO
+      VIDEOJUEGOS · TE LO CUENTO EN 1 MINUTO
     </div>
   </AbsoluteFill>
 );
@@ -162,11 +212,10 @@ export const Thumbnail: React.FC = () => (
 export const SCENES: SceneDef[] = [
   { key: "hook", firstSeg: "hook", C: Hook },
   { key: "lema", firstSeg: "lema", C: Lema, flash: C.nv },
-  { key: "dinero", firstSeg: "dinero", C: Dinero, flash: C.yellow },
-  { key: "gta5", firstSeg: "gta5", C: Gta5 },
-  { key: "ps5", firstSeg: "ps5", C: Ps5, flash: C.nv },
-  { key: "horas", firstSeg: "horas", C: Horas, flash: C.nvLight },
-  { key: "mision", firstSeg: "mision", C: Mision, flash: C.yellow },
+  { key: "que", firstSeg: "que", C: Que, flash: C.nvLight },
+  { key: "dmca", firstSeg: "dmca", C: Dmca, flash: C.red },
+  { key: "pc", firstSeg: "pc", C: Pc, flash: C.nv },
+  { key: "rumor", firstSeg: "rumor", C: Rumor, flash: C.yellow },
   { key: "cierre", firstSeg: "cierre", C: Cierre, flash: C.nv },
 ];
 
@@ -181,13 +230,15 @@ export const SfxCues: React.FC = () => {
   return (
     <>
       <Sfx at={0} src="impact" volume={0.55} />
-      <Sfx at={at("hook", "records")} src="glitch" volume={0.35} />
+      <Sfx at={at("hook", "fans")} src="pop" volume={0.45} />
+      <Sfx at={at("hook", "borrados")} src="impact" volume={0.55} />
       <Sfx at={at("lema", "menos")} src="ding" volume={0.4} />
-      <Sfx at={at("dinero", "3")} src="cash" volume={0.5} />
-      <Sfx at={at("gta5", "gta") + 4} src="impact" volume={0.55} />
-      <Sfx at={at("ps5", "jugadores") - 10} src="impact" volume={0.45} />
-      <Sfx at={at("horas", "683") - 4} src="riser" volume={0.3} />
-      <Sfx at={at("mision", "mayor") - 6} src="ding" volume={0.45} />
+      <Sfx at={at("que", "leonida") - 4} src="pop" volume={0.45} />
+      <Sfx at={at("que", "filtrada")} src="glitch" volume={0.4} />
+      <Sfx at={at("dmca", "derechos")} src="impact" volume={0.45} />
+      <Sfx at={at("dmca", "3.007") - 6} src="riser" volume={0.3} />
+      <Sfx at={at("pc", "fecha")} src="pop" volume={0.45} />
+      <Sfx at={at("rumor", "principios") - 4} src="whoosh" volume={0.35} />
       <Sfx at={at("cierre", "comentarios")} src="pop" volume={0.5} />
     </>
   );

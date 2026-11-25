@@ -1,0 +1,17 @@
+{
+ "segments": [
+  {"id": "hook", "gap": 0.3, "text": "Take-Two ha tumbado el GTA seis para PC hecho por fans: más de tres mil repositorios borrados."},
+  {"id": "lema", "gap": 0.35, "text": "Te lo cuento en menos de un minuto."},
+  {"id": "que", "gap": 0.3, "text": "Se llamaba Proyecto Leonida, y buscaba ejecutar en Windows una versión filtrada de Xbox."},
+  {"id": "dmca", "gap": 0.35, "text": "Take-Two pidió su retirada por derechos de autor, y GitHub bloqueó tres mil siete repositorios de golpe."},
+  {"id": "pc", "gap": 0.3, "text": "¿Y el GTA seis oficial para PC? Rockstar todavía no ha dado fecha."},
+  {"id": "rumor", "gap": 0.35, "text": "Se habla de principios de dos mil veintisiete, pero no está confirmado."},
+  {"id": "cierre", "gap": 0.0, "text": "¿Esperarás a la versión oficial? Te leo en comentarios."}
+ ],
+ "display": [
+  {"spoken": "GTA seis", "display": "GTA 6"},
+  {"spoken": "tres mil siete", "display": "3.007"},
+  {"spoken": "tres mil", "display": "3.000"},
+  {"spoken": "dos mil veintisiete", "display": "2027"}
+ ]
+}
