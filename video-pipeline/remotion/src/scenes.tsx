@@ -1,339 +1,160 @@
 /**
- * HISTORIA: «Tidal borrará ~27 millones de canciones hechas solo con IA» (IA · 25 nov 2026).
- * Sin logotipos de terceros: marcas solo como texto.
+ * HISTORIA: «GTA 6 ha destrozado todos los récords» (vídeo viral 30 s · 25 nov 2026).
+ * Fondos: arte oficial de rockstargames.com. Efectos estilo GTA: gta-fx (echris6/gta-components, MIT), en public/fx/v-*.webm.
+ * Datos: Take-Two (3.790 M$ el primer día), Sony/PlayStation (39 M jugadores y 683 M horas en PS5, 19-22 nov).
  */
 import React from "react";
 import { Audio } from "@remotion/media";
-import { AbsoluteFill, interpolate, random, Sequence, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
-import { Chip, MaskLine, Stamp, punch, useShake } from "./components";
-import { C, clamp, EASE_MOVE, FONT_BODY, FONT_HEAD, popSpring, ramp, softSpring, wordF } from "./lib";
-import { BrandLogo, Counter, HookBadge, Lema, NewsBar, Poll, SceneDef, SceneProps, TechBackdrop } from "./news";
+import { AbsoluteFill, Img, Sequence, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
+import { Bg, MaskLine, punch, useShake } from "./components";
+import { C, FONT_BODY, FONT_HEAD, popSpring, ramp, wordF } from "./lib";
+import { BrandLogo, GtaFx, HookBadge, Lema, NewsBar, Poll, SceneDef, SceneProps } from "./news";
 
 const DATE = "25 NOV";
-const Bar: React.FC<{ active: number }> = ({ active }) => <NewsBar active={active} total={5} label="NOTICIA IA" date={DATE} />;
+const Bar: React.FC<{ active: number }> = ({ active }) => <NewsBar active={active} total={5} label="GTA 6" date={DATE} />;
 
-// ---------- iconos propios ----------
-const Note: React.FC<{ s: number; color: string }> = ({ s, color }) => (
-  <svg viewBox="0 0 60 70" width={s} height={(s * 70) / 60}>
-    <path d="M 22 8 L 54 2 L 54 48" stroke={color} strokeWidth="7" fill="none" strokeLinejoin="round" />
-    <line x1="22" y1="8" x2="22" y2="56" stroke={color} strokeWidth="7" />
-    <ellipse cx="14" cy="57" rx="11" ry="8" fill={color} />
-    <ellipse cx="46" cy="49" rx="11" ry="8" fill={color} />
-  </svg>
-);
-const Trash: React.FC<{ w: number; lid: number }> = ({ w, lid }) => (
-  <svg viewBox="0 0 200 240" width={w} height={(w * 240) / 200}>
-    <g transform={`rotate(${-lid * 28} 20 46)`}>
-      <rect x="10" y="30" width="180" height="22" rx="8" fill={C.white} />
-      <rect x="75" y="14" width="50" height="20" rx="6" fill={C.white} />
-    </g>
-    <path d="M 26 62 L 174 62 L 160 232 L 40 232 Z" fill="#141a24" stroke={C.white} strokeWidth="8" />
-    {[66, 100, 134].map((x) => (
-      <line key={x} x1={x} y1="86" x2={x - 4 + (x - 100) * 0.05} y2="208" stroke={C.white} strokeWidth="8" strokeLinecap="round" opacity="0.6" />
-    ))}
-  </svg>
-);
-const TrackRow: React.FC<{ i: number; del: number; w: number }> = ({ i, del, w }) => {
-  const names = ["Neon Dreams (AI)", "Lofi Beats #2841", "Chill Vibes 99", "Summer Hit AI v3", "Sad Piano 1127", "Epic Trailer 512"];
-  return (
-    <div style={{ position: "relative", width: w, height: 86, display: "flex", alignItems: "center", gap: 18, padding: "0 20px", background: "#0f1520", borderRadius: 16, border: "2px solid #223", opacity: 1 - del * 0.6, translate: `${del * 60}px 0` }}>
-      <div style={{ width: 56, height: 56, borderRadius: 10, background: `linear-gradient(135deg, ${C.nv}, #8E5CFF)` }} />
-      <div style={{ flex: 1, fontFamily: FONT_BODY, fontWeight: 800, fontSize: 30, color: C.white }}>{names[i % names.length]}</div>
-      <div style={{ fontFamily: FONT_BODY, fontWeight: 900, fontSize: 24, color: C.ink, background: C.yellow, borderRadius: 8, padding: "4px 10px" }}>100% IA</div>
-      <div style={{ position: "absolute", left: 14, right: 14, top: 40, height: 8, background: C.red, scale: `${del} 1`, transformOrigin: "left center", borderRadius: 4 }} />
-    </div>
-  );
-};
+// desplazamientos verticales de los efectos (px) para no tapar los subtítulos (y ≥ 1290)
+const FX_Y = { chyron: 0, cash: 0, wasted: 0, confirmado: -330, horas: 0, mision: 0 };
 
 // =====================================================================
-// 1. GANCHO
+// 1. GANCHO: rótulo de última hora sobre el arte oficial
 // =====================================================================
-const Hook: React.FC<SceneProps> = ({ startMs }) => {
+const Hook: React.FC<SceneProps> = ({ dur, startMs }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const w = (q: string) => wordF("hook", q, startMs);
-  const fBorrar = w("borrar");
-  const fNum = w("27");
-  const fInt = w("inteligencia");
-  const sh = useShake(fBorrar, 8, 12);
-  const z = punch(frame, fps, fNum, 0.05);
-  return (
-    <AbsoluteFill style={{ scale: String(z), translate: `${sh.x}px ${sh.y}px` }}>
-      <TechBackdrop />
-      <HookBadge label="ÚLTIMA HORA" date="25 NOV 2026" />
-      <div style={{ position: "absolute", left: 80, top: 230, display: "flex", alignItems: "center", gap: 30 }}>
-        <div style={{ scale: String(popSpring(frame, fps, -6)) }}>
-          <BrandLogo slug="tidal" size={140} />
-        </div>
-        <MaskLine delay={-9} size={150} shadow={C.red}>
-          Tidal borra
-        </MaskLine>
-      </div>
-      <Counter from={0} to={27} start={fNum - 2} dur={16} suffix=" MILLONES" color={C.nvLight} size={150} style={{ left: 80, top: 410 }} />
-      <div style={{ position: "absolute", left: 80, top: 590 }}>
-        <MaskLine delay={fInt - 6} size={84} shadow={C.ink}>
-          de canciones hechas
-        </MaskLine>
-        <MaskLine delay={fInt - 2} size={84} color={C.yellow} shadow={C.ink}>
-          solo con IA
-        </MaskLine>
-      </div>
-      <div style={{ position: "absolute", left: 80, top: 830, display: "flex", flexDirection: "column", gap: 14 }}>
-        {[0, 1, 2, 3].map((i) => (
-          <TrackRow key={i} i={i} w={640} del={ramp(frame, fBorrar + 4 + i * 5, 8)} />
-        ))}
-      </div>
-      <div style={{ position: "absolute", left: 760, top: 900 }}>
-        <Trash w={220} lid={ramp(frame, fBorrar, 8)} />
-      </div>
-      {/* notas que caen a la papelera */}
-      {Array.from({ length: 6 }, (_, i) => {
-        const p = (frame - (fBorrar + 6 + i * 5)) / 16;
-        if (p < 0 || p > 1) return null;
-        return (
-          <div key={i} style={{ position: "absolute", left: interpolate(p, [0, 1], [500 + i * 30, 840]), top: interpolate(p, [0, 0.5, 1], [880 + i * 40, 820, 960]), rotate: `${p * 200}deg`, opacity: 1 - p * 0.3 }}>
-            <Note s={60} color={C.nvLight} />
-          </div>
-        );
-      })}
-    </AbsoluteFill>
-  );
-};
-
-// =====================================================================
-// 3. CUÁNDO: 9 dic · 100 % IA fuera · con ayuda de IA se queda
-// =====================================================================
-const Cuando: React.FC<SceneProps> = ({ startMs }) => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const w = (q: string) => wordF("cuando", q, startMs);
-  const fRech = w("rechazara");
-  const fAyuda = w("ayuda");
-  const cal = popSpring(frame, fps, 0);
-  return (
-    <AbsoluteFill>
-      <TechBackdrop />
-      <Bar active={1} />
-      <div style={{ position: "absolute", left: 540 - 200, top: 230, width: 400, borderRadius: 24, overflow: "hidden", background: C.white, boxShadow: "0 30px 60px rgba(0,0,0,0.6)", rotate: `${interpolate(cal, [0, 1], [-20, -3])}deg`, scale: String(cal) }}>
-        <div style={{ background: C.nv, color: C.white, fontFamily: FONT_BODY, fontWeight: 900, fontSize: 44, textAlign: "center", padding: "10px 0" }}>DICIEMBRE</div>
-        <div style={{ fontFamily: FONT_HEAD, fontSize: 230, color: C.ink, textAlign: "center", lineHeight: 1.1 }}>9</div>
-      </div>
-      {[
-        { t: "100% IA", s: "FUERA", c: C.red, icon: "✕", at: fRech },
-        { t: "CON AYUDA DE IA", s: "SE QUEDA", c: C.green, icon: "✓", at: fAyuda },
-      ].map((b, i) => {
-        const s = popSpring(frame, fps, b.at - 2);
-        return (
-          <div
-            key={b.t}
-            style={{
-              position: "absolute",
-              left: 80,
-              right: 80,
-              top: 640 + i * 270,
-              height: 230,
-              borderRadius: 28,
-              border: `6px solid ${b.c}`,
-              background: "rgba(11,6,24,0.85)",
-              display: "flex",
-              alignItems: "center",
-              gap: 34,
-              padding: "0 40px",
-              scale: String(s),
-              opacity: frame >= b.at - 2 ? 1 : 0,
-              boxShadow: `0 0 40px ${b.c}66`,
-            }}
-          >
-            <div style={{ width: 130, height: 130, borderRadius: 65, background: b.c, color: C.ink, fontFamily: FONT_HEAD, fontSize: 90, display: "flex", alignItems: "center", justifyContent: "center" }}>{b.icon}</div>
-            <div>
-              <div style={{ fontFamily: FONT_BODY, fontWeight: 900, fontSize: 44, color: C.white }}>{b.t}</div>
-              <div style={{ fontFamily: FONT_HEAD, fontSize: 100, color: b.c, lineHeight: 1 }}>{b.s}</div>
-            </div>
-          </div>
-        );
-      })}
-    </AbsoluteFill>
-  );
-};
-
-// =====================================================================
-// 4. MOTIVO: 43 % de lo que llegaba era 100 % IA
-// =====================================================================
-const Motivo: React.FC<SceneProps> = ({ startMs }) => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const w = (q: string) => wordF("motivo", q, startMs);
-  const f43 = w("43");
-  const fIA = w("100");
-  const R = 230;
-  const L = 2 * Math.PI * R;
-  const fill = interpolate(frame, [f43 - 2, f43 + 18], [0, 0.43], { ...clamp, easing: EASE_MOVE });
-  const z = punch(frame, fps, f43, 0.05);
+  const fRec = wordF("hook", "records", startMs);
+  const z = punch(frame, fps, fRec, 0.05);
   return (
     <AbsoluteFill style={{ scale: String(z) }}>
-      <TechBackdrop hue="#0a1d33" />
-      <Bar active={2} />
-      <div style={{ position: "absolute", left: 0, right: 0, top: 230, textAlign: "center" }}>
-        <MaskLine delay={0} size={100} shadow={C.ink}>
-          El motivo
-        </MaskLine>
-      </div>
-      <svg width={600} height={600} viewBox="-300 -300 600 600" style={{ position: "absolute", left: 240, top: 380 }}>
-        <circle r={R} fill="none" stroke="#1c2a3c" strokeWidth={70} />
-        <circle r={R} fill="none" stroke={C.yellow} strokeWidth={70} strokeDasharray={L} strokeDashoffset={L * (1 - fill)} transform="rotate(-90)" />
-      </svg>
-      <Counter from={0} to={43} start={f43 - 2} dur={18} suffix="%" color={C.white} size={190} style={{ left: 0, right: 0, top: 570, textAlign: "center" }} />
-      <div style={{ position: "absolute", left: 80, right: 80, top: 1030, textAlign: "center", opacity: frame >= fIA - 6 ? 1 : 0 }}>
-        <MaskLine delay={fIA - 6} size={64} shadow={C.ink}>
-          de las canciones subidas
-        </MaskLine>
-        <MaskLine delay={fIA - 2} size={84} color={C.yellow} shadow={C.ink}>
-          eran 100% IA
-        </MaskLine>
-      </div>
-      <Chip text="Últimos 90 días · datos de Tidal" delay={fIA + 8} color={C.white} size={28} style={{ left: 300, top: 1215 }} />
+      <Bg src="img/keyart.jpg" dur={dur} dim={0.35} from={1.1} to={1.3} y={[0, -60]} />
+      <HookBadge label="ÚLTIMA HORA" date="25 NOV 2026" />
+      <GtaFx name="v-chyron" from={0} style={{ translate: `0 ${FX_Y.chyron}px` }} />
     </AbsoluteFill>
   );
 };
 
 // =====================================================================
-// 5. ESCUCHAS: 96 % con cero reproducciones
+// 3. DINERO: 3.790 M$ el primer día
 // =====================================================================
-const Escuchas: React.FC<SceneProps> = ({ startMs }) => {
+const Dinero: React.FC<SceneProps> = ({ dur }) => (
+  <AbsoluteFill>
+    <Bg src="img/poster.jpg" dur={dur} dim={0.45} from={1.6} to={1.8} objectPosition="60% center" />
+    <Bar active={1} />
+    <GtaFx name="v-cash" from={0} style={{ translate: `0 ${FX_Y.cash}px` }} />
+  </AbsoluteFill>
+);
+
+// =====================================================================
+// 4. GTA 5: su récord… WASTED
+// =====================================================================
+const Gta5: React.FC<SceneProps> = ({ startMs }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const w = (q: string) => wordF("escuchas", q, startMs);
-  const f96 = w("96");
-  const fNi = w("ni");
-  const sh = useShake(fNi, 8, 12);
+  const fCinco = wordF("gta5", "gta", startMs);
+  const sh = useShake(fCinco + 6, 10, 18);
   return (
-    <AbsoluteFill style={{ translate: `${sh.x}px ${sh.y}px` }}>
-      <TechBackdrop hue="#0a1d33" />
-      <Bar active={3} />
-      <Counter from={0} to={96} start={f96 - 2} dur={16} suffix="%" color={C.nvLight} size={240} style={{ left: 0, right: 0, top: 240, textAlign: "center" }} />
-      <div style={{ position: "absolute", left: 0, right: 0, top: 520, textAlign: "center", opacity: frame >= f96 + 6 ? 1 : 0 }}>
-        <MaskLine delay={f96 + 6} size={70} shadow={C.ink}>
-          de esas canciones
-        </MaskLine>
-      </div>
-      {/* reproductor con 0 escuchas y ecualizador plano */}
-      <div style={{ position: "absolute", left: 120, right: 120, top: 660, height: 330, borderRadius: 30, background: "#0f1520", border: `4px solid ${C.nv}`, padding: 30, scale: String(popSpring(frame, fps, f96 + 4)) }}>
-        <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: 140 }}>
-          {Array.from({ length: 22 }, (_, i) => {
-            const alive = frame < fNi;
-            const h = alive ? 20 + 100 * Math.abs(Math.sin(frame / 4 + i * 0.7) * random(`eq${i}`)) : 6;
-            return <div key={i} style={{ flex: 1, height: h, background: alive ? C.nvLight : "#33415a", borderRadius: 4 }} />;
-          })}
+    <AbsoluteFill style={{ backgroundColor: "#0b0b0e", translate: `${sh.x}px ${sh.y}px` }}>
+      <AbsoluteFill style={{ filter: `grayscale(${ramp(frame, fCinco, 10)})` }}>
+        <div style={{ position: "absolute", left: 0, right: 0, top: 560, textAlign: "center", scale: String(popSpring(frame, fps, 0)) }}>
+          <div style={{ fontFamily: FONT_BODY, fontWeight: 900, fontSize: 44, color: C.white, opacity: 0.8, letterSpacing: "0.12em" }}>RÉCORD ANTERIOR</div>
+          <div style={{ fontFamily: FONT_HEAD, fontSize: 230, color: C.white, lineHeight: 1 }}>GTA V</div>
+          <div style={{ fontFamily: FONT_HEAD, fontSize: 120, color: C.nvLight }}>800 M$</div>
+          <div style={{ fontFamily: FONT_BODY, fontWeight: 800, fontSize: 40, color: C.white, opacity: 0.8 }}>primer día · 2013</div>
         </div>
-        <div style={{ marginTop: 30, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ fontFamily: FONT_BODY, fontWeight: 900, fontSize: 40, color: C.white }}>Reproducciones</div>
-          <div style={{ fontFamily: FONT_HEAD, fontSize: 110, color: frame >= fNi ? C.red : C.white }}>0</div>
-        </div>
-      </div>
-      <Stamp text="Ni una escucha" delay={fNi} color={C.red} size={90} rotate={-7} style={{ left: 190, top: 1040 }} />
-      <Chip text="en 3 meses" delay={fNi + 10} color={C.white} size={34} style={{ left: 420, top: 1200 }} />
+      </AbsoluteFill>
+      <GtaFx name="v-wasted" from={Math.max(0, fCinco - 30)} style={{ translate: `0 ${FX_Y.wasted}px` }} />
     </AbsoluteFill>
   );
 };
 
 // =====================================================================
-// 6. OTRAS PLATAFORMAS
+// 5. PS5: +39 M jugadores · CONFIRMADO
 // =====================================================================
-const Otras: React.FC<SceneProps> = ({ startMs }) => {
+const Ps5: React.FC<SceneProps> = ({ dur, startMs }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const w = (q: string) => wordF("otras", q, startMs);
-  const fSp = w("spotify");
-  const fAp = w("apple");
-  const fPerm = w("permiten");
-  const toB = softSpring(frame, fps, fPerm - 2);
+  const fJug = wordF("ps5", "jugadores", startMs);
   return (
     <AbsoluteFill>
-      <TechBackdrop hue="#1d1606" glow={C.yellow} />
-      <Bar active={4} />
-      <div style={{ position: "absolute", left: 0, right: 0, top: 240, textAlign: "center" }}>
-        <MaskLine delay={0} size={90} shadow={C.ink}>
-          ¿Y los demás?
-        </MaskLine>
+      <Bg src="img/car.jpg" dur={dur} dim={0.5} from={1.15} to={1.3} objectPosition="40% center" />
+      <Bar active={2} />
+      <div style={{ position: "absolute", left: 0, right: 0, top: 230, display: "flex", justifyContent: "center", scale: String(popSpring(frame, fps, 0)) }}>
+        <BrandLogo slug="playstation" size={200} color={C.white} />
       </div>
-      {[
-        { t: "SPOTIFY", slug: "spotify", at: fSp, x: 80 },
-        { t: "APPLE MUSIC", slug: "applemusic", at: fAp, x: 560 },
-      ].map((b) => (
-        <div
-          key={b.t}
-          style={{
-            position: "absolute",
-            left: b.x,
-            top: 450,
-            width: 440,
-            height: 300,
-            borderRadius: 30,
-            background: "#141a24",
-            border: `5px solid ${C.white}`,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 18,
-            scale: String(popSpring(frame, fps, b.at - 2)),
-            opacity: frame >= b.at - 2 ? 1 : 0,
-          }}
-        >
-          <BrandLogo slug={b.slug} size={130} />
-          <div style={{ fontFamily: FONT_HEAD, fontSize: 64, color: C.white }}>{b.t}</div>
-        </div>
-      ))}
-      <div style={{ position: "absolute", left: 0, right: 0, top: 830, textAlign: "center", scale: String(toB), opacity: toB }}>
-        <div style={{ fontFamily: FONT_HEAD, fontSize: 100, color: C.yellow, textShadow: `6px 6px 0 ${C.ink}` }}>TODAVÍA LAS PERMITEN</div>
-      </div>
-      <Chip text="Etiquetan la música IA o la recomiendan menos" delay={fPerm + 10} color={C.white} size={28} style={{ left: 150, top: 1040 }} />
+      <GtaFx name="v-confirmado" from={Math.max(0, fJug - 24)} style={{ translate: `0 ${FX_Y.confirmado}px` }} />
     </AbsoluteFill>
   );
 };
 
 // =====================================================================
-// 7. CIERRE
+// 6. HORAS: 683.000.000
+// =====================================================================
+const Horas: React.FC<SceneProps> = ({ dur }) => (
+  <AbsoluteFill>
+    <Bg src="img/skyline.jpg" dur={dur} dim={0.5} from={1.05} to={1.2} />
+    <Bar active={3} />
+    <GtaFx name="v-horas" from={0} style={{ translate: `0 ${FX_Y.horas}px` }} />
+  </AbsoluteFill>
+);
+
+// =====================================================================
+// 7. MISIÓN SUPERADA: mayor lanzamiento del entretenimiento
+// =====================================================================
+const Mision: React.FC<SceneProps> = ({ dur, startMs }) => {
+  const frame = useCurrentFrame();
+  const fMayor = wordF("mision", "mayor", startMs);
+  return (
+    <AbsoluteFill>
+      <Bg src="img/keyart.jpg" dur={dur} dim={0.45} from={1.25} to={1.4} y={[-40, 20]} />
+      <Bar active={4} />
+      <GtaFx name="v-mision" from={0} style={{ translate: `0 ${FX_Y.mision}px` }} />
+      <div style={{ position: "absolute", left: 80, right: 80, top: 860, textAlign: "center", opacity: frame >= fMayor ? 1 : 0 }}>
+        <MaskLine delay={fMayor} size={82} shadow={C.ink}>
+          Mayor lanzamiento
+        </MaskLine>
+        <MaskLine delay={fMayor + 4} size={82} color={C.nvLight} shadow={C.ink}>
+          del entretenimiento
+        </MaskLine>
+      </div>
+      <div style={{ position: "absolute", left: 0, right: 0, top: 1110, display: "flex", justifyContent: "center", opacity: ramp(frame, fMayor + 10, 8) }}>
+        <BrandLogo slug="rockstargames" size={120} />
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+// =====================================================================
+// 8. CIERRE
 // =====================================================================
 const Cierre: React.FC<SceneProps> = (p) => (
-  <Poll {...p} segId="cierre" line1="¿Deberían hacer" line2="lo mismo?" size1={120} size2={190} footer="Fuentes: Tidal · TechCrunch · Variety · The Hollywood Reporter · CBC" bar={<Bar active={5} />} />
+  <Poll {...p} segId="cierre" line1="¿Ya lo" line2="has jugado?" size1={170} size2={170} footer="Fuentes: Take-Two · PlayStation · Forbes · CNN" bar={<Bar active={5} />} />
 );
 
 // =====================================================================
 // MINIATURA (portada TikTok 1080×1920; zona clave y 240-1680)
 // =====================================================================
 export const Thumbnail: React.FC = () => (
-  <AbsoluteFill>
-    <TechBackdrop />
-    <AbsoluteFill style={{ background: `radial-gradient(circle at 50% 70%, ${C.red}44 0%, transparent 45%)` }} />
+  <AbsoluteFill style={{ backgroundColor: C.ink }}>
+    <Img src={staticFile("img/keyart.jpg")} style={{ position: "absolute", width: "100%", height: "100%", objectFit: "cover", scale: "1.15" }} />
+    <AbsoluteFill style={{ background: "linear-gradient(180deg, rgba(11,6,24,0.85) 0%, rgba(11,6,24,0.45) 40%, rgba(11,6,24,0.8) 66%, rgba(11,6,24,0.95) 100%)" }} />
     <div style={{ position: "absolute", left: 0, right: 0, top: 250, textAlign: "center" }}>
       <div style={{ display: "inline-block", fontFamily: FONT_BODY, fontWeight: 900, fontSize: 44, color: C.white, background: C.red, padding: "10px 26px", borderRadius: 10, letterSpacing: "0.08em" }}>
         ● ÚLTIMA HORA
       </div>
-      <div style={{ fontFamily: FONT_HEAD, fontSize: 200, lineHeight: 1.08, color: C.white, marginTop: 40, textShadow: `10px 10px 0 ${C.ink}` }}>ADIÓS A LA</div>
-      <div style={{ fontFamily: FONT_HEAD, fontSize: 230, lineHeight: 1.08, color: C.nvLight, textShadow: `0 0 60px ${C.nv}, 10px 10px 0 ${C.ink}` }}>MÚSICA IA</div>
-      <div style={{ display: "inline-block", marginTop: 26, fontFamily: FONT_BODY, fontWeight: 900, fontSize: 52, color: C.ink, background: C.yellow, padding: "10px 30px", borderRadius: 999, rotate: "-3deg" }}>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 16 }}>
-          <BrandLogo slug="tidal" size={56} color={C.ink} />
-          TIDAL BORRA 27 MILLONES
-        </span>
-      </div>
-      <div style={{ marginTop: 18, fontFamily: FONT_BODY, fontWeight: 900, fontSize: 36, color: C.white }}>DE CANCIONES HECHAS 100% CON IA</div>
+      <div style={{ fontFamily: FONT_HEAD, fontSize: 250, lineHeight: 1.02, color: C.white, marginTop: 30, textShadow: `10px 10px 0 ${C.ink}` }}>GTA 6</div>
+      <div style={{ fontFamily: FONT_HEAD, fontSize: 170, lineHeight: 1.02, color: C.nvLight, textShadow: `0 0 60px ${C.nv}, 10px 10px 0 ${C.ink}`, whiteSpace: "nowrap" }}>LO HA ROTO TODO</div>
     </div>
-    <div style={{ position: "absolute", left: 120, top: 1080 }}>
-      <Trash w={330} lid={1} />
-    </div>
-    {[0, 1, 2].map((i) => (
-      <div key={i} style={{ position: "absolute", left: 440 + i * 70, top: 1070 + (i % 2) * 90, rotate: `${-30 + i * 25}deg` }}>
-        <Note s={110} color={C.nvLight} />
+    <div style={{ position: "absolute", left: 0, right: 0, top: 960, textAlign: "center" }}>
+      <div style={{ fontFamily: FONT_HEAD, fontSize: 230, lineHeight: 1, color: C.white, textShadow: `8px 8px 0 ${C.ink}` }}>3.790 M$</div>
+      <div style={{ display: "inline-block", marginTop: 16, fontFamily: FONT_BODY, fontWeight: 900, fontSize: 54, color: C.ink, background: C.yellow, padding: "10px 30px", borderRadius: 999, rotate: "-3deg" }}>
+        EN SU PRIMER DÍA
       </div>
-    ))}
-    <div style={{ position: "absolute", right: 80, top: 1240, textAlign: "right" }}>
-      <div style={{ fontFamily: FONT_HEAD, fontSize: 170, lineHeight: 1, color: C.red, textShadow: `8px 8px 0 ${C.ink}` }}>96%</div>
-      <div style={{ fontFamily: FONT_BODY, fontWeight: 900, fontSize: 36, color: C.white }}>SIN NI UNA ESCUCHA</div>
+    </div>
+    <div style={{ position: "absolute", left: 0, right: 0, top: 1400, textAlign: "center", fontFamily: FONT_HEAD, fontSize: 110, color: "#FF3B2E", textShadow: "0 0 40px #FF3B2E, 6px 6px 0 #000", rotate: "-4deg" }}>
+      GTA V: WASTED
     </div>
     <div style={{ position: "absolute", left: 0, right: 0, top: 1620, textAlign: "center", fontFamily: FONT_BODY, fontWeight: 900, fontSize: 40, color: C.white, opacity: 0.9 }}>
-      NOTICIA IA · TE LO CUENTO EN 1 MINUTO
+      TE LO CUENTO EN 1 MINUTO
     </div>
   </AbsoluteFill>
 );
@@ -341,10 +162,11 @@ export const Thumbnail: React.FC = () => (
 export const SCENES: SceneDef[] = [
   { key: "hook", firstSeg: "hook", C: Hook },
   { key: "lema", firstSeg: "lema", C: Lema, flash: C.nv },
-  { key: "cuando", firstSeg: "cuando", C: Cuando, flash: C.nvLight },
-  { key: "motivo", firstSeg: "motivo", C: Motivo, flash: C.yellow },
-  { key: "escuchas", firstSeg: "escuchas", C: Escuchas, flash: C.nv },
-  { key: "otras", firstSeg: "otras", C: Otras, flash: C.yellow },
+  { key: "dinero", firstSeg: "dinero", C: Dinero, flash: C.yellow },
+  { key: "gta5", firstSeg: "gta5", C: Gta5 },
+  { key: "ps5", firstSeg: "ps5", C: Ps5, flash: C.nv },
+  { key: "horas", firstSeg: "horas", C: Horas, flash: C.nvLight },
+  { key: "mision", firstSeg: "mision", C: Mision, flash: C.yellow },
   { key: "cierre", firstSeg: "cierre", C: Cierre, flash: C.nv },
 ];
 
@@ -359,14 +181,13 @@ export const SfxCues: React.FC = () => {
   return (
     <>
       <Sfx at={0} src="impact" volume={0.55} />
-      <Sfx at={at("hook", "borrar")} src="glitch" volume={0.4} />
-      <Sfx at={at("hook", "27") - 2} src="riser" volume={0.3} />
+      <Sfx at={at("hook", "records")} src="glitch" volume={0.35} />
       <Sfx at={at("lema", "menos")} src="ding" volume={0.4} />
-      <Sfx at={at("cuando", "rechazara")} src="impact" volume={0.45} />
-      <Sfx at={at("cuando", "ayuda")} src="ding" volume={0.4} />
-      <Sfx at={at("motivo", "43") - 2} src="riser" volume={0.3} />
-      <Sfx at={at("escuchas", "ni")} src="glitch" volume={0.45} />
-      <Sfx at={at("otras", "permiten")} src="pop" volume={0.45} />
+      <Sfx at={at("dinero", "3")} src="cash" volume={0.5} />
+      <Sfx at={at("gta5", "gta") + 4} src="impact" volume={0.55} />
+      <Sfx at={at("ps5", "jugadores") - 10} src="impact" volume={0.45} />
+      <Sfx at={at("horas", "683") - 4} src="riser" volume={0.3} />
+      <Sfx at={at("mision", "mayor") - 6} src="ding" volume={0.45} />
       <Sfx at={at("cierre", "comentarios")} src="pop" volume={0.5} />
     </>
   );

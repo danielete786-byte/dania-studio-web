@@ -1,0 +1,20 @@
+{
+ "segments": [
+  {"id": "hook", "gap": 0.25, "text": "GTA seis ha destrozado todos los récords. En solo una semana."},
+  {"id": "lema", "gap": 0.3, "text": "Te lo cuento en menos de un minuto."},
+  {"id": "dinero", "gap": 0.2, "text": "En su primer día: tres mil setecientos noventa millones de dólares."},
+  {"id": "gta5", "gap": 0.3, "text": "Casi cinco veces más que GTA cinco."},
+  {"id": "ps5", "gap": 0.25, "text": "En PlayStation, más de treinta y nueve millones de jugadores en cuatro días."},
+  {"id": "horas", "gap": 0.3, "text": "Y seiscientos ochenta y tres millones de horas jugadas."},
+  {"id": "mision", "gap": 0.35, "text": "Es el mayor lanzamiento de la historia del entretenimiento."},
+  {"id": "cierre", "gap": 0.0, "text": "¿Tú ya lo has jugado? Te leo en comentarios."}
+ ],
+ "display": [
+  {"spoken": "GTA seis", "display": "GTA 6"},
+  {"spoken": "GTA cinco", "display": "GTA 5"},
+  {"spoken": "tres mil setecientos noventa millones de dólares", "display": "3.790 millones de dólares"},
+  {"spoken": "treinta y nueve millones", "display": "39 millones"},
+  {"spoken": "cuatro días", "display": "4 días"},
+  {"spoken": "seiscientos ochenta y tres millones", "display": "683 millones"}
+ ]
+}
