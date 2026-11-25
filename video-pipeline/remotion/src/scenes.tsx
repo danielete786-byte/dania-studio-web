@@ -28,7 +28,7 @@ const Hook: React.FC<SceneProps> = ({ dur, startMs }) => {
     <AbsoluteFill style={{ scale: String(z) }}>
       <Bg src="img/keyart.jpg" dur={dur} dim={0.35} from={1.1} to={1.3} y={[0, -60]} />
       <HookBadge label="ÚLTIMA HORA" date="25 NOV 2026" />
-      <GtaFx name="v-chyron" from={0} style={{ translate: `0 ${FX_Y.chyron}px` }} />
+      <GtaFx name="v-chyron" from={-48} style={{ translate: `0 ${FX_Y.chyron}px` }} />
     </AbsoluteFill>
   );
 };
@@ -54,7 +54,7 @@ const Gta5: React.FC<SceneProps> = ({ startMs }) => {
   const sh = useShake(fCinco + 6, 10, 18);
   return (
     <AbsoluteFill style={{ backgroundColor: "#0b0b0e", translate: `${sh.x}px ${sh.y}px` }}>
-      <AbsoluteFill style={{ filter: `grayscale(${ramp(frame, fCinco, 10)})` }}>
+      <AbsoluteFill style={{ filter: `grayscale(${ramp(frame, fCinco, 10)})`, opacity: 1 - ramp(frame, Math.max(0, fCinco - 30) + 33, 4) }}>
         <div style={{ position: "absolute", left: 0, right: 0, top: 560, textAlign: "center", scale: String(popSpring(frame, fps, 0)) }}>
           <div style={{ fontFamily: FONT_BODY, fontWeight: 900, fontSize: 44, color: C.white, opacity: 0.8, letterSpacing: "0.12em" }}>RÉCORD ANTERIOR</div>
           <div style={{ fontFamily: FONT_HEAD, fontSize: 230, color: C.white, lineHeight: 1 }}>GTA V</div>
@@ -142,7 +142,7 @@ export const Thumbnail: React.FC = () => (
         ● ÚLTIMA HORA
       </div>
       <div style={{ fontFamily: FONT_HEAD, fontSize: 250, lineHeight: 1.02, color: C.white, marginTop: 30, textShadow: `10px 10px 0 ${C.ink}` }}>GTA 6</div>
-      <div style={{ fontFamily: FONT_HEAD, fontSize: 170, lineHeight: 1.02, color: C.nvLight, textShadow: `0 0 60px ${C.nv}, 10px 10px 0 ${C.ink}`, whiteSpace: "nowrap" }}>LO HA ROTO TODO</div>
+      <div style={{ fontFamily: FONT_HEAD, fontSize: 148, lineHeight: 1.05, color: C.nvLight, textShadow: `0 0 60px ${C.nv}, 10px 10px 0 ${C.ink}`, whiteSpace: "nowrap" }}>LO HA ROTO TODO</div>
     </div>
     <div style={{ position: "absolute", left: 0, right: 0, top: 960, textAlign: "center" }}>
       <div style={{ fontFamily: FONT_HEAD, fontSize: 230, lineHeight: 1, color: C.white, textShadow: `8px 8px 0 ${C.ink}` }}>3.790 M$</div>
