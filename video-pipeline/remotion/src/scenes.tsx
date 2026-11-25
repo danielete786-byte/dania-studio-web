@@ -14,7 +14,7 @@ const DATE = "25 NOV";
 const Bar: React.FC<{ active: number }> = ({ active }) => <NewsBar active={active} total={5} label="GTA 6" date={DATE} />;
 
 // desplazamientos verticales de los efectos (px) para no tapar los subtítulos (y ≥ 1290)
-const FX_Y = { chyron: 0, cash: 0, wasted: 0, confirmado: -330, horas: 0, mision: 0 };
+const FX_Y = { chyron: -440, cash: 0, wasted: 0, confirmado: -300, horas: 0, mision: 0 };
 
 // =====================================================================
 // 1. GANCHO: rótulo de última hora sobre el arte oficial
@@ -79,7 +79,7 @@ const Ps5: React.FC<SceneProps> = ({ dur, startMs }) => {
       <Bg src="img/car.jpg" dur={dur} dim={0.5} from={1.15} to={1.3} objectPosition="40% center" />
       <Bar active={2} />
       <div style={{ position: "absolute", left: 0, right: 0, top: 230, display: "flex", justifyContent: "center", scale: String(popSpring(frame, fps, 0)) }}>
-        <BrandLogo slug="playstation" size={200} color={C.white} />
+        <BrandLogo slug="playstation" size={150} color={C.white} />
       </div>
       <GtaFx name="v-confirmado" from={Math.max(0, fJug - 24)} style={{ translate: `0 ${FX_Y.confirmado}px` }} />
     </AbsoluteFill>
