@@ -282,7 +282,7 @@ const Otras: React.FC<SceneProps> = ({ startMs }) => {
         </div>
       ))}
       <div style={{ position: "absolute", left: 0, right: 0, top: 830, textAlign: "center", scale: String(toB), opacity: toB }}>
-        <div style={{ fontFamily: FONT_HEAD, fontSize: 120, color: C.yellow, textShadow: `6px 6px 0 ${C.ink}` }}>TODAVÍA LAS PERMITEN</div>
+        <div style={{ fontFamily: FONT_HEAD, fontSize: 100, color: C.yellow, textShadow: `6px 6px 0 ${C.ink}` }}>TODAVÍA LAS PERMITEN</div>
       </div>
       <Chip text="Etiquetan la música IA o la recomiendan menos" delay={fPerm + 10} color={C.white} size={28} style={{ left: 150, top: 1040 }} />
     </AbsoluteFill>
@@ -307,8 +307,8 @@ export const Thumbnail: React.FC = () => (
       <div style={{ display: "inline-block", fontFamily: FONT_BODY, fontWeight: 900, fontSize: 44, color: C.white, background: C.red, padding: "10px 26px", borderRadius: 10, letterSpacing: "0.08em" }}>
         ● ÚLTIMA HORA
       </div>
-      <div style={{ fontFamily: FONT_HEAD, fontSize: 210, lineHeight: 0.95, color: C.white, marginTop: 30, textShadow: `10px 10px 0 ${C.ink}` }}>ADIÓS A LA</div>
-      <div style={{ fontFamily: FONT_HEAD, fontSize: 240, lineHeight: 0.95, color: C.nvLight, textShadow: `0 0 60px ${C.nv}, 10px 10px 0 ${C.ink}` }}>MÚSICA IA</div>
+      <div style={{ fontFamily: FONT_HEAD, fontSize: 200, lineHeight: 1.08, color: C.white, marginTop: 40, textShadow: `10px 10px 0 ${C.ink}` }}>ADIÓS A LA</div>
+      <div style={{ fontFamily: FONT_HEAD, fontSize: 230, lineHeight: 1.08, color: C.nvLight, textShadow: `0 0 60px ${C.nv}, 10px 10px 0 ${C.ink}` }}>MÚSICA IA</div>
       <div style={{ display: "inline-block", marginTop: 26, fontFamily: FONT_BODY, fontWeight: 900, fontSize: 52, color: C.ink, background: C.yellow, padding: "10px 30px", borderRadius: 999, rotate: "-3deg" }}>
         TIDAL BORRA 27 MILLONES
       </div>
@@ -318,7 +318,7 @@ export const Thumbnail: React.FC = () => (
       <Trash w={330} lid={1} />
     </div>
     {[0, 1, 2].map((i) => (
-      <div key={i} style={{ position: "absolute", left: 440 + i * 70, top: 1000 + (i % 2) * 90, rotate: `${-30 + i * 25}deg` }}>
+      <div key={i} style={{ position: "absolute", left: 440 + i * 70, top: 1070 + (i % 2) * 90, rotate: `${-30 + i * 25}deg` }}>
         <Note s={110} color={C.nvLight} />
       </div>
     ))}
