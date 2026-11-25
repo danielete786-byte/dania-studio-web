@@ -1,0 +1,19 @@
+{
+ "segments": [
+  {"id": "hook", "gap": 0.3, "text": "Tidal va a borrar unos veintisiete millones de canciones hechas solo con inteligencia artificial."},
+  {"id": "lema", "gap": 0.4, "text": "Te lo cuento en menos de un minuto."},
+  {"id": "cuando", "gap": 0.35, "text": "Desde el nueve de diciembre, rechazará la música hecha solo con IA. La que usa la IA como ayuda, seguirá."},
+  {"id": "motivo", "gap": 0.3, "text": "El motivo: el cuarenta y tres por ciento de lo que les llegaba ya era cien por cien IA."},
+  {"id": "escuchas", "gap": 0.35, "text": "Y el noventa y seis por ciento de esas canciones no tuvo ni una escucha en tres meses."},
+  {"id": "otras", "gap": 0.4, "text": "Spotify y Apple Music, en cambio, todavía las permiten."},
+  {"id": "cierre", "gap": 0.0, "text": "¿Deberían hacer lo mismo? Te leo en comentarios."}
+ ],
+ "display": [
+  {"spoken": "veintisiete millones", "display": "27 millones"},
+  {"spoken": "nueve de diciembre", "display": "9 de diciembre"},
+  {"spoken": "cuarenta y tres por ciento", "display": "43%"},
+  {"spoken": "cien por cien", "display": "100%"},
+  {"spoken": "noventa y seis por ciento", "display": "96%"},
+  {"spoken": "tres meses", "display": "3 meses"}
+ ]
+}

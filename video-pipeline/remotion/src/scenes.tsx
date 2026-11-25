@@ -1,222 +1,333 @@
 /**
- * HISTORIA: «GTA 6, el mayor lanzamiento de la historia de PlayStation» (Videojuegos · 24 nov 2026).
- * Fondos: arte oficial de prensa de rockstargames.com (public/img, no se sube a git).
+ * HISTORIA: «Tidal borrará ~27 millones de canciones hechas solo con IA» (IA · 25 nov 2026).
+ * Sin logotipos de terceros: marcas solo como texto.
  */
 import React from "react";
 import { Audio } from "@remotion/media";
-import { AbsoluteFill, Img, random, Sequence, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
-import { Bg, Chip, MaskLine, Stamp, punch, useShake } from "./components";
-import { C, FONT_BODY, FONT_HEAD, popSpring, softSpring, wordF } from "./lib";
+import { AbsoluteFill, interpolate, random, Sequence, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
+import { Chip, MaskLine, Stamp, punch, useShake } from "./components";
+import { C, clamp, EASE_MOVE, FONT_BODY, FONT_HEAD, popSpring, ramp, softSpring, wordF } from "./lib";
 import { Counter, HookBadge, Lema, NewsBar, Poll, SceneDef, SceneProps, TechBackdrop } from "./news";
 
-const DATE = "24 NOV";
-const Bar: React.FC<{ active: number }> = ({ active }) => <NewsBar active={active} total={4} label="VIDEOJUEGOS" date={DATE} />;
-const millones = (v: number) => `${Math.round(v)}`;
+const DATE = "25 NOV";
+const Bar: React.FC<{ active: number }> = ({ active }) => <NewsBar active={active} total={5} label="NOTICIA IA" date={DATE} />;
 
 // ---------- iconos propios ----------
-const Player: React.FC<{ s: number; color: string }> = ({ s, color }) => (
-  <svg viewBox="0 0 40 50" width={s} height={s * 1.25}>
-    <circle cx="20" cy="12" r="10" fill={color} />
-    <path d="M 2 48 Q 20 14 38 48 Z" fill={color} />
+const Note: React.FC<{ s: number; color: string }> = ({ s, color }) => (
+  <svg viewBox="0 0 60 70" width={s} height={(s * 70) / 60}>
+    <path d="M 22 8 L 54 2 L 54 48" stroke={color} strokeWidth="7" fill="none" strokeLinejoin="round" />
+    <line x1="22" y1="8" x2="22" y2="56" stroke={color} strokeWidth="7" />
+    <ellipse cx="14" cy="57" rx="11" ry="8" fill={color} />
+    <ellipse cx="46" cy="49" rx="11" ry="8" fill={color} />
   </svg>
 );
-const Console: React.FC<{ w: number; on: boolean }> = ({ w, on }) => (
-  <svg viewBox="0 0 60 110" width={w} height={(w * 110) / 60}>
-    <path d="M 8 4 Q 30 0 52 4 L 46 106 L 14 106 Z" fill={on ? "#fff" : "#2a2a33"} />
-    <rect x="25" y="6" width="10" height="98" rx="4" fill={on ? C.nv : "#16161c"} />
-  </svg>
-);
-const Clock: React.FC<{ w: number; t: number }> = ({ w, t }) => (
-  <svg viewBox="-60 -60 120 120" width={w} height={w}>
-    <circle r="54" fill="#1a0a14" stroke={C.nv} strokeWidth="8" />
-    {Array.from({ length: 12 }, (_, i) => (
-      <line key={i} x1="0" y1="-44" x2="0" y2="-36" stroke="#fff" strokeWidth="4" transform={`rotate(${i * 30})`} />
+const Trash: React.FC<{ w: number; lid: number }> = ({ w, lid }) => (
+  <svg viewBox="0 0 200 240" width={w} height={(w * 240) / 200}>
+    <g transform={`rotate(${-lid * 28} 20 46)`}>
+      <rect x="10" y="30" width="180" height="22" rx="8" fill={C.white} />
+      <rect x="75" y="14" width="50" height="20" rx="6" fill={C.white} />
+    </g>
+    <path d="M 26 62 L 174 62 L 160 232 L 40 232 Z" fill="#141a24" stroke={C.white} strokeWidth="8" />
+    {[66, 100, 134].map((x) => (
+      <line key={x} x1={x} y1="86" x2={x - 4 + (x - 100) * 0.05} y2="208" stroke={C.white} strokeWidth="8" strokeLinecap="round" opacity="0.6" />
     ))}
-    <line x1="0" y1="0" x2="0" y2="-38" stroke="#fff" strokeWidth="5" strokeLinecap="round" transform={`rotate(${t * 40})`} />
-    <line x1="0" y1="0" x2="0" y2="-26" stroke={C.nvLight} strokeWidth="7" strokeLinecap="round" transform={`rotate(${t * 3.3})`} />
-    <circle r="6" fill={C.nvLight} />
   </svg>
 );
+const TrackRow: React.FC<{ i: number; del: number; w: number }> = ({ i, del, w }) => {
+  const names = ["Neon Dreams (AI)", "Lofi Beats #2841", "Chill Vibes 99", "Summer Hit AI v3", "Sad Piano 1127", "Epic Trailer 512"];
+  return (
+    <div style={{ position: "relative", width: w, height: 86, display: "flex", alignItems: "center", gap: 18, padding: "0 20px", background: "#0f1520", borderRadius: 16, border: "2px solid #223", opacity: 1 - del * 0.6, translate: `${del * 60}px 0` }}>
+      <div style={{ width: 56, height: 56, borderRadius: 10, background: `linear-gradient(135deg, ${C.nv}, #8E5CFF)` }} />
+      <div style={{ flex: 1, fontFamily: FONT_BODY, fontWeight: 800, fontSize: 30, color: C.white }}>{names[i % names.length]}</div>
+      <div style={{ fontFamily: FONT_BODY, fontWeight: 900, fontSize: 24, color: C.ink, background: C.yellow, borderRadius: 8, padding: "4px 10px" }}>100% IA</div>
+      <div style={{ position: "absolute", left: 14, right: 14, top: 40, height: 8, background: C.red, scale: `${del} 1`, transformOrigin: "left center", borderRadius: 4 }} />
+    </div>
+  );
+};
 
 // =====================================================================
 // 1. GANCHO
 // =====================================================================
-const Hook: React.FC<SceneProps> = ({ dur, startMs }) => {
+const Hook: React.FC<SceneProps> = ({ startMs }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const w = (q: string) => wordF("hook", q, startMs);
-  const fPS = w("playstation");
-  const fMas = w("mas");
-  const fDias = w("4");
-  const sh = useShake(fMas + 4, 10, 16);
-  const z = punch(frame, fps, fPS, 0.05) * punch(frame, fps, fMas + 4, 0.07);
+  const fBorrar = w("borrar");
+  const fNum = w("27");
+  const fInt = w("inteligencia");
+  const sh = useShake(fBorrar, 8, 12);
+  const z = punch(frame, fps, fNum, 0.05);
   return (
     <AbsoluteFill style={{ scale: String(z), translate: `${sh.x}px ${sh.y}px` }}>
-      <Bg src="img/keyart.jpg" dur={dur} dim={0.55} from={1.12} to={1.28} y={[0, -50]} />
-      <HookBadge label="ÚLTIMA HORA" date="24 NOV 2026" />
+      <TechBackdrop />
+      <HookBadge label="ÚLTIMA HORA" date="25 NOV 2026" />
       <div style={{ position: "absolute", left: 80, top: 230 }}>
-        <MaskLine delay={-9} size={150} shadow={C.nv}>
-          GTA 6 rompe
-        </MaskLine>
-        <MaskLine delay={fPS - 8} size={110} shadow={C.ink}>
-          la historia de
-        </MaskLine>
-        <MaskLine delay={fPS - 3} size={140} color={C.nvLight} shadow={C.ink}>
-          PlayStation
+        <MaskLine delay={-9} size={150} shadow={C.red}>
+          Tidal borra
         </MaskLine>
       </div>
-      <Counter from={0} to={39} start={fMas} dur={18} prefix="+" format={millones} suffix=" M" color={C.white} size={220} style={{ left: 80, top: 820 }} />
-      <Chip text="jugadores en PS5" delay={fMas + 10} color={C.nv} textColor={C.white} size={44} style={{ left: 90, top: 1080 }} />
-      <Stamp text="En 4 días" delay={fDias} color={C.yellow} size={80} rotate={-8} style={{ left: 600, top: 1060 }} />
+      <Counter from={0} to={27} start={fNum - 2} dur={16} suffix=" MILLONES" color={C.nvLight} size={150} style={{ left: 80, top: 410 }} />
+      <div style={{ position: "absolute", left: 80, top: 590 }}>
+        <MaskLine delay={fInt - 6} size={84} shadow={C.ink}>
+          de canciones hechas
+        </MaskLine>
+        <MaskLine delay={fInt - 2} size={84} color={C.yellow} shadow={C.ink}>
+          solo con IA
+        </MaskLine>
+      </div>
+      <div style={{ position: "absolute", left: 80, top: 830, display: "flex", flexDirection: "column", gap: 14 }}>
+        {[0, 1, 2, 3].map((i) => (
+          <TrackRow key={i} i={i} w={640} del={ramp(frame, fBorrar + 4 + i * 5, 8)} />
+        ))}
+      </div>
+      <div style={{ position: "absolute", left: 760, top: 900 }}>
+        <Trash w={220} lid={ramp(frame, fBorrar, 8)} />
+      </div>
+      {/* notas que caen a la papelera */}
+      {Array.from({ length: 6 }, (_, i) => {
+        const p = (frame - (fBorrar + 6 + i * 5)) / 16;
+        if (p < 0 || p > 1) return null;
+        return (
+          <div key={i} style={{ position: "absolute", left: interpolate(p, [0, 1], [500 + i * 30, 840]), top: interpolate(p, [0, 0.5, 1], [880 + i * 40, 820, 960]), rotate: `${p * 200}deg`, opacity: 1 - p * 0.3 }}>
+            <Note s={60} color={C.nvLight} />
+          </div>
+        );
+      })}
     </AbsoluteFill>
   );
 };
 
 // =====================================================================
-// 3. HORAS JUGADAS
+// 3. CUÁNDO: 9 dic · 100 % IA fuera · con ayuda de IA se queda
 // =====================================================================
-const Horas: React.FC<SceneProps> = ({ startMs }) => {
+const Cuando: React.FC<SceneProps> = ({ startMs }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const w = (q: string) => wordF("horas", q, startMs);
-  const fSony = w("sony");
-  const fNum = w("683");
-  const fJug = w("17");
-  const z = punch(frame, fps, fNum + 6, 0.06);
-  return (
-    <AbsoluteFill style={{ scale: String(z) }}>
-      <TechBackdrop hue="#2a0618" />
-      <Bar active={1} />
-      <Chip text="Datos de Sony" delay={fSony} color={C.white} size={40} style={{ left: 80, top: 230 }} />
-      <div style={{ position: "absolute", left: 540 - 200, top: 330, scale: String(popSpring(frame, fps, 2)) }}>
-        <Clock w={400} t={frame} />
-      </div>
-      <Counter from={0} to={683} start={fNum - 2} dur={22} format={millones} color={C.nvLight} size={240} style={{ left: 0, right: 0, top: 760, textAlign: "center" }} />
-      <div style={{ position: "absolute", left: 0, right: 0, top: 1010, textAlign: "center", opacity: frame >= fNum + 6 ? 1 : 0 }}>
-        <MaskLine delay={fNum + 6} size={84} shadow={C.ink}>
-          millones de horas
-        </MaskLine>
-      </div>
-      <Chip text="+17 h por jugador" delay={fJug} color={C.yellow} textColor={C.ink} size={44} style={{ left: 330, top: 1150 }} />
-    </AbsoluteFill>
-  );
-};
-
-// =====================================================================
-// 4. RÉCORDS: simultáneos + 7 de cada 10 consolas nuevas
-// =====================================================================
-const Record: React.FC<SceneProps> = ({ startMs }) => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const w = (q: string) => wordF("record", q, startMs);
-  const fRec = w("record");
-  const fSim = w("simultaneos");
-  const fPrim = w("primero");
-  const fSiete = w("7");
-  const toB = softSpring(frame, fps, fPrim - 4);
+  const w = (q: string) => wordF("cuando", q, startMs);
+  const fRech = w("rechazara");
+  const fAyuda = w("ayuda");
+  const cal = popSpring(frame, fps, 0);
   return (
     <AbsoluteFill>
-      <TechBackdrop hue="#2a0618" />
-      <Bar active={2} />
-      {/* A: multitud de jugadores a la vez */}
-      <div style={{ opacity: 1 - toB }}>
-        <div style={{ position: "absolute", left: 70, right: 70, top: 300, display: "flex", flexWrap: "wrap", gap: 14, justifyContent: "center" }}>
-          {Array.from({ length: 60 }, (_, i) => {
-            const s = popSpring(frame, fps, fSim - 14 + Math.floor(random(`p${i}`) * 16));
-            return (
-              <div key={i} style={{ scale: String(s) }}>
-                <Player s={70} color={i % 7 === 0 ? C.nvLight : "#ffffff"} />
-              </div>
-            );
-          })}
-        </div>
-        <Stamp text="Récord" delay={fRec} color={C.nvLight} size={150} rotate={-8} style={{ left: 260, top: 560 }} />
-        <div style={{ position: "absolute", left: 0, right: 0, top: 1080, textAlign: "center" }}>
-          <MaskLine delay={fSim - 2} size={80} shadow={C.ink}>
-            jugadores a la vez
-          </MaskLine>
-        </div>
+      <TechBackdrop />
+      <Bar active={1} />
+      <div style={{ position: "absolute", left: 540 - 200, top: 230, width: 400, borderRadius: 24, overflow: "hidden", background: C.white, boxShadow: "0 30px 60px rgba(0,0,0,0.6)", rotate: `${interpolate(cal, [0, 1], [-20, -3])}deg`, scale: String(cal) }}>
+        <div style={{ background: C.nv, color: C.white, fontFamily: FONT_BODY, fontWeight: 900, fontSize: 44, textAlign: "center", padding: "10px 0" }}>DICIEMBRE</div>
+        <div style={{ fontFamily: FONT_HEAD, fontSize: 230, color: C.ink, textAlign: "center", lineHeight: 1.1 }}>9</div>
       </div>
-      {/* B: 7 de cada 10 consolas nuevas */}
-      {frame >= fPrim - 6 ? (
-        <div style={{ opacity: toB }}>
-          <div style={{ position: "absolute", left: 0, right: 0, top: 300, textAlign: "center" }}>
-            <MaskLine delay={fPrim - 4} size={96} shadow={C.ink}>
-              Lo primero que se jugó
-            </MaskLine>
+      {[
+        { t: "100% IA", s: "FUERA", c: C.red, icon: "✕", at: fRech },
+        { t: "CON AYUDA DE IA", s: "SE QUEDA", c: C.green, icon: "✓", at: fAyuda },
+      ].map((b, i) => {
+        const s = popSpring(frame, fps, b.at - 2);
+        return (
+          <div
+            key={b.t}
+            style={{
+              position: "absolute",
+              left: 80,
+              right: 80,
+              top: 640 + i * 270,
+              height: 230,
+              borderRadius: 28,
+              border: `6px solid ${b.c}`,
+              background: "rgba(11,6,24,0.85)",
+              display: "flex",
+              alignItems: "center",
+              gap: 34,
+              padding: "0 40px",
+              scale: String(s),
+              opacity: frame >= b.at - 2 ? 1 : 0,
+              boxShadow: `0 0 40px ${b.c}66`,
+            }}
+          >
+            <div style={{ width: 130, height: 130, borderRadius: 65, background: b.c, color: C.ink, fontFamily: FONT_HEAD, fontSize: 90, display: "flex", alignItems: "center", justifyContent: "center" }}>{b.icon}</div>
+            <div>
+              <div style={{ fontFamily: FONT_BODY, fontWeight: 900, fontSize: 44, color: C.white }}>{b.t}</div>
+              <div style={{ fontFamily: FONT_HEAD, fontSize: 100, color: b.c, lineHeight: 1 }}>{b.s}</div>
+            </div>
           </div>
-          <div style={{ position: "absolute", left: 90, right: 90, top: 520, display: "flex", flexWrap: "wrap", gap: 30, justifyContent: "center" }}>
-            {Array.from({ length: 10 }, (_, i) => (
-              <div key={i} style={{ scale: String(popSpring(frame, fps, fPrim + i * 2)) }}>
-                <Console w={120} on={i < 7 && frame >= fSiete + i * 2} />
-              </div>
-            ))}
-          </div>
-          <div style={{ position: "absolute", left: 0, right: 0, top: 1000, textAlign: "center", fontFamily: FONT_HEAD, fontSize: 130, color: C.nvLight, textShadow: `6px 6px 0 ${C.ink}`, scale: String(popSpring(frame, fps, fSiete)), opacity: frame >= fSiete ? 1 : 0 }}>
-            7 DE CADA 10
-          </div>
-          <Chip text="consolas nuevas" delay={fSiete + 6} color={C.white} size={40} style={{ left: 360, top: 1170 }} />
-        </div>
-      ) : null}
+        );
+      })}
     </AbsoluteFill>
   );
 };
 
 // =====================================================================
-// 5. OJO: jugadores ≠ copias vendidas
+// 4. MOTIVO: 43 % de lo que llegaba era 100 % IA
 // =====================================================================
-const Ojo: React.FC<SceneProps> = ({ startMs }) => {
+const Motivo: React.FC<SceneProps> = ({ startMs }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const w = (q: string) => wordF("ojo", q, startMs);
-  const fJug = w("jugadores");
-  const fCop = w("copias");
-  const sh = useShake(fCop, 8, 12);
+  const w = (q: string) => wordF("motivo", q, startMs);
+  const f43 = w("43");
+  const fIA = w("100");
+  const R = 230;
+  const L = 2 * Math.PI * R;
+  const fill = interpolate(frame, [f43 - 2, f43 + 18], [0, 0.43], { ...clamp, easing: EASE_MOVE });
+  const z = punch(frame, fps, f43, 0.05);
   return (
-    <AbsoluteFill style={{ translate: `${sh.x}px ${sh.y}px` }}>
-      <TechBackdrop hue="#1d1606" glow={C.yellow} />
-      <Bar active={3} />
-      <Stamp text="Ojo" delay={0} color={C.yellow} size={140} rotate={-6} style={{ left: 380, top: 260 }} />
-      <div style={{ position: "absolute", left: 0, right: 0, top: 520, display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
-        <div style={{ fontFamily: FONT_HEAD, fontSize: 150, color: C.white, scale: String(popSpring(frame, fps, fJug - 2)), opacity: frame >= fJug - 2 ? 1 : 0 }}>JUGADORES</div>
-        <div style={{ fontFamily: FONT_HEAD, fontSize: 180, color: C.red, lineHeight: 0.9, scale: String(popSpring(frame, fps, fCop - 4)), opacity: frame >= fCop - 4 ? 1 : 0 }}>≠</div>
-        <div style={{ fontFamily: FONT_HEAD, fontSize: 130, color: C.yellow, scale: String(popSpring(frame, fps, fCop)), opacity: frame >= fCop ? 1 : 0 }}>COPIAS VENDIDAS</div>
+    <AbsoluteFill style={{ scale: String(z) }}>
+      <TechBackdrop hue="#0a1d33" />
+      <Bar active={2} />
+      <div style={{ position: "absolute", left: 0, right: 0, top: 230, textAlign: "center" }}>
+        <MaskLine delay={0} size={100} shadow={C.ink}>
+          El motivo
+        </MaskLine>
       </div>
-      <Chip text="Ventas oficiales de la semana: aún sin cifra" delay={fCop + 10} color={C.white} size={30} style={{ left: 150, top: 1150 }} />
+      <svg width={600} height={600} viewBox="-300 -300 600 600" style={{ position: "absolute", left: 240, top: 380 }}>
+        <circle r={R} fill="none" stroke="#1c2a3c" strokeWidth={70} />
+        <circle r={R} fill="none" stroke={C.yellow} strokeWidth={70} strokeDasharray={L} strokeDashoffset={L * (1 - fill)} transform="rotate(-90)" />
+      </svg>
+      <Counter from={0} to={43} start={f43 - 2} dur={18} suffix="%" color={C.white} size={190} style={{ left: 0, right: 0, top: 570, textAlign: "center" }} />
+      <div style={{ position: "absolute", left: 80, right: 80, top: 1030, textAlign: "center", opacity: frame >= fIA - 6 ? 1 : 0 }}>
+        <MaskLine delay={fIA - 6} size={64} shadow={C.ink}>
+          de las canciones subidas
+        </MaskLine>
+        <MaskLine delay={fIA - 2} size={84} color={C.yellow} shadow={C.ink}>
+          eran 100% IA
+        </MaskLine>
+      </div>
+      <Chip text="Últimos 90 días · datos de Tidal" delay={fIA + 8} color={C.white} size={28} style={{ left: 300, top: 1215 }} />
     </AbsoluteFill>
   );
 };
 
 // =====================================================================
-// 6. CIERRE
+// 5. ESCUCHAS: 96 % con cero reproducciones
+// =====================================================================
+const Escuchas: React.FC<SceneProps> = ({ startMs }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const w = (q: string) => wordF("escuchas", q, startMs);
+  const f96 = w("96");
+  const fNi = w("ni");
+  const sh = useShake(fNi, 8, 12);
+  return (
+    <AbsoluteFill style={{ translate: `${sh.x}px ${sh.y}px` }}>
+      <TechBackdrop hue="#0a1d33" />
+      <Bar active={3} />
+      <Counter from={0} to={96} start={f96 - 2} dur={16} suffix="%" color={C.nvLight} size={240} style={{ left: 0, right: 0, top: 240, textAlign: "center" }} />
+      <div style={{ position: "absolute", left: 0, right: 0, top: 520, textAlign: "center", opacity: frame >= f96 + 6 ? 1 : 0 }}>
+        <MaskLine delay={f96 + 6} size={70} shadow={C.ink}>
+          de esas canciones
+        </MaskLine>
+      </div>
+      {/* reproductor con 0 escuchas y ecualizador plano */}
+      <div style={{ position: "absolute", left: 120, right: 120, top: 660, height: 330, borderRadius: 30, background: "#0f1520", border: `4px solid ${C.nv}`, padding: 30, scale: String(popSpring(frame, fps, f96 + 4)) }}>
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: 140 }}>
+          {Array.from({ length: 22 }, (_, i) => {
+            const alive = frame < fNi;
+            const h = alive ? 20 + 100 * Math.abs(Math.sin(frame / 4 + i * 0.7) * random(`eq${i}`)) : 6;
+            return <div key={i} style={{ flex: 1, height: h, background: alive ? C.nvLight : "#33415a", borderRadius: 4 }} />;
+          })}
+        </div>
+        <div style={{ marginTop: 30, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ fontFamily: FONT_BODY, fontWeight: 900, fontSize: 40, color: C.white }}>Reproducciones</div>
+          <div style={{ fontFamily: FONT_HEAD, fontSize: 110, color: frame >= fNi ? C.red : C.white }}>0</div>
+        </div>
+      </div>
+      <Stamp text="Ni una escucha" delay={fNi} color={C.red} size={90} rotate={-7} style={{ left: 190, top: 1040 }} />
+      <Chip text="en 3 meses" delay={fNi + 10} color={C.white} size={34} style={{ left: 420, top: 1200 }} />
+    </AbsoluteFill>
+  );
+};
+
+// =====================================================================
+// 6. OTRAS PLATAFORMAS
+// =====================================================================
+const Otras: React.FC<SceneProps> = ({ startMs }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const w = (q: string) => wordF("otras", q, startMs);
+  const fSp = w("spotify");
+  const fAp = w("apple");
+  const fPerm = w("permiten");
+  const toB = softSpring(frame, fps, fPerm - 2);
+  return (
+    <AbsoluteFill>
+      <TechBackdrop hue="#1d1606" glow={C.yellow} />
+      <Bar active={4} />
+      <div style={{ position: "absolute", left: 0, right: 0, top: 240, textAlign: "center" }}>
+        <MaskLine delay={0} size={90} shadow={C.ink}>
+          ¿Y los demás?
+        </MaskLine>
+      </div>
+      {[
+        { t: "SPOTIFY", at: fSp, x: 80 },
+        { t: "APPLE MUSIC", at: fAp, x: 560 },
+      ].map((b) => (
+        <div
+          key={b.t}
+          style={{
+            position: "absolute",
+            left: b.x,
+            top: 450,
+            width: 440,
+            height: 300,
+            borderRadius: 30,
+            background: "#141a24",
+            border: `5px solid ${C.white}`,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 18,
+            scale: String(popSpring(frame, fps, b.at - 2)),
+            opacity: frame >= b.at - 2 ? 1 : 0,
+          }}
+        >
+          <Note s={90} color={C.white} />
+          <div style={{ fontFamily: FONT_HEAD, fontSize: 70, color: C.white }}>{b.t}</div>
+        </div>
+      ))}
+      <div style={{ position: "absolute", left: 0, right: 0, top: 830, textAlign: "center", scale: String(toB), opacity: toB }}>
+        <div style={{ fontFamily: FONT_HEAD, fontSize: 120, color: C.yellow, textShadow: `6px 6px 0 ${C.ink}` }}>TODAVÍA LAS PERMITEN</div>
+      </div>
+      <Chip text="Etiquetan la música IA o la recomiendan menos" delay={fPerm + 10} color={C.white} size={28} style={{ left: 150, top: 1040 }} />
+    </AbsoluteFill>
+  );
+};
+
+// =====================================================================
+// 7. CIERRE
 // =====================================================================
 const Cierre: React.FC<SceneProps> = (p) => (
-  <Poll {...p} segId="cierre" line1="¿Ya lo estás" line2="jugando?" size1={130} size2={190} footer="Fuentes: PlayStation · HotHardware · Mixed · VGTimes" bar={<Bar active={4} />} />
+  <Poll {...p} segId="cierre" line1="¿Deberían hacer" line2="lo mismo?" size1={120} size2={190} footer="Fuentes: Tidal · TechCrunch · Variety · The Hollywood Reporter · CBC" bar={<Bar active={5} />} />
 );
 
 // =====================================================================
 // MINIATURA (portada TikTok 1080×1920; zona clave y 240-1680)
 // =====================================================================
 export const Thumbnail: React.FC = () => (
-  <AbsoluteFill style={{ backgroundColor: C.ink }}>
-    <Img src={staticFile("img/keyart.jpg")} style={{ position: "absolute", width: "100%", height: "100%", objectFit: "cover", scale: "1.15" }} />
-    <AbsoluteFill style={{ background: "linear-gradient(180deg, rgba(11,6,24,0.8) 0%, rgba(11,6,24,0.5) 40%, rgba(11,6,24,0.85) 70%, rgba(11,6,24,0.95) 100%)" }} />
+  <AbsoluteFill>
+    <TechBackdrop />
+    <AbsoluteFill style={{ background: `radial-gradient(circle at 50% 70%, ${C.red}44 0%, transparent 45%)` }} />
     <div style={{ position: "absolute", left: 0, right: 0, top: 250, textAlign: "center" }}>
       <div style={{ display: "inline-block", fontFamily: FONT_BODY, fontWeight: 900, fontSize: 44, color: C.white, background: C.red, padding: "10px 26px", borderRadius: 10, letterSpacing: "0.08em" }}>
         ● ÚLTIMA HORA
       </div>
-      <div style={{ fontFamily: FONT_HEAD, fontSize: 250, lineHeight: 0.95, color: C.white, marginTop: 30, textShadow: `10px 10px 0 ${C.ink}` }}>GTA 6</div>
-      <div style={{ fontFamily: FONT_HEAD, fontSize: 250, lineHeight: 0.95, color: C.nvLight, textShadow: `0 0 60px ${C.nv}, 10px 10px 0 ${C.ink}` }}>RÉCORD</div>
-    </div>
-    <div style={{ position: "absolute", left: 0, right: 0, top: 900, textAlign: "center" }}>
-      <div style={{ fontFamily: FONT_HEAD, fontSize: 300, lineHeight: 1, color: C.white, textShadow: `8px 8px 0 ${C.ink}` }}>39</div>
-      <div style={{ fontFamily: FONT_HEAD, fontSize: 160, lineHeight: 1, color: C.white, textShadow: `8px 8px 0 ${C.ink}`, whiteSpace: "nowrap" }}>MILLONES</div>
-      <div style={{ display: "inline-block", marginTop: 16, fontFamily: FONT_BODY, fontWeight: 900, fontSize: 54, color: C.ink, background: C.yellow, padding: "10px 30px", borderRadius: 999, rotate: "-3deg" }}>
-        DE JUGADORES EN 4 DÍAS
+      <div style={{ fontFamily: FONT_HEAD, fontSize: 210, lineHeight: 0.95, color: C.white, marginTop: 30, textShadow: `10px 10px 0 ${C.ink}` }}>ADIÓS A LA</div>
+      <div style={{ fontFamily: FONT_HEAD, fontSize: 240, lineHeight: 0.95, color: C.nvLight, textShadow: `0 0 60px ${C.nv}, 10px 10px 0 ${C.ink}` }}>MÚSICA IA</div>
+      <div style={{ display: "inline-block", marginTop: 26, fontFamily: FONT_BODY, fontWeight: 900, fontSize: 52, color: C.ink, background: C.yellow, padding: "10px 30px", borderRadius: 999, rotate: "-3deg" }}>
+        TIDAL BORRA 27 MILLONES
       </div>
+      <div style={{ marginTop: 18, fontFamily: FONT_BODY, fontWeight: 900, fontSize: 36, color: C.white }}>DE CANCIONES HECHAS 100% CON IA</div>
+    </div>
+    <div style={{ position: "absolute", left: 120, top: 1080 }}>
+      <Trash w={330} lid={1} />
+    </div>
+    {[0, 1, 2].map((i) => (
+      <div key={i} style={{ position: "absolute", left: 440 + i * 70, top: 1000 + (i % 2) * 90, rotate: `${-30 + i * 25}deg` }}>
+        <Note s={110} color={C.nvLight} />
+      </div>
+    ))}
+    <div style={{ position: "absolute", right: 80, top: 1240, textAlign: "right" }}>
+      <div style={{ fontFamily: FONT_HEAD, fontSize: 170, lineHeight: 1, color: C.red, textShadow: `8px 8px 0 ${C.ink}` }}>96%</div>
+      <div style={{ fontFamily: FONT_BODY, fontWeight: 900, fontSize: 36, color: C.white }}>SIN NI UNA ESCUCHA</div>
     </div>
     <div style={{ position: "absolute", left: 0, right: 0, top: 1620, textAlign: "center", fontFamily: FONT_BODY, fontWeight: 900, fontSize: 40, color: C.white, opacity: 0.9 }}>
-      PLAYSTATION · TE LO CUENTO EN 1 MINUTO
+      NOTICIA IA · TE LO CUENTO EN 1 MINUTO
     </div>
   </AbsoluteFill>
 );
@@ -224,9 +335,10 @@ export const Thumbnail: React.FC = () => (
 export const SCENES: SceneDef[] = [
   { key: "hook", firstSeg: "hook", C: Hook },
   { key: "lema", firstSeg: "lema", C: Lema, flash: C.nv },
-  { key: "horas", firstSeg: "horas", C: Horas, flash: C.nvLight },
-  { key: "record", firstSeg: "record", C: Record, flash: C.nv },
-  { key: "ojo", firstSeg: "ojo", C: Ojo, flash: C.yellow },
+  { key: "cuando", firstSeg: "cuando", C: Cuando, flash: C.nvLight },
+  { key: "motivo", firstSeg: "motivo", C: Motivo, flash: C.yellow },
+  { key: "escuchas", firstSeg: "escuchas", C: Escuchas, flash: C.nv },
+  { key: "otras", firstSeg: "otras", C: Otras, flash: C.yellow },
   { key: "cierre", firstSeg: "cierre", C: Cierre, flash: C.nv },
 ];
 
@@ -241,14 +353,14 @@ export const SfxCues: React.FC = () => {
   return (
     <>
       <Sfx at={0} src="impact" volume={0.55} />
-      <Sfx at={at("hook", "mas") - 2} src="riser" volume={0.3} />
-      <Sfx at={at("hook", "4")} src="impact" volume={0.5} />
+      <Sfx at={at("hook", "borrar")} src="glitch" volume={0.4} />
+      <Sfx at={at("hook", "27") - 2} src="riser" volume={0.3} />
       <Sfx at={at("lema", "menos")} src="ding" volume={0.4} />
-      <Sfx at={at("horas", "683")} src="riser" volume={0.3} />
-      <Sfx at={at("horas", "17")} src="pop" volume={0.45} />
-      <Sfx at={at("record", "record")} src="impact" volume={0.5} />
-      <Sfx at={at("record", "7")} src="ding" volume={0.4} />
-      <Sfx at={at("ojo", "copias")} src="glitch" volume={0.45} />
+      <Sfx at={at("cuando", "rechazara")} src="impact" volume={0.45} />
+      <Sfx at={at("cuando", "ayuda")} src="ding" volume={0.4} />
+      <Sfx at={at("motivo", "43") - 2} src="riser" volume={0.3} />
+      <Sfx at={at("escuchas", "ni")} src="glitch" volume={0.45} />
+      <Sfx at={at("otras", "permiten")} src="pop" volume={0.45} />
       <Sfx at={at("cierre", "comentarios")} src="pop" volume={0.5} />
     </>
   );
