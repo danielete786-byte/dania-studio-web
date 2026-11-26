@@ -128,17 +128,22 @@ const Que: React.FC<SceneProps> = ({ startMs }) => {
     <AbsoluteFill>
       <Space sats={50} earthY={1900} />
       <Bar active={1} />
-      <Stamp text="Aprobado · FCC" delay={fApr} color={C.green} size={80} rotate={-6} style={{ left: 260, top: 250 }} />
-      <div style={{ position: "absolute", left: 0, right: 0, top: 420, textAlign: "center", opacity: frame >= fStar - 4 ? 1 : 0 }}>
+      <div style={{ position: "absolute", left: 0, right: 0, top: 236, textAlign: "center" }}>
+        <MaskLine delay={0} size={66} shadow={C.ink}>
+          El regulador de EE. UU.
+        </MaskLine>
+      </div>
+      <Stamp text="Aprobado · FCC" delay={fApr} color={C.green} size={76} rotate={-6} style={{ left: 270, top: 330 }} />
+      <div style={{ position: "absolute", left: 0, right: 0, top: 470, textAlign: "center", opacity: frame >= fStar - 4 ? 1 : 0 }}>
         <MaskLine delay={fStar - 4} size={180} color={C.nvLight} shadow={C.ink}>
           Starmind
         </MaskLine>
       </div>
-      <div style={{ position: "absolute", left: 540 - 300, top: 660, translate: `0 ${interpolate(sat, [0, 1], [400, 0])}px`, rotate: `${Math.sin(frame / 20) * 4}deg`, opacity: sat }}>
+      <div style={{ position: "absolute", left: 540 - 300, top: 705, translate: `0 ${interpolate(sat, [0, 1], [400, 0])}px`, rotate: `${Math.sin(frame / 20) * 4}deg`, opacity: sat }}>
         <Satellite w={600} glow={ramp(frame, fCen, 10)} />
       </div>
-      <Chip text="Centro de datos en órbita" delay={fCen} color={C.white} size={42} style={{ left: 120, top: 1030 }} />
-      <Chip text="☀ Energía solar" delay={fSol - 4} color={C.yellow} textColor={C.ink} size={42} style={{ left: 120, top: 1140 }} />
+      <Chip text="Centro de datos en órbita" delay={fCen} color={C.white} size={42} style={{ left: 120, top: 1040 }} />
+      <Chip text="☀ Energía solar" delay={fSol - 4} color={C.yellow} textColor={C.ink} size={42} style={{ left: 120, top: 1150 }} />
     </AbsoluteFill>
   );
 };
@@ -198,7 +203,8 @@ const Spacex: React.FC<SceneProps> = ({ startMs }) => {
   const { fps } = useVideoConfig();
   const w = (q: string) => wordF("spacex", q, startMs);
   const f27 = w("2027");
-  const rocket = ramp(frame, 4, 50, EASE_MOVE);
+  const fLan = w("lanzar");
+  const rocket = ramp(frame, fLan - 8, 40, EASE_MOVE);
   return (
     <AbsoluteFill>
       <Space sats={30} earthY={1850} />
@@ -207,14 +213,14 @@ const Spacex: React.FC<SceneProps> = ({ startMs }) => {
         <SpacexMark size={300} />
       </div>
       {/* cohete (dibujo propio) */}
-      <svg width={200} height={420} viewBox="0 0 100 210" style={{ position: "absolute", left: 800, top: interpolate(rocket, [0, 1], [1300, 380]) }}>
+      <svg width={170} height={357} viewBox="0 0 100 210" style={{ position: "absolute", left: 820, top: interpolate(rocket, [0, 1], [1950, 880]) + Math.sin(frame / 8) * 6 }}>
         <path d="M 50 0 C 70 30 72 70 70 140 L 30 140 C 28 70 30 30 50 0 Z" fill="#e6eefc" />
         <rect x="30" y="140" width="40" height="20" fill="#9fb3cc" />
         <path d="M 30 120 L 12 160 L 30 150 Z M 70 120 L 88 160 L 70 150 Z" fill={C.nv} />
         <path d={`M 36 160 Q 50 ${200 + 10 * Math.sin(frame)} 64 160 Z`} fill={C.yellow} />
       </svg>
-      <div style={{ position: "absolute", left: 90, top: 760, opacity: frame >= f27 - 10 ? 1 : 0 }}>
-        <MaskLine delay={f27 - 10} size={80} shadow={C.ink}>
+      <div style={{ position: "absolute", left: 90, top: 760, opacity: frame >= fLan - 4 ? 1 : 0 }}>
+        <MaskLine delay={fLan - 4} size={80} shadow={C.ink}>
           Primeros lanzamientos
         </MaskLine>
       </div>
