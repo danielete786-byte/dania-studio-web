@@ -1,0 +1,17 @@
+{
+ "segments": [
+  {"id": "hook", "gap": 0.3, "text": "Luz verde a un millón de satélites de SpaceX para hacer inteligencia artificial en el espacio."},
+  {"id": "lema", "gap": 0.35, "text": "Te lo cuento en menos de un minuto."},
+  {"id": "que", "gap": 0.3, "text": "El regulador de Estados Unidos aprobó el proyecto Starmind: centros de datos en órbita, alimentados por energía solar."},
+  {"id": "plazos", "gap": 0.3, "text": "El primero debe funcionar en dos mil treinta y tres, y el millón completo, en dos mil cuarenta."},
+  {"id": "spacex", "gap": 0.3, "text": "SpaceX quiere lanzar los primeros en dos mil veintisiete."},
+  {"id": "retos", "gap": 0.35, "text": "El problema: enfriar los chips en el vacío y protegerlos de la radiación."},
+  {"id": "cierre", "gap": 0.0, "text": "¿Te parece buena idea? Te leo en comentarios."}
+ ],
+ "display": [
+  {"spoken": "un millón", "display": "1 millón"},
+  {"spoken": "dos mil treinta y tres", "display": "2033"},
+  {"spoken": "dos mil cuarenta", "display": "2040"},
+  {"spoken": "dos mil veintisiete", "display": "2027"}
+ ]
+}
