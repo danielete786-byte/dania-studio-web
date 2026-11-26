@@ -1,0 +1,16 @@
+{
+ "segments": [
+  {"id": "hook", "gap": 0.3, "text": "Los trabajadores de Rockstar, el estudio de GTA seis, rechazan al sindicato."},
+  {"id": "lema", "gap": 0.35, "text": "Te lo cuento en menos de un minuto."},
+  {"id": "voto", "gap": 0.3, "text": "En sus estudios de Reino Unido, el setenta y cinco por ciento votó en contra, con una participación del noventa y tres por ciento."},
+  {"id": "rockstar", "gap": 0.3, "text": "Rockstar dice que su plantilla prefiere tratar directamente con la empresa."},
+  {"id": "juicio", "gap": 0.35, "text": "Pero el sindicato no se rinde, y sigue la batalla legal por los despedidos de dos mil veinticinco."},
+  {"id": "cierre", "gap": 0.0, "text": "¿Tú habrías votado sí o no? Te leo en comentarios."}
+ ],
+ "display": [
+  {"spoken": "GTA seis", "display": "GTA 6"},
+  {"spoken": "setenta y cinco por ciento", "display": "75%"},
+  {"spoken": "noventa y tres por ciento", "display": "93%"},
+  {"spoken": "dos mil veinticinco", "display": "2025"}
+ ]
+}
