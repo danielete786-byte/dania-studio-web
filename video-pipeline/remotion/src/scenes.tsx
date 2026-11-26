@@ -12,7 +12,7 @@ import { BrandLogo, GtaFx, HookBadge, Lema, NewsBar, Poll, SceneDef, SceneProps,
 
 const DATE = "26 NOV";
 const Bar: React.FC<{ active: number }> = ({ active }) => <NewsBar active={active} total={4} label="VIDEOJUEGOS" date={DATE} />;
-const FX_Y = { chyron: -470, voto: -40 };
+const FX_Y = { chyron: -430, voto: -40 };
 
 // =====================================================================
 // 1. GANCHO: rótulo de última hora (gta-fx) sobre el arte oficial
