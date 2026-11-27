@@ -1,0 +1,13 @@
+{
+ "segments": [
+  {"id": "hook", "gap": 0.3, "text": "Nvidia frena los envíos de sus servidores de IA a cuatro países del sudeste asiático."},
+  {"id": "lema", "gap": 0.35, "text": "Te lo cuento en menos de un minuto."},
+  {"id": "paises", "gap": 0.3, "text": "Malasia, Singapur, Tailandia e Indonesia. Según el Financial Times, Dell y Supermicro ya se lo están avisando a sus clientes."},
+  {"id": "motivo", "gap": 0.3, "text": "El motivo: Estados Unidos ahora exige licencia, para que China no use esos chips a través de centros de datos de la zona."},
+  {"id": "duracion", "gap": 0.35, "text": "Y nadie sabe cuánto durará el parón."},
+  {"id": "cierre", "gap": 0.0, "text": "¿Crees que servirá de algo? Te leo en comentarios."}
+ ],
+ "display": [
+  {"spoken": "cuatro países", "display": "4 países"}
+ ]
+}
