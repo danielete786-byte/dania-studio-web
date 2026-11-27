@@ -178,7 +178,7 @@ const Contenido: React.FC<SceneProps> = ({ startMs }) => {
     { k: "poderes", t: "Poderes", at: w("poderes") },
     { k: "jefes", t: "Jefes enormes", at: w("jefes") },
   ];
-  const ship = ramp(frame, fOce - 6, 90);
+  const ship = softSpring(frame, fps, fOce - 6);
   return (
     <AbsoluteFill>
       <Ocean level={1450} />
@@ -218,8 +218,8 @@ const Contenido: React.FC<SceneProps> = ({ startMs }) => {
           );
         })}
       </div>
-      <div style={{ position: "absolute", left: interpolate(ship, [0, 1], [-320, 1100]), top: 1220 + Math.sin(frame / 10) * 6, rotate: `${Math.sin(frame / 12) * 3}deg` }}>
-        <Ship w={260} />
+      <div style={{ position: "absolute", left: 740, top: 1110 + Math.sin(frame / 10) * 6, rotate: `${Math.sin(frame / 12) * 3}deg`, opacity: ship, translate: `${interpolate(ship, [0, 1], [120, 0])}px 0` }}>
+        <Ship w={230} />
       </div>
     </AbsoluteFill>
   );
@@ -287,7 +287,7 @@ export const Thumbnail: React.FC = () => (
       <div style={{ fontFamily: FONT_HEAD, fontSize: 104, lineHeight: 1.0, color: C.white, textShadow: `0 0 30px #5CC2FF, 6px 6px 0 ${C.ink}` }}>SEA OF SORROW</div>
       <div style={{ fontFamily: FONT_BODY, fontWeight: 900, fontSize: 40, color: C.nvLight, marginTop: 12 }}>1ª GRAN EXPANSIÓN</div>
     </div>
-    <div style={{ position: "absolute", left: 700, top: 1300, rotate: "4deg" }}>
+    <div style={{ position: "absolute", left: 700, top: 1335, rotate: "4deg" }}>
       <Ship w={260} />
     </div>
     <div style={{ position: "absolute", left: 0, right: 0, top: 1620, textAlign: "center", fontFamily: FONT_BODY, fontWeight: 900, fontSize: 40, color: C.white, opacity: 0.9 }}>
