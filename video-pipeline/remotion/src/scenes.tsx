@@ -99,7 +99,7 @@ const Paises: React.FC<SceneProps> = ({ startMs }) => {
     <AbsoluteFill>
       <TechBackdrop hue="#0B1A06" />
       <Bar active={1} />
-      <div style={{ position: "absolute", left: 80, right: 80, top: 240, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 26 }}>
+      <div style={{ position: "absolute", left: 80, right: 80, top: 250, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 26 }}>
         {COUNTRIES.map((c, i) => {
           const at = i === 0 ? 0 : w(c.q) - 2;
           const sp = popSpring(frame, fps, at);
@@ -108,7 +108,7 @@ const Paises: React.FC<SceneProps> = ({ startMs }) => {
             <div
               key={c.code}
               style={{
-                height: 210,
+                height: 250,
                 borderRadius: 24,
                 background: "rgba(10,14,10,0.9)",
                 border: `5px solid ${x > 0.5 ? C.red : C.nv}`,
@@ -121,17 +121,17 @@ const Paises: React.FC<SceneProps> = ({ startMs }) => {
                 opacity: frame >= at ? 1 : 0,
               }}
             >
-              <div style={{ fontFamily: FONT_BODY, fontWeight: 900, fontSize: 34, color: C.nvLight, letterSpacing: "0.1em" }}>{c.code}</div>
-              <div style={{ fontFamily: FONT_HEAD, fontSize: 84, color: C.white, lineHeight: 1.05 }}>{c.name}</div>
+              <div style={{ fontFamily: FONT_BODY, fontWeight: 900, fontSize: 40, color: C.nvLight, letterSpacing: "0.1em" }}>{c.code}</div>
+              <div style={{ fontFamily: FONT_HEAD, fontSize: 96, color: C.white, lineHeight: 1.05 }}>{c.name}</div>
               <div style={{ position: "absolute", right: 14, top: 10, fontFamily: FONT_HEAD, fontSize: 70, color: C.red, opacity: x, scale: String(interpolate(x, [0, 1], [1.8, 1])) }}>✕</div>
             </div>
           );
         })}
       </div>
-      <div style={{ position: "absolute", left: 80, right: 80, top: 760, opacity: ramp(frame, fFt - 4, 6) }}>
+      <div style={{ position: "absolute", left: 80, right: 80, top: 830, opacity: ramp(frame, fFt - 4, 6) }}>
         <div style={{ display: "inline-block", fontFamily: FONT_BODY, fontWeight: 900, fontSize: 34, color: C.ink, background: "#FCD0B1", padding: "8px 22px", borderRadius: 8 }}>SEGÚN EL FINANCIAL TIMES</div>
       </div>
-      <div style={{ position: "absolute", left: 80, right: 80, top: 860, display: "flex", alignItems: "center", gap: 50 }}>
+      <div style={{ position: "absolute", left: 80, right: 80, top: 920, display: "flex", alignItems: "center", gap: 50 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 18, scale: String(popSpring(frame, fps, fDell - 2)), opacity: frame >= fDell - 2 ? 1 : 0 }}>
           <BrandLogo slug="dell" size={130} />
         </div>
@@ -140,7 +140,7 @@ const Paises: React.FC<SceneProps> = ({ startMs }) => {
           <div style={{ fontFamily: FONT_HEAD, fontSize: 70, color: C.white }}>SUPERMICRO</div>
         </div>
       </div>
-      <Chip text="Ya avisan a sus clientes" delay={w("avisando") - 2} color={C.yellow} textColor={C.ink} size={44} style={{ left: 80, top: 1080 }} />
+      <Chip text="Ya avisan a sus clientes" delay={w("avisando") - 2} color={C.yellow} textColor={C.ink} size={44} style={{ left: 80, top: 1120 }} />
     </AbsoluteFill>
   );
 };
@@ -219,7 +219,7 @@ const Motivo: React.FC<SceneProps> = ({ startMs }) => {
       <Stamp text="Exigida" delay={fLic} color={C.red} size={80} rotate={-10} style={{ left: 600, top: 560 }} />
       {/* esquema: chips -> centro de datos -> China */}
       <Node label="CHIPS" sub="Nvidia" color={C.nv} at={fChina - 8} x={40} />
-      <Node label="DATA CENTER" sub="sudeste asiático" color={C.cyan} at={fCen - 4} x={400} />
+      <Node label="CENTRO" sub="de datos en la zona" color={C.cyan} at={fCen - 4} x={400} />
       <Node label="CHINA" sub="acceso remoto" color={C.red} at={fChina} x={760} />
       {[0, 1].map((k) => (
         <div key={k} style={{ position: "absolute", left: 320 + k * 360, top: 912, width: 80, height: 10, background: k === 1 && cut > 0.5 ? C.red : C.white, opacity: ramp(frame, fCen, 6), borderRadius: 5 }} />
