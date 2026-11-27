@@ -1,0 +1,18 @@
+{
+ "segments": [
+  {"id": "hook", "gap": 0.3, "text": "Jólou Náit Silksong ya tiene fecha para su primera gran expansión: Si of Sórrou llega el once de diciembre."},
+  {"id": "lema", "gap": 0.35, "text": "Te lo cuento en menos de un minuto."},
+  {"id": "gratis", "gap": 0.3, "text": "Y lo mejor: será gratis para todos los que tengan el juego."},
+  {"id": "contenido", "gap": 0.3, "text": "Tim Cheri promete un viaje por el océano olvidado de Farlum, con nuevas zonas, personajes, poderes y jefes enormes."},
+  {"id": "pesca", "gap": 0.35, "text": "Y el tráiler termina con Jórnet... ¿pescando?"},
+  {"id": "cierre", "gap": 0.0, "text": "¿Vas a volver a Farlum? Te leo en comentarios."}
+ ],
+ "display": [
+  {"spoken": "Jólou Náit Silksong", "display": "Hollow Knight: Silksong"},
+  {"spoken": "Si of Sórrou", "display": "Sea of Sorrow"},
+  {"spoken": "once de diciembre", "display": "11 de diciembre"},
+  {"spoken": "Tim Cheri", "display": "Team Cherry"},
+  {"spoken": "Farlum", "display": "Pharloom"},
+  {"spoken": "Jórnet", "display": "Hornet"}
+ ]
+}
