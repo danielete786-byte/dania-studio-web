@@ -1,0 +1,14 @@
+{
+ "segments": [
+  {"id": "hook", "gap": 0.3, "text": "Los chips de IA más potentes de Nvidia, prohibidos en China, aparecen en Shanghái."},
+  {"id": "lema", "gap": 0.35, "text": "Te lo cuento en menos de un minuto."},
+  {"id": "rack", "gap": 0.3, "text": "Lo ha descubierto Bloomberg: un rack con setenta y dos chips Blackwell, usado como garantía de un préstamo de catorce millones de dólares."},
+  {"id": "megaspeed", "gap": 0.3, "text": "El centro de datos está ligado a la fundadora de Megaspeed, una empresa que Estados Unidos acaba de meter en su lista negra."},
+  {"id": "huang", "gap": 0.35, "text": "Y Jensen Huang decía que eran demasiado grandes para pasarlos de contrabando."},
+  {"id": "cierre", "gap": 0.0, "text": "¿Cómo crees que llegaron allí? Te leo en comentarios."}
+ ],
+ "display": [
+  {"spoken": "setenta y dos", "display": "72"},
+  {"spoken": "catorce millones de dólares", "display": "14 millones de dólares"}
+ ]
+}
