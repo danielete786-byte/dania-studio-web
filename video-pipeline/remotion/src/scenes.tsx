@@ -67,11 +67,11 @@ const Hook: React.FC<SceneProps> = ({ startMs }) => {
         </MaskLine>
       </div>
       <Stamp text="Prohibidos en China" delay={fProh} color={C.red} size={84} rotate={-6} style={{ left: 120, top: 690 }} />
-      <div style={{ position: "absolute", left: 120, top: 860, display: "flex", alignItems: "flex-end", gap: 26, opacity: frame >= fSh - 6 ? 1 : 0 }}>
+      <div style={{ position: "absolute", left: 100, top: 870, display: "flex", alignItems: "flex-end", gap: 22, opacity: frame >= fSh - 6 ? 1 : 0 }}>
         <div style={{ translate: `0 ${pin}px` }}>
           <Pin size={140} />
         </div>
-        <div style={{ fontFamily: FONT_HEAD, fontSize: 190, lineHeight: 1, color: C.white, textShadow: `8px 8px 0 ${C.ink}`, scale: String(popSpring(frame, fps, fSh)), transformOrigin: "left bottom" }}>SHANGHÁI</div>
+        <div style={{ fontFamily: FONT_HEAD, fontSize: 160, lineHeight: 1, color: C.white, textShadow: `8px 8px 0 ${C.ink}`, scale: String(popSpring(frame, fps, fSh)), transformOrigin: "left bottom", whiteSpace: "nowrap" }}>SHANGHÁI</div>
       </div>
     </AbsoluteFill>
   );
@@ -101,7 +101,7 @@ const Rack: React.FC<SceneProps> = ({ startMs }) => {
         <Rack72 w={360} lit={lit} />
       </div>
       <Counter from={0} to={72} start={fRack} dur={Math.max(8, f72 - fRack + 6)} format={(v) => String(Math.round(v))} color={C.nvLight} size={250} style={{ left: 500, top: 360 }} />
-      <div style={{ position: "absolute", left: 510, top: 640, opacity: ramp(frame, fBlack - 4, 6) }}>
+      <div style={{ position: "absolute", left: 510, top: 690, opacity: ramp(frame, fBlack - 4, 6) }}>
         <div style={{ fontFamily: FONT_HEAD, fontSize: 70, color: C.white, lineHeight: 1 }}>CHIPS</div>
         <div style={{ fontFamily: FONT_HEAD, fontSize: 86, color: C.nvLight, lineHeight: 1 }}>BLACKWELL</div>
       </div>
@@ -110,7 +110,7 @@ const Rack: React.FC<SceneProps> = ({ startMs }) => {
           position: "absolute",
           left: 500,
           right: 60,
-          top: 880,
+          top: 930,
           padding: "26px 30px",
           borderRadius: 22,
           background: "#F4F1E8",
